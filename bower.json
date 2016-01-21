@@ -1,0 +1,20 @@
+{
+  "name": "MPDA",
+  "version": "0.0.0",
+  "main": "bower_components/requirejs/require.js",
+  "license": "MIT",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "~2.1.4",
+    "requirejs": "~2.1.19",
+    "lodash": "~3.10.1",
+    "bacon": "~0.7.74",
+    "jsts": "0.16.0"
+  }
+}

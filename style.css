@@ -1,0 +1,51 @@
+/* Fonts. */
+@font-face {
+    font-family: OpenSans;
+    font-style: normal;
+    font-weight: normal;
+    src: url('font/OpenSans-Regular.ttf') format("truetype");
+}
+
+@font-face {
+    font-family: OpenSans;
+    font-style: normal;
+    font-weight: 300;
+    src: url('font/OpenSans-Light.ttf') format("truetype");
+}
+
+/* Reset. */
+* {
+    margin: 0;
+    padding: 0;
+    border: 0;
+    font-size: 100%;
+    font: inherit;
+    vertical-align: baseline;
+
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    -khtml-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* HTML tags. */
+html, body {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background-color: hsl(60, 2%, 50%);
+    font-family: OpenSans;
+    font-size: 14px;
+}
+
+.view {
+    position: absolute;
+    left: 0px;
+    right: 0px;
+    top: 0px;
+    bottom: 0px;
+}
