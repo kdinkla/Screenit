@@ -420,7 +420,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         WellLocation.prototype.imageURL = function () {
             var plateTag = WellLocation.plateTags[this.plate];
             var wellTag = plateTag + WellLocation.columnTags[this.column] + WellLocation.rowTags[this.row];
-            return "dataset/images/" + plateTag + "/" + wellTag + "/" + wellTag + "_seg.jpeg";
+            return "http://www.ebi.ac.uk/huber-srv/cellmorph/view/" + plateTag + "/" + wellTag + "/" + wellTag + "_seg.jpeg";
+            //return "dataset/images/" + plateTag + "/" + wellTag + "/" + wellTag + "_seg.jpeg";
         };
         WellLocation.prototype.image = function () {
             var _this = this;
