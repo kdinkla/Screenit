@@ -53,6 +53,9 @@ The server-side caches the results of large computations on disk in the __cache_
 ## Database
 Image feature data is stored in a SQLite database that contains a single table __objects__.
 
+The database is ~3GB and can be downloaded, along with its config.py file, via Dropbox for now: https://www.dropbox.com/sh/hvhpdjcfiap3ofe/AABUn4ZZk0V49ArRQZihckADa?dl=0
+Both database and config file should be placed in the __dataset__ directory.
+
 ## Directory structure
 __server__ contains all server-side Python code. Currently, most files serve as API delegators for the Tangelo web server.
 
