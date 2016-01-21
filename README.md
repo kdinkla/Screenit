@@ -3,44 +3,42 @@ Multi-Parameter Data Analysis for High-throughput Screening - Visualization Prot
 
 ## Installation
 Install the following software packages:
-- Python 2.7
+- Python `2.7`
 - Pip
 
-Linux:
+Bash:
 ```
 sudo apt-get install python python-dev python-pip
 ```
 
 Use Pip to install the following Python packages:
-- tangelo
-- numpy
-- pandas
-- scikit-learn
-- joblib
+- tangelo `>= 0.9.0`
+- numpy `>= 1.10.1`
+- pandas `>= 0.17.0`
+- scikit-learn `>= 0.17`
+- joblib `>= 0.8.4`
+- wrapt `>= 1.10.5`
+- frozendict `>= 0.5`
 
-Linux:
+Bash:
 ```
-sudo pip install tangelo numpy pandas scikit-learn joblib
+sudo pip install tangelo numpy pandas scikit-learn joblib wrapt frozendict
 ```
 
 Download and place the code at a location that you like, but first look at __Cache__, __Database__, and __Images__ sections for space requirements.
 
-Install npm and then bower.
-
-Linux:
+Install npm and then bower. Bash:
 ```
 sudo apt-get install npm
 sudo apt-get install nodejs-legacy
 sudo npm install -g bower
 ```
-Use bower to install additional Javascript libraries.
-
-Linux, in the root directory of the prototype code:
+Use bower to install additional Javascript libraries. Bash, in the root directory of the prototype:
 ```
 bower install
 ```
 
-Run tangelo to launch the server:
+Run tangelo to launch the server. Bash, in the root directory of the prototype:
 ```
 sudo tangelo -c tangelo_config.yaml
 ```

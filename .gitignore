@@ -1,6 +1,7 @@
 bower_components
 cache
-dataset
+dataset/*
+!dataset/config.py
 *.map
 *.pyc
 .idea
