@@ -58,6 +58,8 @@ The system expects the following columns to be present:
 - __x__, float that specifies the x-coordinate of the object in its well, in pixel space of the well images
 - __y__, float that specifies the y-coordinate of the object in its well, in pixel space of the well images
 
+All other columns in the __dataset/columns__ directory are assumed to contain image features as floating point values. The CellMorph data stores image features as 32-bit floats to reduce storage and increase performance, but more precise floats should be supported as well.
+
 ## Code organization
 __server__ contains all server-side Python code. Currently, most files serve as API delegators for the Tangelo web server:
 - __compute.py__ contains all interactive computation code
