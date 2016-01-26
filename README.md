@@ -52,13 +52,17 @@ The column data should be placed in __dataset/columns__. The __dataset__ directo
 The code for converting the CellMorph (per plate) tab-delimited files can be found in __wrangle/liteFill.py__.
 
 The system expects the following columns to be present:
-- plate, integer ranging from 0 to N, that encodes the containing plate of the object, out of N plates
-- column, integer ranging from 0 to C, that encodes the column coordinate the containing well of the object, out of C columns on a plate
-- row, integer ranging from 0 to R, that encodes the row coordinate of the containing well of the object, out of R rows on a plate
-- x, float that specifies the x-coordinate of the object in its well, in pixel space of the well images
-- y, float that specifies the y-coordinate of the object in its well, in pixel space of the well images
+- __plate__, integer ranging from 0 to N, that encodes the containing plate of the object, out of N plates
+- __column__, integer ranging from 0 to C, that encodes the column coordinate the containing well of the object, out of C columns on a plate
+- __row__, integer ranging from 0 to R, that encodes the row coordinate of the containing well of the object, out of R rows on a plate
+- __x__, float that specifies the x-coordinate of the object in its well, in pixel space of the well images
+- __y__, float that specifies the y-coordinate of the object in its well, in pixel space of the well images
 
-## Directory structure
-__server__ contains all server-side Python code. Currently, most files serve as API delegators for the Tangelo web server.
+## Code organization
+__server__ contains all server-side Python code. Currently, most files serve as API delegators for the Tangelo web server:
+- __compute.py__ contains all interactive computation code
+- __numpyData.py__ that data retrieval backend, which can be replaced in the future.
 
-__wrangle__ contains code that can be used to scrape all image feature data from the CellMorph comma-separated files and store it in a SQLite database as described in the __Database__ section.
+__wrangle/columnFill__ contains code that can be used to scrape all image feature data from the CellMorph comma-separated files (per plate) and store it as NumPy columns in the __Data__ section.
+
+__src__ contains all client-side code, which is written primarily in Typescript. __typings__ contains type definition files that interface TypeScript with common JavaScript libraries found in __bower_components__ and configured in __bower.json__.
