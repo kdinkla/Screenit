@@ -46,7 +46,7 @@ Browse to the server's address to try out the prototype.
 ## Data
 Image feature data is stored per image feature as a NumPy array dump in __dataset/columns__. Every object (in a well) has a value in such an array, where the array index of an object is consistent across all columns. Everything is therefore stored at the object level, including eventual well and plate information (sacrificing disk space for sake of computation speed).
 
-The example CellMorph data is 1.5GB and can be downloaded from Google Drive for now: https://drive.google.com/folderview?id=0B4zuo4p8QBcaN1dVUmxXVW9nR28&usp=sharing
+The example CellMorph data is 1.5GB and can be downloaded from Google Drive for now: https://drive.google.com/folderview?id=0B4zuo4p8QBcaaXIwTXRCaGpUdU0&usp=sharing
 The column data should be placed in __dataset/columns__. The __dataset__ directory already contains the __config.py__ file for CellMorph, which also contains explanatory comments per configuration option.
 
 The code for converting the CellMorph (per plate) tab-delimited files can be found in __wrangle/liteFill.py__.
