@@ -15,24 +15,22 @@ Use Pip to install the following Python packages:
 - tangelo `>= 0.9.0`
 - numpy `>= 1.10.1`
 - pandas `>= 0.17.0`
+- scipy `>= 0.13`
 - scikit-learn `>= 0.17`
-- joblib `>= 0.8.4`
-- wrapt `>= 1.10.5`
-- frozendict `>= 0.5`
 
 Bash:
 ```
-sudo pip install tangelo numpy pandas scikit-learn joblib wrapt frozendict
+sudo pip install tangelo numpy pandas scipy scikit-learn
 ```
 
 Download and place the code at a location that you like, but first look at __Cache__, __Database__, and __Images__ sections for space requirements.
 
 Install npm and then bower. Bash:
 ```
-sudo apt-get install npm
-sudo apt-get install nodejs-legacy
+sudo apt-get install npm nodejs-legacy
 sudo npm install -g bower
 ```
+
 Use bower to install additional Javascript libraries. Bash, in the root directory of the prototype:
 ```
 bower install
@@ -43,16 +41,22 @@ Run tangelo to launch the server. Bash, in the root directory of the prototype:
 sudo tangelo -c tangelo_config.yaml
 ```
 
-Browse to the server's address to try out the prototype. Be warned that the first time it may take a while to launch the prototype; it will be setting up its data.
+Browse to the server's address to try out the prototype.
 
-## Cache
-The server-side caches the results of large computations on disk in the __cache__ directory. This directory can be replaced by a symbolic link to a more suited disk or location. Cache size will probably stay below 100GB for the CellMorph data set.
+## Data
+Image feature data is stored per image feature as a NumPy array dump in __dataset/columns__. Every object (in a well) has a value in such an array, where the array index of an object is consistent across all columns. Everything is therefore stored at the object level, including eventual well and plate information (sacrificing disk space for sake of computation speed).
 
-## Database
-Image feature data is stored in a SQLite database that contains a single table __objects__.
+The example CellMorph data is 1.5GB and can be downloaded from Google Drive for now: https://drive.google.com/folderview?id=0B4zuo4p8QBcaN1dVUmxXVW9nR28&usp=sharing
+The column data should be placed in __dataset/columns__. The __dataset__ directory already contains the __config.py__ file for CellMorph, which also contains explanatory comments per configuration option.
 
-The database is ~3GB and can be downloaded, along with its config.py file, via Dropbox for now: https://www.dropbox.com/sh/hvhpdjcfiap3ofe/AABUn4ZZk0V49ArRQZihckADa?dl=0
-Both database and config file should be placed in the __dataset__ directory.
+The code for converting the CellMorph (per plate) tab-delimited files can be found in __wrangle/liteFill.py__.
+
+The system expects the following columns to be present:
+- plate, integer ranging from 0 to N, that encodes the containing plate of the object, out of N plates
+- column, integer ranging from 0 to C, that encodes the column coordinate the containing well of the object, out of C columns on a plate
+- row, integer ranging from 0 to R, that encodes the row coordinate of the containing well of the object, out of R rows on a plate
+- x, float that specifies the x-coordinate of the object in its well, in pixel space of the well images
+- y, float that specifies the y-coordinate of the object in its well, in pixel space of the well images
 
 ## Directory structure
 __server__ contains all server-side Python code. Currently, most files serve as API delegators for the Tangelo web server.

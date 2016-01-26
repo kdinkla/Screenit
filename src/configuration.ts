@@ -19,6 +19,9 @@ export class BaseConfiguration {
     featureFont = new Font(12);
     sideFont = new Font(10);
 
+    // User adjustable options.
+    imageType: string = null;   // The type of image to present.
+
     // Default palette.
     base = Color.grey(75);
     baseEmphasis = Color.BLACK;
@@ -97,7 +100,7 @@ export class BaseConfiguration {
     miniHeatColumnCount = 5;
 
     // Well details view.
-    wellViewMaxDim = [500, 500];
+    wellViewMaxDim = [500, 370];
 
     // Object details view.
     objectViewImageRadius = 40;

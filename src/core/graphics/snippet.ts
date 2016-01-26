@@ -1,8 +1,9 @@
 /// <reference path='style.ts' />
 
-import View = require('./view');
-import ViewContext = View.ViewContext;
-import Snippet = View.Snippet;
+import view = require('./view');
+import ViewContext = view.ViewContext;
+import Snippet = view.Snippet;
+import ViewMouseEvent = view.ViewMouseEvent;
 
 import style = require('./style');
 import Color = style.Color;
@@ -202,28 +203,29 @@ export class LabelStyle {
     }
 }
 
-export class Label extends BaseSnippet {
+export class Label extends PlacedSnippet {
     public lines: string[]; // Wrapped lines.
     public size: number[];  // Dimensions of wrapped text in local space.
-    public topLeft: number[];
 
     constructor(public identifier: string,
                 text: string,
-                public position: number[],
+                position: number[],
                 public style: LabelStyle = new LabelStyle(),
                 public pickable: boolean = false) {
         super(identifier);
 
         // Multiple lines and their dimension.
         this.lines = style.font.wordWrap(text);
-        this.size = style.font.wrapDimensions(this.lines);
+        var dimensions = style.font.wrapDimensions(this.lines);
 
         // Determine top left position from position and align.
         this.topLeft = position;
-        if(style.horizontalAnchor === 'middle') this.topLeft[0] -= this.size[0] / 2;
-        else if(style.horizontalAnchor === 'right') this.topLeft[0] -= this.size[0];
-        if(style.verticalAnchor === 'middle') this.topLeft[1] += this.size[1] / 2;
-        else if(style.verticalAnchor === 'top') this.topLeft[1] += this.size[1];
+        if(style.horizontalAnchor === 'middle') this.topLeft[0] -= dimensions[0] / 2;
+        else if(style.horizontalAnchor === 'right') this.topLeft[0] -= dimensions[0];
+        if(style.verticalAnchor === 'middle') this.topLeft[1] += dimensions[1] / 2;
+        else if(style.verticalAnchor === 'top') this.topLeft[1] += dimensions[1];
+
+        this.setDimensions(dimensions);
     }
 
     paint(context: ViewContext) {

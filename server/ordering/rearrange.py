@@ -33,14 +33,7 @@ def rearrange(X, optimal = True, method = "average"):
 
 def rearrangeDataframe(targetFrame, distanceFrame, optimal = True, method = "average"):
     rearrangedIndices = rearrange(distanceFrame.values, optimal, method)
-
     oldIndex = targetFrame.index
     newIndex = [oldIndex[i] for i in rearrangedIndices]
-
-    print "Old index:"
-    print oldIndex
-
-    print "New index:"
-    print newIndex
 
     return targetFrame.reindex(newIndex)

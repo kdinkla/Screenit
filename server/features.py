@@ -3,4 +3,4 @@ tangelo.paths(".")
 import compute
 
 def run():
-    return compute.featureInfo().to_json()
+    return compute.featureInfo()

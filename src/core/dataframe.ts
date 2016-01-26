@@ -25,6 +25,10 @@ export class DataFrame<T> {
         return this.matrix[this.columnIndex[name]];
     }
 
+    cell(column: any, row: any) {
+        return (this.columnVector(column) || [])[this.rowIndex[row]];
+    }
+
     transpose() {
         var tr = this.shallowClone();
 

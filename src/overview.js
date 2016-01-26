@@ -35,7 +35,12 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var splomScatterTopRight = Vector.add(splomScatterTopLeft, [this.splom.dimensions()[0], 0]);
             var objScatterTopLeft = Vector.add(splomScatterTopRight, [-2 * cfg.splomSize, 2 * cfg.splomSize]);
             objScatterTopLeft = Vector.max(objScatterTopLeft, splomScatterTopLeft);
-            this.objectScatter = new ObjectFeaturePlot("mds2", "mds1", objScatterTopLeft, mod, cfg, cfg.scatterPlotSize, false, false, false, "Landscape of All Features");
+            if ("mds1" in mod.objectInfo.value.columnIndex && "mds2" in mod.objectInfo.value.columnIndex) {
+                this.objectScatter = new ObjectFeaturePlot("mds2", "mds1", objScatterTopLeft, mod, cfg, cfg.scatterPlotSize, false, false, "Landscape of All Features");
+            }
+            else {
+                this.objectScatter = null;
+            }
             var objScatterBottomLeft = Vector.add(objScatterTopLeft, [0, cfg.splomSize + cfg.splomSpace]);
             var objScatterTopRight = Vector.add(objScatterTopLeft, [cfg.scatterPlotSize, 0]);
             var allScatterTopRight = [Math.max(splomScatterTopRight[0], objScatterTopRight[0]) - cfg.splomSpace, splomScatterTopRight[1]];
@@ -135,7 +140,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     var c2II = colLen - c2I - 1;
                     var c2 = this.features[c2I];
                     if (c1 in objectFeatures.columnIndex && c2 in objectFeatures.columnIndex) {
-                        this.plots.push(new ObjectFeaturePlot(c1, c2, Vector.add(this.topLeft, [c1II * configuration.splomSize, c2I * configuration.splomSize]), model, configuration, configuration.splomInnerSize, true, c2I == 0, c1II == 0));
+                        this.plots.push(new ObjectFeaturePlot(c1, c2, Vector.add(this.topLeft, [c1II * configuration.splomSize, c2I * configuration.splomSize]), model, configuration, configuration.splomInnerSize, c2I == 0, c1II == 0));
                     }
                 }
             }
@@ -163,9 +168,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     exports.Splom = Splom;
     var ObjectFeaturePlot = (function (_super) {
         __extends(ObjectFeaturePlot, _super);
-        function ObjectFeaturePlot(feature1, feature2, topLeft, model, configuration, size, cached, columnLabel, rowLabel, footerLabel) {
+        function ObjectFeaturePlot(feature1, feature2, topLeft, model, configuration, size, columnLabel, rowLabel, footerLabel) {
             var _this = this;
-            if (cached === void 0) { cached = false; }
             if (columnLabel === void 0) { columnLabel = false; }
             if (rowLabel === void 0) { rowLabel = false; }
             if (footerLabel === void 0) { footerLabel = null; }
@@ -176,18 +180,14 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.model = model;
             this.configuration = configuration;
             this.size = size;
-            this.cached = cached;
             this.columnLabel = columnLabel;
             this.rowLabel = rowLabel;
             this.footerLabel = footerLabel;
-            this.cached = true;
             // Cache heavy duty dot draw operations, optional.
-            if (this.cached) {
-                this.cachedBackground = model.objectInfo.value[this.identifier]; //model.objectInfo.value[this.identifier];
-                if (!this.cachedBackground) {
-                    this.cachedBackground = view.View.renderToCanvas(size, size, function (c) { return _this.paintDots(c); });
-                    model.objectInfo.value[this.identifier] = this.cachedBackground;
-                }
+            this.cachedBackground = model.objectHistograms.value[this.identifier]; //model.objectInfo.value[this.identifier];
+            if (!this.cachedBackground) {
+                this.cachedBackground = view.View.renderToCanvas(size, size, function (c) { return _this.paintDots(c); });
+                model.objectHistograms.value[this.identifier] = this.cachedBackground;
             }
         }
         ObjectFeaturePlot.prototype.paintDots = function (context) {
@@ -195,50 +195,49 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = this.configuration;
             var size = this.size;
             // Paint histograms, if available.
-            /*var histograms = mod.objectHistograms.value.matricesByFeaturePair(this.feature1, this.feature2);
-            if(_.keys(histograms).length > 0) {
+            var histograms = mod.objectHistograms.value.matricesFor(this.feature1, this.feature2);
+            var pairHistos = _.pairs(histograms);
+            if (pairHistos) {
                 context.save();
-    
-                console.log("Start paint histogram of " + this.feature1 + " and " + this.feature2);
-                var clusters = _.keys(histograms);
-                clusters.forEach(cK => {
+                pairHistos.forEach(function (hP) {
+                    var cK = hP[0];
+                    var matrix = hP[1];
                     var population = mod.populationSpace.populations.byId(cK);
-                    var matrix = histograms[cK];
-    
-                    context.fillStyle = Number(cK) >= 0 ? population.color : cfg.base;
-                    matrix.forEach((c, xI) => c.forEach((cell, yI) => {
-                        if(cell) context.fillRect(xI, yI, 1, 1);
-                    }));
-    
-                    console.log("Paint histogram of: " + cK);
+                    var coreColor = Number(cK) >= 0 ? population.color : cfg.base;
+                    //context.fillStyle = Number(cK) >= 0 ? population.colorTrans : cfg.base;
+                    matrix.forEach(function (c, xI) { return c.forEach(function (cell, yI) {
+                        if (cell) {
+                            context.fillStyle = coreColor.alpha(1 - 0.5 / cell);
+                            context.fillRect(xI, size - yI, 1, 1);
+                        }
+                    }); });
                 });
-                console.log("Finished paint histogram of " + this.feature1 + " and " + this.feature2);
-    
                 context.restore();
-            } else {*/
-            context.save();
-            var objectFeatures = this.model.objectInfo.value;
-            var x = objectFeatures.columnVector(this.feature1) || []; //objectFeatures.normalizedColumnVector(this.feature1) || [];
-            var y = objectFeatures.columnVector(this.feature2) || []; //objectFeatures.normalizedColumnVector(this.feature2) || [];
-            var cluster = objectFeatures.columnVector('population') || [];
-            // Large colored dots for background.
-            var r = cfg.splomClusterRadius;
-            for (var i = 0; i < x.length; i++) {
-                //var objId = objectFeatures.rows[i];
-                var pI = cluster[i]; //clstr.clusterMap[objId];
-                var population = mod.populationSpace.populations.byId(pI);
-                var color = population ? population.colorTrans : Color.NONE; //pI >= 0 ? cfg.clusterTransparentColors[clstr.identifierIndex[pI]] : Color.NONE;
-                context.fillStyle = color.toString();
-                this.paintOfflineDot(context, x[i] * size, (1 - y[i]) * size, r, r);
             }
-            // Plain dots for density.
-            r = cfg.splomDotRadius;
-            context.fillStyle = cfg.splomDotDensityColor.toString();
-            for (var i = 0; i < x.length; i++) {
-                this.paintOfflineDot(context, x[i] * size, (1 - y[i]) * size, r, r);
+            else {
+                context.save();
+                var objectFeatures = this.model.objectInfo.value;
+                var x = objectFeatures.columnVector(this.feature1) || []; //objectFeatures.normalizedColumnVector(this.feature1) || [];
+                var y = objectFeatures.columnVector(this.feature2) || []; //objectFeatures.normalizedColumnVector(this.feature2) || [];
+                var cluster = objectFeatures.columnVector('population') || [];
+                // Large colored dots for background.
+                var r = cfg.splomClusterRadius;
+                for (var i = 0; i < x.length; i++) {
+                    //var objId = objectFeatures.rows[i];
+                    var pI = cluster[i]; //clstr.clusterMap[objId];
+                    var population = mod.populationSpace.populations.byId(pI);
+                    var color = population ? population.colorTrans : Color.NONE; //pI >= 0 ? cfg.clusterTransparentColors[clstr.identifierIndex[pI]] : Color.NONE;
+                    context.fillStyle = color.toString();
+                    this.paintOfflineDot(context, x[i] * size, (1 - y[i]) * size, r, r);
+                }
+                // Plain dots for density.
+                r = cfg.splomDotRadius;
+                context.fillStyle = cfg.splomDotDensityColor.toString();
+                for (var i = 0; i < x.length; i++) {
+                    this.paintOfflineDot(context, x[i] * size, (1 - y[i]) * size, r, r);
+                }
+                context.restore();
             }
-            context.restore();
-            //}
         };
         ObjectFeaturePlot.prototype.paintOfflineDot = function (context, cx, cy, rw, rh) {
             context.beginPath();
@@ -263,18 +262,14 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Background rectangle.
             context.strokeStyle(cfg.baseVeryDim);
             context.strokeRect(0, 0, size, size);
+            //context.context['imageSmoothingEnabled'] = false;
+            context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
+            //context.context['imageSmoothingEnabled'] = true;
             context.transitioning = false;
-            if (this.cached) {
-                //context.context['imageSmoothingEnabled'] = false;
-                context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
-            }
-            else {
-                this.paintDots(context.context);
-            }
             //context.transitioning = false;
             var objectFeatures = this.model.objectInfo.value;
-            var x = objectFeatures.normalizedColumnVector(this.feature1) || [];
-            var y = objectFeatures.normalizedColumnVector(this.feature2) || [];
+            var x = objectFeatures.columnVector(this.feature1) || [];
+            var y = objectFeatures.columnVector(this.feature2) || [];
             //var clstr = mod.clusters.value;
             // Large colored dots with halo for representatives.
             mod.populationSpace.populations.forEach(function (pop) { return pop.exemplars.forEach(function (ex) {
@@ -491,7 +486,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         function FeatureHistogramTable(identifier, topLeft, state) {
             _super.call(this, identifier, topLeft);
             this.state = state;
-            var features = state.features.value.columns;
+            var features = state.features.value;
             var frames = state.featureHistograms.value.histograms;
             //var frame = state.featureHistograms.value.histograms['objects'];   //state.features.value;
             var cfg = state.configuration;
@@ -865,6 +860,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.state = state;
             var cfg = state.configuration;
             this.setDimensions(cfg.wellViewMaxDim);
+            var availableTypes = _.keys(state.availableImageTypes());
+            var wellOptions = {};
+            availableTypes.forEach(function (t) { return wellOptions[t] = t; });
+            this.imageTypeOption = new ConfigurationOptions("WellDetailOptions", this.bottomLeft, state, "imageType", wellOptions);
         }
         WellDetailView.prototype.paint = function (ctx) {
             var state = this.state;
@@ -880,16 +879,16 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             ctx.transitioning = false;
             ctx.save();
             ctx.translate(this.topLeft);
-            var well = state.focused().wellLocation();
+            var well = state.selectionWell(state.focused());
             if (well) {
-                var img = well.image();
+                var img = well.image(cfg.imageType);
                 if (img) {
                     var wellScale = Math.min(cfg.wellViewMaxDim[0] / img.width, 2 * cfg.wellViewMaxDim[1] / img.height);
                     ctx.picking = true;
                     ctx.drawImageClipped(img, [0, 0], [img.width, 0.5 * img.height], [0, 0], [wellScale * img.width, wellScale * 0.5 * img.height]);
                     ctx.picking = false;
                     // Test object coordinates.
-                    var objects = state.objectInfo.value; //state.wellObjectInfo.value;
+                    var objects = state.objectInfo.value;
                     var x = objects.columnVector("x");
                     var y = objects.columnVector("y");
                     var xRad = wellScale * cfg.objectViewImageRadius;
@@ -908,6 +907,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             }
             ctx.restore();
             ctx.transitioning = true;
+            // Well type button.
+            ctx.snippet(this.imageTypeOption);
         };
         WellDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             var object = enriched.closestWellObject(coordinates);
@@ -951,11 +952,14 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             ctx.translate(this.topLeft);
             //ctx.transitioning = false;
             ctx.picking = true;
-            var objectWells = mod.allObjectWells();
-            var well = objectWells.location(this.object);
-            if (well) {
-                var img = well.image();
-                var coordinates = objectWells.coordinates(this.object);
+            //var objectWells = mod.allObjectWells();
+            var wellInfo = mod.objectWellInfo(this.object);
+            //var well = mod.wellLocation()//objectWells.location(this.object);
+            if (wellInfo) {
+                var img = wellInfo.location.image(cfg.imageType);
+                var coordinates = wellInfo.coordinates; //objectWells.coordinates(this.object);
+                //console.log("Object well location:");
+                //console.log(wellInfo.location);
                 if (img && coordinates) {
                     // Trunc cell coordinates to stay within image.
                     coordinates = [
@@ -1104,6 +1108,42 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return new WellCoordinates(Math.round(mouseCoordinates[0] * (info.columnCount - 1)), Math.round(mouseCoordinates[1] * (info.rowCount - 1)));
         };
         return PlateMiniHeatmap;
+    })(PlacedSnippet);
+    var ConfigurationButton = (function (_super) {
+        __extends(ConfigurationButton, _super);
+        function ConfigurationButton(identifier, text, position, targetField, targetValue, style) {
+            _super.call(this, identifier, text, position, style, true);
+            this.targetField = targetField;
+            this.targetValue = targetValue;
+        }
+        ConfigurationButton.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
+            interaction.configuration[this.targetField] = this.targetValue;
+        };
+        return ConfigurationButton;
+    })(Label);
+    var ConfigurationOptions = (function (_super) {
+        __extends(ConfigurationOptions, _super);
+        function ConfigurationOptions(identifier, topLeft, targetState, targetField, targetMap) {
+            _super.call(this, identifier, topLeft);
+            this.targetState = targetState;
+            this.targetField = targetField;
+            this.targetMap = targetMap;
+            var cfg = targetState.configuration;
+            var baseStyle = new LabelStyle(cfg.sideFont, cfg.baseDim);
+            var selectedStyle = new LabelStyle(cfg.sideFont, cfg.baseEmphasis);
+            var buttonSnippets = _.pairs(targetMap).map(function (p, pI) {
+                var label = p[0];
+                var value = p[1];
+                var style = cfg[targetField] === value || (!cfg[targetField] && pI === 0) ? selectedStyle : baseStyle; // Default to first option.
+                return new ConfigurationButton(identifier + "_" + value, label, topLeft, targetField, value, style);
+            });
+            this.buttons = new List(identifier + "_lst", buttonSnippets, topLeft, [0, 0], 'horizontal', 5, 'top');
+            this.setDimensions(this.buttons.dimensions);
+        }
+        ConfigurationOptions.prototype.paint = function (context) {
+            context.snippet(this.buttons);
+        };
+        return ConfigurationOptions;
     })(PlacedSnippet);
 });
 //# sourceMappingURL=overview.js.map

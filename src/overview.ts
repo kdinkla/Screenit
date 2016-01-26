@@ -39,6 +39,9 @@ import dataframe = require('./core/dataframe');
 import DataFrame = dataframe.DataFrame;
 import NumberFrame = dataframe.NumberFrame;
 
+import collection = require('./core/collection');
+import StringMap = collection.StringMap;
+
 import style = require('./core/graphics/style');
 import Color = style.Color;
 import Font = style.Font;
@@ -78,11 +81,16 @@ export class OverView extends View<EnrichedState> {
         var objScatterTopLeft = Vector.add(splomScatterTopRight, [-2 * cfg.splomSize, 2 * cfg.splomSize]);
         objScatterTopLeft = Vector.max(objScatterTopLeft, splomScatterTopLeft);
 
-        this.objectScatter = new ObjectFeaturePlot(
-            "mds2", "mds1",
-            objScatterTopLeft, mod,
-            cfg, cfg.scatterPlotSize, false,
-            false, false, "Landscape of All Features");
+        if("mds1" in mod.objectInfo.value.columnIndex && "mds2" in mod.objectInfo.value.columnIndex) {
+            this.objectScatter = new ObjectFeaturePlot(
+                "mds2", "mds1",
+                objScatterTopLeft, mod,
+                cfg, cfg.scatterPlotSize, false,
+                false, "Landscape of All Features");
+        } else {
+            this.objectScatter = null;
+        }
+
         var objScatterBottomLeft = Vector.add(objScatterTopLeft, [0, cfg.splomSize + cfg.splomSpace]);
         var objScatterTopRight = Vector.add(objScatterTopLeft, [cfg.scatterPlotSize, 0]);
         var allScatterTopRight = [Math.max(splomScatterTopRight[0], objScatterTopRight[0]) - cfg.splomSpace, splomScatterTopRight[1]];
@@ -204,7 +212,6 @@ export class Splom extends BaseSnippet {
                         model,
                         configuration,
                         configuration.splomInnerSize,
-                        true,    // Cached!
                         c2I == 0,
                         c1II == 0
                     ));
@@ -245,21 +252,16 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
                 public model: EnrichedState,
                 public configuration: BaseConfiguration,
                 public size: number,
-                public cached: boolean = false,
                 public columnLabel: boolean = false,
                 public rowLabel: boolean = false,
                 public footerLabel: string = null) {
         super("objPlt_" + feature1 + ".." + feature2);
 
-        this.cached = true;
-
         // Cache heavy duty dot draw operations, optional.
-        if(this.cached) {
-            this.cachedBackground = model.objectInfo.value[this.identifier];  //model.objectInfo.value[this.identifier];
-            if(!this.cachedBackground) {
-                this.cachedBackground = view.View.renderToCanvas(size, size, c => this.paintDots(c));
-                model.objectInfo.value[this.identifier] = this.cachedBackground;
-            }
+        this.cachedBackground = model.objectHistograms.value[this.identifier];  //model.objectInfo.value[this.identifier];
+        if(!this.cachedBackground) {
+            this.cachedBackground = view.View.renderToCanvas(size, size, c => this.paintDots(c));
+            model.objectHistograms.value[this.identifier] = this.cachedBackground;
         }
     }
 
@@ -269,27 +271,28 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         var size = this.size;
 
         // Paint histograms, if available.
-        /*var histograms = mod.objectHistograms.value.matricesByFeaturePair(this.feature1, this.feature2);
-        if(_.keys(histograms).length > 0) {
+        var histograms = mod.objectHistograms.value.matricesFor(this.feature1, this.feature2);
+        var pairHistos = _.pairs(histograms);
+        if(pairHistos) {
             context.save();
 
-            console.log("Start paint histogram of " + this.feature1 + " and " + this.feature2);
-            var clusters = _.keys(histograms);
-            clusters.forEach(cK => {
+            pairHistos.forEach(hP => {
+                var cK = hP[0];
+                var matrix = hP[1];
                 var population = mod.populationSpace.populations.byId(cK);
-                var matrix = histograms[cK];
 
-                context.fillStyle = Number(cK) >= 0 ? population.color : cfg.base;
+                var coreColor = Number(cK) >= 0 ? population.color : cfg.base;
+                //context.fillStyle = Number(cK) >= 0 ? population.colorTrans : cfg.base;
                 matrix.forEach((c, xI) => c.forEach((cell, yI) => {
-                    if(cell) context.fillRect(xI, yI, 1, 1);
+                    if(cell) {
+                        context.fillStyle = coreColor.alpha(1 - 0.5 / cell);
+                        context.fillRect(xI, size - yI, 1, 1);
+                    }
                 }));
-
-                console.log("Paint histogram of: " + cK);
             });
-            console.log("Finished paint histogram of " + this.feature1 + " and " + this.feature2);
 
             context.restore();
-        } else {*/
+        } else {
             context.save();
 
             var objectFeatures = this.model.objectInfo.value;
@@ -319,7 +322,7 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
             }
 
             context.restore();
-        //}
+        }
     }
 
     private paintOfflineDot(context: CanvasRenderingContext2D, cx: number, cy: number, rw: number, rh: number) {
@@ -352,20 +355,16 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         context.strokeStyle(cfg.baseVeryDim);
         context.strokeRect(0, 0, size, size);
 
-        context.transitioning = false;
-        if(this.cached) {
-            //context.context['imageSmoothingEnabled'] = false;
-            context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
-            //context.context['imageSmoothingEnabled'] = true;
-        } else {
-            this.paintDots(context.context);
-        }
+        //context.context['imageSmoothingEnabled'] = false;
+        context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
+        //context.context['imageSmoothingEnabled'] = true;
 
+        context.transitioning = false;
         //context.transitioning = false;
 
         var objectFeatures = this.model.objectInfo.value;
-        var x = objectFeatures.normalizedColumnVector(this.feature1) || [];
-        var y = objectFeatures.normalizedColumnVector(this.feature2) || [];
+        var x = objectFeatures.columnVector(this.feature1) || [];
+        var y = objectFeatures.columnVector(this.feature2) || [];
         //var clstr = mod.clusters.value;
 
         // Large colored dots with halo for representatives.
@@ -668,7 +667,7 @@ class FeatureHistogramTable extends PlacedSnippet {
                 public state: EnrichedState) {
         super(identifier, topLeft);
 
-        var features = state.features.value.columns;
+        var features = state.features.value;
         var frames = state.featureHistograms.value.histograms;
         //var frame = state.featureHistograms.value.histograms['objects'];   //state.features.value;
         var cfg = state.configuration;
@@ -1115,12 +1114,24 @@ class PlateIndexSelection extends PlacedSnippet {
 }
 
 class WellDetailView extends PlacedSnippet {
+    imageTypeOption: ConfigurationOptions;
+
     constructor(topLeft: number[],
                 public state: EnrichedState) {
         super("WellDetailView", topLeft);
 
         var cfg = state.configuration;
         this.setDimensions(cfg.wellViewMaxDim);
+
+        var availableTypes = _.keys(state.availableImageTypes());
+        var wellOptions: StringMap<string> = {};
+        availableTypes.forEach(t => wellOptions[t] = t);
+        this.imageTypeOption = new ConfigurationOptions(
+            "WellDetailOptions",
+            this.bottomLeft,
+            state,
+            "imageType",
+            wellOptions);
     }
 
     paint(ctx: ViewContext) {
@@ -1142,9 +1153,9 @@ class WellDetailView extends PlacedSnippet {
         ctx.save();
         ctx.translate(this.topLeft);
 
-        var well = state.focused().wellLocation();
+        var well = state.selectionWell(state.focused());
         if(well) {
-            var img = well.image();
+            var img = well.image(cfg.imageType);
             if (img) {
                 var wellScale = Math.min(cfg.wellViewMaxDim[0] / img.width, 2 * cfg.wellViewMaxDim[1] / img.height);
                 ctx.picking = true;
@@ -1155,7 +1166,7 @@ class WellDetailView extends PlacedSnippet {
                 ctx.picking = false;
 
                 // Test object coordinates.
-                var objects = state.objectInfo.value;   //state.wellObjectInfo.value;
+                var objects = state.objectInfo.value;
                 var x = objects.columnVector("x");
                 var y = objects.columnVector("y");
                 var xRad = wellScale * cfg.objectViewImageRadius;
@@ -1175,6 +1186,9 @@ class WellDetailView extends PlacedSnippet {
 
         ctx.restore();
         ctx.transitioning = true;
+
+        // Well type button.
+        ctx.snippet(this.imageTypeOption);
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[],
@@ -1232,11 +1246,16 @@ class ObjectDetailView extends PlacedSnippet {
         //ctx.transitioning = false;
         ctx.picking = true;
 
-        var objectWells = mod.allObjectWells();
-        var well = objectWells.location(this.object);
-        if(well) {
-            var img = well.image();
-            var coordinates = objectWells.coordinates(this.object);
+        //var objectWells = mod.allObjectWells();
+        var wellInfo = mod.objectWellInfo(this.object);
+
+        //var well = mod.wellLocation()//objectWells.location(this.object);
+        if(wellInfo) {
+            var img = wellInfo.location.image(cfg.imageType);
+            var coordinates = wellInfo.coordinates; //objectWells.coordinates(this.object);
+
+            //console.log("Object well location:");
+            //console.log(wellInfo.location);
 
             if (img && coordinates) {
                 // Trunc cell coordinates to stay within image.
@@ -1427,5 +1446,51 @@ class PlateMiniHeatmap extends PlacedSnippet {
             Math.round(mouseCoordinates[0] * (info.columnCount - 1)),
             Math.round(mouseCoordinates[1] * (info.rowCount - 1))
         );
+    }
+}
+
+class ConfigurationButton extends Label {
+    constructor(identifier: string,
+                text: string,
+                position: number[],
+                public targetField: string,
+                public targetValue: any,
+                style: LabelStyle) {
+        super(identifier, text, position, style, true);
+    }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        interaction.configuration[this.targetField] = this.targetValue;
+    }
+}
+
+class ConfigurationOptions extends PlacedSnippet {
+    buttons: List<ConfigurationButton>;
+
+    constructor(identifier: string,
+                topLeft: number[],
+                public targetState: InteractionState,
+                public targetField: string,
+                public targetMap: StringMap<any>) {
+        super(identifier, topLeft);
+
+        var cfg = targetState.configuration;
+        var baseStyle: LabelStyle = new LabelStyle(cfg.sideFont, cfg.baseDim);
+        var selectedStyle: LabelStyle = new LabelStyle(cfg.sideFont, cfg.baseEmphasis);
+
+        var buttonSnippets = _.pairs(targetMap).map((p, pI) => {
+            var label = p[0];
+            var value = p[1];
+            var style = cfg[targetField] === value || (!cfg[targetField] && pI === 0) ? selectedStyle : baseStyle; // Default to first option.
+
+            return new ConfigurationButton(identifier + "_" + value, label, topLeft, targetField, value, style);
+        });
+
+        this.buttons = new List(identifier + "_lst", buttonSnippets, topLeft, [0, 0], 'horizontal', 5, 'top');
+        this.setDimensions(this.buttons.dimensions);
+    }
+
+    paint(context: ViewContext) {
+        context.snippet(this.buttons);
     }
 }

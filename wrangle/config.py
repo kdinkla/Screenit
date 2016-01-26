@@ -3,7 +3,7 @@ import csv
 
 # Constants.
 inputPath = "/Users/kdinkla/Desktop/Novartis/HCS/CellMorph/www.ebi.ac.uk/huber-srv/cellmorph/data/"
-outputPath = "/Users/kdinkla/Desktop/Novartis/HCS/CellMorph/db/"
+outputPath = "/Users/kdinkla/MPDA/git/wrangle/db/"
 sqlDotReplacement = '_'
 
 # Screening parameters.
@@ -58,3 +58,10 @@ def objectFeatures():
 # Directory of feature file of given plate, column, and row.
 def featureDirectory(plate, column, row):
     return inputPath + plate + "/" + plate + column + row + "_ftrs.tab"
+
+# Resolves directory for given database column, row, and plate number. Image types: seg and rgb
+def wellURL(column, row, plate, type):
+    plateTag = plates[plate]
+    wellTag = plateTag + columns[column] + rows[row]
+    return "http://www.ebi.ac.uk/huber-srv/cellmorph/view/" + plateTag + "/" + wellTag + "/" + wellTag + "_" + type + ".jpeg"
+    #return "dataset/images/" + plateTag + "/" + wellTag + "/" + wellTag + "_seg.jpeg"

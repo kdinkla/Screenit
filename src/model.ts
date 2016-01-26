@@ -48,11 +48,11 @@ export class EnrichedState extends InteractionState {
     allExemplars: Chain<number>;                        // All exemplars in population space.
 
     dataSetInfo: ProxyValue<DataSetInfo>;               // Data set specifications.
-    features: ProxyValue<DataFrame<number>>;            // Available parameters.
-    featureHistograms: ProxyValue<FeatureHistograms>;
+    features: ProxyValue<string[]>;                     // Available parameters.
     objectInfo: ProxyValue<NumberFrame>;                // All features for prime sample.
-    //objectHistograms: ProxyValue<HistogramMatrix>;      // 2D histograms for selected cluster and feature combinations.
+    objectHistograms: ProxyValue<HistogramMatrix>;      // 2D histograms for selected cluster and feature combinations.
     wellClusterShares: ProxyValue<WellClusterShares>;   // Cluster <-> well shares (normalized object count).
+    featureHistograms: ProxyValue<FeatureHistograms>;
 
     constructor(state: InteractionState) {
         super(state.populationSpace,
@@ -80,27 +80,27 @@ export class EnrichedState extends InteractionState {
         this.features = new ProxyValue(
             "features",
             {},
-            new DataFrame<number>(), f => new DataFrame(f).transpose().normalize(false, true)
+            []
         );
         this.objectInfo = new ProxyValue(
             "objectInfo",
             objectInfoDict,
             new NumberFrame(), o => new NumberFrame(o)
         );
-        /*this.objectHistograms = new ProxyValue(
+        this.objectHistograms = new ProxyValue(
             "objectHistograms2D",
             histogramDict,
             new HistogramMatrix(), m => new HistogramMatrix(m)
-        );*/
-        this.featureHistograms = new ProxyValue(
-            "featureHistograms",
-            populationDict,
-            new FeatureHistograms(), hs => new FeatureHistograms(hs)
         );
         this.wellClusterShares = new ProxyValue(
             "wellClusterShares",
             populationDict,
             new WellClusterShares(), s => new WellClusterShares(s)
+        );
+        this.featureHistograms = new ProxyValue(
+            "featureHistograms",
+            populationDict,
+            new FeatureHistograms(), hs => new FeatureHistograms(hs)
         );
     }
 
@@ -144,8 +144,8 @@ export class EnrichedState extends InteractionState {
             var x = tbl.columnVector('x');
             var y = tbl.columnVector('y');
             var plate = tbl.columnVector('plate');
-            var row = tbl.columnVector('well_row');
-            var col = tbl.columnVector('well_col');
+            var row = tbl.columnVector('row');
+            var col = tbl.columnVector('column');
 
             var minDist = Number.MAX_VALUE;
             var focusedWell = this.focused();
@@ -167,25 +167,27 @@ export class EnrichedState extends InteractionState {
 
     // Well selections, including single focused well.
     allWellSelections() {
-        var location = this.focused().wellLocation();
+        var location = this.selectionWell(this.focused());   //this.focused().wellLocation();
         var focusedWell = location ? [location.toWellSelection("Selected")] : [];
         return _.union(this.dataSetInfo.value.wellSelections, focusedWell);
     }
 
     // Focused coordinates.
     focused() {
-        //this.makeConsistent(this.hoveredCoordinates);
         return this.hoveredCoordinates.otherwise(this.selectedCoordinates);
     }
 
     // Complete, or correct, coordinates, from object level up to plate level.
     conformHoveredCoordinates(targetState: InteractionState) {
-        if(targetState.hoveredCoordinates !== null) {
-            var location = this.allObjectWells().location(targetState.hoveredCoordinates.object);
-            if (location) {
-                targetState.hoveredCoordinates.well = location.coordinates();
-                targetState.hoveredCoordinates.plate = location.plate;
+        var coordinates = targetState.hoveredCoordinates;
+        if(coordinates !== null) {
+            var wellInfo = this.objectWellInfo(coordinates.object); //this.allObjectWells().location(targetState.hoveredCoordinates.object);
+            if (wellInfo) {
+                var location = wellInfo.location;
+                coordinates.well = location.coordinates();
+                coordinates.plate = location.plate;
             }
+
         }
     }
 
@@ -201,8 +203,65 @@ export class EnrichedState extends InteractionState {
         return this.allObjInfo;
     }*/
 
-    allObjectWells() {
+    /*allObjectWells() {
         return new ObjectWells(this.objectInfo.value);
+    }*/
+
+    selectionWell(selection: SelectionCoordinates) {
+        return this.wellLocation(selection.well.column, selection.well.row, selection.plate);
+    }
+
+    objectWellInfo(object: number) {
+        var result: {location: WellLocation; coordinates: number[]} = null;
+
+        var table = this.objectInfo.value;
+        if(object in table.rowIndex) {
+            result = {
+                location: this.wellLocation(table.cell("column", object), table.cell("row", object), table.cell("plate", object)),
+                coordinates: [table.cell("x", object), table.cell("y", object)]
+            }
+        }
+
+        return result;
+    }
+
+    wellLocation(column: number, row: number, plate: number) {
+        var objectTable = this.objectInfo.value;
+
+        var locationMap: StringMap<WellLocation> = objectTable['wellLocations'];
+        if(!locationMap) {
+            locationMap = {};
+
+            var imageURLs = this.availableImageTypes();    //objectTable.columns.filter(c => _.startsWith(c, "img_"));
+
+            var plateVec = objectTable.columnVector('plate');
+            var columnVec = objectTable.columnVector('column');
+            var rowVec = objectTable.columnVector('row');
+            //var imageVecs = imageURLs.map(c => objectTable.columnVector(c));
+
+            for(var i = 0; i < plateVec.length; i++) {
+                var plateObj = plateVec[i];
+                var columnObj = columnVec[i];
+                var rowObj = rowVec[i];
+
+                var imgMap: StringMap<string> = {};
+                _.pairs(imageURLs).forEach((p, cnI) => imgMap[p[0]] = <any>objectTable.columnVector(p[1])[i]);
+                locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
+            }
+
+            objectTable['wellLocations'] = locationMap;
+        }
+
+        return locationMap[column + "_" + row + "_" + plate] || new WellLocation(column, row, plate);
+    }
+
+    availableImageTypes() {
+        var result: StringMap<string> = {};
+
+        var columns = this.objectInfo.value.columns.filter(c => _.startsWith(c, "img_"));
+        columns.forEach(c => result[c.slice(4)] = c);
+
+        return result;
     }
 }
 
@@ -229,7 +288,7 @@ export class PopulationSpace {
     // Dictionary for communicating population description.
     toDict() {
         var exemplars = {};
-        this.populations.forEach(p => exemplars[p.identifier] = p.exemplars.elements); // DO NOT REMOVE!
+        this.populations.forEach(p => exemplars[p.identifier] = _.clone(p.exemplars.elements)); // DO NOT REMOVE!
         return { features: this.features.elements, exemplars: exemplars };
     }
 
@@ -284,7 +343,7 @@ export class SelectionCoordinates {
     }
 
     // Well location. Returns null if it is invalid.
-    private static cachedLocation: WellLocation = null;
+    /*private static cachedLocation: WellLocation = null;
     wellLocation() {
         var location: WellLocation = null;
 
@@ -299,7 +358,7 @@ export class SelectionCoordinates {
         }
 
         return location;
-    }
+    }*/
 
     // Selected population, or total population fallback.
     populationOrTotal(): any {
@@ -329,7 +388,7 @@ export class DataSetInfo {
     }
 }
 
-export class ObjectWells {
+/*export class ObjectWells {
     private wellLocations: WellLocation[];
 
     constructor(public frame: DataFrame<any>) {
@@ -337,8 +396,8 @@ export class ObjectWells {
             var locations = [];
             frame['wellLocations'] = locations;
             frame.rows.forEach(r => {
-                var columnI = frame.columnIndex["well_col"];
-                var rowI = frame.columnIndex["well_row"];
+                var columnI = frame.columnIndex["column"];
+                var rowI = frame.columnIndex["row"];
                 var plateI = frame.columnIndex["plate"];
                 var rI = frame.rowIndex[r];
 
@@ -365,7 +424,7 @@ export class ObjectWells {
             this.frame.matrix[yI][rI]
         ];
     }
-}
+}*/
 
 export class WellClusterShares extends NumberFrame {
     wellIndex: number[][][][];  // Index by cluster name (object nr), plate nr, col nr, row nr.
@@ -429,7 +488,7 @@ export class FeatureHistograms {
 
     constructor(dict: {} = {}) {
         this.histograms = {};
-        _.keys(dict).map(k => this.histograms[k] = new DataFrame(dict[k]).transpose().normalize(false, true));
+        _.keys(dict).map(k => this.histograms[k] = new DataFrame(dict[k]).normalize()); //.transpose().normalize(false, true));
     }
 }
 
@@ -459,21 +518,14 @@ export class WellLocation extends WellCoordinates {
 
     constructor(column: number,
                 row: number,
-                public plate: number) {
+                public plate: number,
+                public imageURLs: StringMap<string> = {}) {
         super(column, row);
     }
 
     toString() {
         return this.column.toString() + "." + this.row.toString() + "." + this.plate.toString();
     }
-
-    /*toJSON() {
-        return {
-            column: this.column,
-            row: this.row,
-            plate: this.plate
-        };
-    }*/
 
     equals(that: WellLocation) {
         return this.column === that.column && this.row === that.row && this.plate === that.plate;
@@ -484,43 +536,20 @@ export class WellLocation extends WellCoordinates {
         return new WellSelection(id, [[this.plate, this.plate]], [new WellCoordinates(this.column, this.row)]);
     }
 
-    /*// Location for the given plate.
-    forPlate(plate: number) {
-        return new WellLocation(this.column, this.row, plate);
-    }
-
-    // Location for the given column and row coordinates.
-    forCoordinates(column: number, row: number) {
-        return new WellLocation(column, row, this.plate);
-    }*/
-
     // Well column and row coordinates. Excludes plate coordinate.
     coordinates() {
         return new WellCoordinates(this.column, this.row);
     }
 
-    static zfill(num: number, len: number) {
-        return (Array(len).join("0") + num).slice(-len);
-    }
+    private imgArrived: string = null;
+    image(type: string = null) {
+        // Default to first image type.
+        if(type === null) type = _.keys(this.imageURLs)[0];
 
-    static plateTags = _.range(1, 69).map(i => "HT" + WellLocation.zfill(i, 2));
-    static columnTags = 'ABCDEFGHIJKLMNOP'.split('');
-    static rowTags = _.range(4, 25).map(i => WellLocation.zfill(i, 3));
-
-    private imageURL() {
-        var plateTag = WellLocation.plateTags[this.plate];
-        var wellTag = plateTag + WellLocation.columnTags[this.column] + WellLocation.rowTags[this.row];
-
-        return "http://www.ebi.ac.uk/huber-srv/cellmorph/view/" + plateTag + "/" + wellTag + "/" + wellTag + "_seg.jpeg";
-        //return "dataset/images/" + plateTag + "/" + wellTag + "/" + wellTag + "_seg.jpeg";
-    }
-
-    private imgArrived = false;
-    image() {
-        if(!this.img) {
+        if(this.imgArrived !== type && this.imageURLs[type]) {
             this.img = new Image();
-            this.img.onload = () => this.imgArrived = true;
-            this.img.src = this.imageURL();
+            this.img.onload = () => this.imgArrived = type;
+            this.img.src = this.imageURLs[type];
         }
 
         return this.imgArrived ? this.img : null;
@@ -535,57 +564,12 @@ export class WellSelection {
 }
 
 export class HistogramMatrix {
-    matrices: StringMap<StringMap<number[][]>>[];   // Histogram per cluster, per feature pair.
+    matrices: StringMap<StringMap<number[][][]>>;   // Histogram per feature pair, per cluster
     constructor(matrixMap: {} = {}) {
-        this.matrices = [];
-
-        _.keys(matrixMap).forEach(kC => {
-            var cNr = Number(kC);
-            var ftrMatrices = matrixMap[kC];
-
-            console.log("Cluster key: " + kC);
-
-            if(!(cNr in this.matrices)) {
-                this.matrices[cNr] = {};
-            }
-
-            _.keys(ftrMatrices).forEach(kF => {
-                var ftrs = kF.split("..");
-                if(!(ftrs[0] in this.matrices[cNr])) {
-                    this.matrices[cNr][ftrs[0]] = {};
-                }
-                this.matrices[cNr][ftrs[0]][ftrs[1]] = ftrMatrices[kF];
-            });
-        });
-
-        console.log("Received new histogram matrix:");
-        console.log(matrixMap);
+        this.matrices = <any>matrixMap;
     }
 
-    // Get matrix for given population id and feature pair.
-    matrix(cluster: number, feature1: string, feature2: string) {
-        var clusterMatrices = this.matrices[cluster] || {};
-
-        var matrix: number[][] = null;
-        if(feature1 in clusterMatrices) {
-            matrix = clusterMatrices[feature1][feature2] || null;
-        } else if (feature2 in clusterMatrices) {
-            matrix = clusterMatrices[feature2][feature1] || null;
-        }
-
-        return matrix;
-    }
-
-    // Matrices by feature pair.
-    matricesByFeaturePair(feature1: string, feature2: string) {
-        var result = {};
-
-        _.keys(this.matrices).forEach(kC => {
-            var cNr = Number(kC);
-            var mat = this.matrix(cNr, feature1, feature2);
-            if(mat) result[cNr] = mat;
-        });
-
-        return result;
+    matricesFor(xFeature: string, yFeature: string) {
+        return (this.matrices[xFeature] || {})[yFeature] || null;
     }
 }

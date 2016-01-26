@@ -12,6 +12,8 @@ define(["require", "exports", './core/graphics/style', './core/math'], function 
             this.font = new Font(16, 200);
             this.featureFont = new Font(12);
             this.sideFont = new Font(10);
+            // User adjustable options.
+            this.imageType = null; // The type of image to present.
             // Default palette.
             this.base = Color.grey(75);
             this.baseEmphasis = Color.BLACK;
@@ -70,7 +72,7 @@ define(["require", "exports", './core/graphics/style', './core/math'], function 
             this.miniHeatSpace = 1;
             this.miniHeatColumnCount = 5;
             // Well details view.
-            this.wellViewMaxDim = [500, 500];
+            this.wellViewMaxDim = [500, 370];
             // Object details view.
             this.objectViewImageRadius = 40;
         }

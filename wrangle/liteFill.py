@@ -38,8 +38,10 @@ try:
     # Setup object table, include plate and well attributes.
     attributes = objectFeatures()
     attributes['plate'] = "INTEGER"
-    attributes['well.col'] = "INTEGER"
-    attributes['well.row'] = "INTEGER"
+    attributes['column'] = "INTEGER"
+    attributes['row'] = "INTEGER"
+    attributes['img_rgb'] = "TEXT"
+    attributes['img_seg'] = "TEXT"
     fCT = ','.join([config.formatField(at) + " " + type for at, type in attributes.items()])  # SQL fields and types.
 
     cur.execute("CREATE TABLE object(id INTEGER PRIMARY KEY, {0})".format(fCT))
@@ -66,8 +68,10 @@ try:
                         # Extract direct attributes and include plate and well attributes.
                         attributes = {k: fast_real(v) for k, v in d.iteritems()}
                         attributes['plate'] = plate
-                        attributes['well.col'] = col
-                        attributes['well.row'] = row
+                        attributes['column'] = col
+                        attributes['row'] = row
+                        attributes['img_rgb'] = config.wellURL(col, row, plate, "rgb")
+                        attributes['img_seg'] = config.wellURL(col, row, plate, "seg")
 
                         fC = ','.join([config.formatField(at) for at, type in attributes.items()])
                         fV = ','.join(["'" + str(a) + "'" for a in attributes.values()])  # SQL values.

@@ -5,7 +5,7 @@ var __extends = this.__extends || function (d, b) {
     __.prototype = b.prototype;
     d.prototype = new __();
 };
-define(["require", "exports", './view', './style', '../math'], function (require, exports, View, style, math) {
+define(["require", "exports", './view', './style', '../math'], function (require, exports, view, style, math) {
     var Color = style.Color;
     var Font = style.Font;
     var Vector = math.Vector;
@@ -199,22 +199,22 @@ define(["require", "exports", './view', './style', '../math'], function (require
             if (pickable === void 0) { pickable = false; }
             _super.call(this, identifier);
             this.identifier = identifier;
-            this.position = position;
             this.style = style;
             this.pickable = pickable;
             // Multiple lines and their dimension.
             this.lines = style.font.wordWrap(text);
-            this.size = style.font.wrapDimensions(this.lines);
+            var dimensions = style.font.wrapDimensions(this.lines);
             // Determine top left position from position and align.
             this.topLeft = position;
             if (style.horizontalAnchor === 'middle')
-                this.topLeft[0] -= this.size[0] / 2;
+                this.topLeft[0] -= dimensions[0] / 2;
             else if (style.horizontalAnchor === 'right')
-                this.topLeft[0] -= this.size[0];
+                this.topLeft[0] -= dimensions[0];
             if (style.verticalAnchor === 'middle')
-                this.topLeft[1] += this.size[1] / 2;
+                this.topLeft[1] += dimensions[1] / 2;
             else if (style.verticalAnchor === 'top')
-                this.topLeft[1] += this.size[1];
+                this.topLeft[1] += dimensions[1];
+            this.setDimensions(dimensions);
         }
         Label.prototype.paint = function (context) {
             var _this = this;
@@ -232,7 +232,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.restore();
         };
         return Label;
-    })(BaseSnippet);
+    })(PlacedSnippet);
     exports.Label = Label;
 });
 //# sourceMappingURL=snippet.js.map

@@ -20,6 +20,9 @@ define(["require", "exports", './collection', './math'], function (require, expo
         DataFrame.prototype.columnVector = function (name) {
             return this.matrix[this.columnIndex[name]];
         };
+        DataFrame.prototype.cell = function (column, row) {
+            return (this.columnVector(column) || [])[this.rowIndex[row]];
+        };
         DataFrame.prototype.transpose = function () {
             var tr = this.shallowClone();
             tr.columns = this.rows;

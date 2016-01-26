@@ -47,15 +47,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             objectInfoDict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
             objectInfoDict['plate'] = focusedWell.plate === null ? -1 : focusedWell.plate;
             this.dataSetInfo = new ProxyValue("dataSetInfo", {}, new DataSetInfo(), function (ds) { return new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels); });
-            this.features = new ProxyValue("features", {}, new DataFrame(), function (f) { return new DataFrame(f).transpose().normalize(false, true); });
+            this.features = new ProxyValue("features", {}, []);
             this.objectInfo = new ProxyValue("objectInfo", objectInfoDict, new NumberFrame(), function (o) { return new NumberFrame(o); });
-            /*this.objectHistograms = new ProxyValue(
-                "objectHistograms2D",
-                histogramDict,
-                new HistogramMatrix(), m => new HistogramMatrix(m)
-            );*/
-            this.featureHistograms = new ProxyValue("featureHistograms", populationDict, new FeatureHistograms(), function (hs) { return new FeatureHistograms(hs); });
+            this.objectHistograms = new ProxyValue("objectHistograms2D", histogramDict, new HistogramMatrix(), function (m) { return new HistogramMatrix(m); });
             this.wellClusterShares = new ProxyValue("wellClusterShares", populationDict, new WellClusterShares(), function (s) { return new WellClusterShares(s); });
+            this.featureHistograms = new ProxyValue("featureHistograms", populationDict, new FeatureHistograms(), function (hs) { return new FeatureHistograms(hs); });
         }
         EnrichedState.prototype.cloneInteractionState = function () {
             return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.configuration));
@@ -86,8 +82,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 var x = tbl.columnVector('x');
                 var y = tbl.columnVector('y');
                 var plate = tbl.columnVector('plate');
-                var row = tbl.columnVector('well_row');
-                var col = tbl.columnVector('well_col');
+                var row = tbl.columnVector('row');
+                var col = tbl.columnVector('column');
                 var minDist = Number.MAX_VALUE;
                 var focusedWell = this.focused();
                 for (var i = 0; i < tbl.rows.length; i++) {
@@ -104,22 +100,23 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Well selections, including single focused well.
         EnrichedState.prototype.allWellSelections = function () {
-            var location = this.focused().wellLocation();
+            var location = this.selectionWell(this.focused()); //this.focused().wellLocation();
             var focusedWell = location ? [location.toWellSelection("Selected")] : [];
             return _.union(this.dataSetInfo.value.wellSelections, focusedWell);
         };
         // Focused coordinates.
         EnrichedState.prototype.focused = function () {
-            //this.makeConsistent(this.hoveredCoordinates);
             return this.hoveredCoordinates.otherwise(this.selectedCoordinates);
         };
         // Complete, or correct, coordinates, from object level up to plate level.
         EnrichedState.prototype.conformHoveredCoordinates = function (targetState) {
-            if (targetState.hoveredCoordinates !== null) {
-                var location = this.allObjectWells().location(targetState.hoveredCoordinates.object);
-                if (location) {
-                    targetState.hoveredCoordinates.well = location.coordinates();
-                    targetState.hoveredCoordinates.plate = location.plate;
+            var coordinates = targetState.hoveredCoordinates;
+            if (coordinates !== null) {
+                var wellInfo = this.objectWellInfo(coordinates.object); //this.allObjectWells().location(targetState.hoveredCoordinates.object);
+                if (wellInfo) {
+                    var location = wellInfo.location;
+                    coordinates.well = location.coordinates();
+                    coordinates.plate = location.plate;
                 }
             }
         };
@@ -133,8 +130,49 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             }
             return this.allObjInfo;
         }*/
-        EnrichedState.prototype.allObjectWells = function () {
+        /*allObjectWells() {
             return new ObjectWells(this.objectInfo.value);
+        }*/
+        EnrichedState.prototype.selectionWell = function (selection) {
+            return this.wellLocation(selection.well.column, selection.well.row, selection.plate);
+        };
+        EnrichedState.prototype.objectWellInfo = function (object) {
+            var result = null;
+            var table = this.objectInfo.value;
+            if (object in table.rowIndex) {
+                result = {
+                    location: this.wellLocation(table.cell("column", object), table.cell("row", object), table.cell("plate", object)),
+                    coordinates: [table.cell("x", object), table.cell("y", object)]
+                };
+            }
+            return result;
+        };
+        EnrichedState.prototype.wellLocation = function (column, row, plate) {
+            var objectTable = this.objectInfo.value;
+            var locationMap = objectTable['wellLocations'];
+            if (!locationMap) {
+                locationMap = {};
+                var imageURLs = this.availableImageTypes(); //objectTable.columns.filter(c => _.startsWith(c, "img_"));
+                var plateVec = objectTable.columnVector('plate');
+                var columnVec = objectTable.columnVector('column');
+                var rowVec = objectTable.columnVector('row');
+                for (var i = 0; i < plateVec.length; i++) {
+                    var plateObj = plateVec[i];
+                    var columnObj = columnVec[i];
+                    var rowObj = rowVec[i];
+                    var imgMap = {};
+                    _.pairs(imageURLs).forEach(function (p, cnI) { return imgMap[p[0]] = objectTable.columnVector(p[1])[i]; });
+                    locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
+                }
+                objectTable['wellLocations'] = locationMap;
+            }
+            return locationMap[column + "_" + row + "_" + plate] || new WellLocation(column, row, plate);
+        };
+        EnrichedState.prototype.availableImageTypes = function () {
+            var result = {};
+            var columns = this.objectInfo.value.columns.filter(function (c) { return _.startsWith(c, "img_"); });
+            columns.forEach(function (c) { return result[c.slice(4)] = c; });
+            return result;
         };
         return EnrichedState;
     })(InteractionState);
@@ -162,7 +200,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         // Dictionary for communicating population description.
         PopulationSpace.prototype.toDict = function () {
             var exemplars = {};
-            this.populations.forEach(function (p) { return exemplars[p.identifier] = p.exemplars.elements; }); // DO NOT REMOVE!
+            this.populations.forEach(function (p) { return exemplars[p.identifier] = _.clone(p.exemplars.elements); }); // DO NOT REMOVE!
             return { features: this.features.elements, exemplars: exemplars };
         };
         // Whether given object is an exemplar.
@@ -219,25 +257,27 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         SelectionCoordinates.prototype.otherwise = function (that) {
             return new SelectionCoordinates(this.population === null ? that.population : this.population, this.object === null ? that.object : this.object, this.well === null ? that.well : this.well, this.plate === null ? that.plate : this.plate);
         };
-        SelectionCoordinates.prototype.wellLocation = function () {
-            var location = null;
-            if (this.well !== null && this.plate !== null) {
+        // Well location. Returns null if it is invalid.
+        /*private static cachedLocation: WellLocation = null;
+        wellLocation() {
+            var location: WellLocation = null;
+    
+            if(this.well !== null && this.plate !== null) {
                 location = new WellLocation(this.well.column, this.well.row, this.plate);
+    
                 if (SelectionCoordinates.cachedLocation !== null && SelectionCoordinates.cachedLocation.equals(location)) {
                     location = SelectionCoordinates.cachedLocation;
-                }
-                else {
+                } else {
                     SelectionCoordinates.cachedLocation = location;
                 }
             }
+    
             return location;
-        };
+        }*/
         // Selected population, or total population fallback.
         SelectionCoordinates.prototype.populationOrTotal = function () {
             return this.population || Population.POPULATION_TOTAL_NAME;
         };
-        // Well location. Returns null if it is invalid.
-        SelectionCoordinates.cachedLocation = null;
         return SelectionCoordinates;
     })();
     exports.SelectionCoordinates = SelectionCoordinates;
@@ -260,26 +300,34 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         return DataSetInfo;
     })();
     exports.DataSetInfo = DataSetInfo;
-    var ObjectWells = (function () {
-        function ObjectWells(frame) {
-            this.frame = frame;
-            if (!frame['wellLocations']) {
+    /*export class ObjectWells {
+        private wellLocations: WellLocation[];
+    
+        constructor(public frame: DataFrame<any>) {
+            if(!frame['wellLocations']) {
                 var locations = [];
                 frame['wellLocations'] = locations;
-                frame.rows.forEach(function (r) {
-                    var columnI = frame.columnIndex["well_col"];
-                    var rowI = frame.columnIndex["well_row"];
+                frame.rows.forEach(r => {
+                    var columnI = frame.columnIndex["column"];
+                    var rowI = frame.columnIndex["row"];
                     var plateI = frame.columnIndex["plate"];
                     var rI = frame.rowIndex[r];
-                    locations[r] = new WellLocation(frame.matrix[columnI][rI], frame.matrix[rowI][rI], frame.matrix[plateI][rI]);
+    
+                    locations[r] = new WellLocation(
+                        frame.matrix[columnI][rI],
+                        frame.matrix[rowI][rI],
+                        frame.matrix[plateI][rI]
+                    );
                 });
             }
         }
-        ObjectWells.prototype.location = function (object) {
+    
+        location(object: number) {
             return this.frame['wellLocations'][object];
-        };
+        }
+    
         // Coordinates in well image.
-        ObjectWells.prototype.coordinates = function (object) {
+        coordinates(object: number) {
             var xI = this.frame.columnIndex["x"];
             var yI = this.frame.columnIndex["y"];
             var rI = this.frame.rowIndex[object];
@@ -287,10 +335,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.frame.matrix[xI][rI],
                 this.frame.matrix[yI][rI]
             ];
-        };
-        return ObjectWells;
-    })();
-    exports.ObjectWells = ObjectWells;
+        }
+    }*/
     var WellClusterShares = (function (_super) {
         __extends(WellClusterShares, _super);
         function WellClusterShares(dictionary) {
@@ -350,7 +396,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var _this = this;
             if (dict === void 0) { dict = {}; }
             this.histograms = {};
-            _.keys(dict).map(function (k) { return _this.histograms[k] = new DataFrame(dict[k]).transpose().normalize(false, true); });
+            _.keys(dict).map(function (k) { return _this.histograms[k] = new DataFrame(dict[k]).normalize(); }); //.transpose().normalize(false, true));
         }
         return FeatureHistograms;
     })();
@@ -379,21 +425,16 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     // Well by plate, column, and row coordinates.
     var WellLocation = (function (_super) {
         __extends(WellLocation, _super);
-        function WellLocation(column, row, plate) {
+        function WellLocation(column, row, plate, imageURLs) {
+            if (imageURLs === void 0) { imageURLs = {}; }
             _super.call(this, column, row);
             this.plate = plate;
-            this.imgArrived = false;
+            this.imageURLs = imageURLs;
+            this.imgArrived = null;
         }
         WellLocation.prototype.toString = function () {
             return this.column.toString() + "." + this.row.toString() + "." + this.plate.toString();
         };
-        /*toJSON() {
-            return {
-                column: this.column,
-                row: this.row,
-                plate: this.plate
-            };
-        }*/
         WellLocation.prototype.equals = function (that) {
             return this.column === that.column && this.row === that.row && this.plate === that.plate;
         };
@@ -401,40 +442,23 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         WellLocation.prototype.toWellSelection = function (id) {
             return new WellSelection(id, [[this.plate, this.plate]], [new WellCoordinates(this.column, this.row)]);
         };
-        /*// Location for the given plate.
-        forPlate(plate: number) {
-            return new WellLocation(this.column, this.row, plate);
-        }
-    
-        // Location for the given column and row coordinates.
-        forCoordinates(column: number, row: number) {
-            return new WellLocation(column, row, this.plate);
-        }*/
         // Well column and row coordinates. Excludes plate coordinate.
         WellLocation.prototype.coordinates = function () {
             return new WellCoordinates(this.column, this.row);
         };
-        WellLocation.zfill = function (num, len) {
-            return (Array(len).join("0") + num).slice(-len);
-        };
-        WellLocation.prototype.imageURL = function () {
-            var plateTag = WellLocation.plateTags[this.plate];
-            var wellTag = plateTag + WellLocation.columnTags[this.column] + WellLocation.rowTags[this.row];
-            return "http://www.ebi.ac.uk/huber-srv/cellmorph/view/" + plateTag + "/" + wellTag + "/" + wellTag + "_seg.jpeg";
-            //return "dataset/images/" + plateTag + "/" + wellTag + "/" + wellTag + "_seg.jpeg";
-        };
-        WellLocation.prototype.image = function () {
+        WellLocation.prototype.image = function (type) {
             var _this = this;
-            if (!this.img) {
+            if (type === void 0) { type = null; }
+            // Default to first image type.
+            if (type === null)
+                type = _.keys(this.imageURLs)[0];
+            if (this.imgArrived !== type && this.imageURLs[type]) {
                 this.img = new Image();
-                this.img.onload = function () { return _this.imgArrived = true; };
-                this.img.src = this.imageURL();
+                this.img.onload = function () { return _this.imgArrived = type; };
+                this.img.src = this.imageURLs[type];
             }
             return this.imgArrived ? this.img : null;
         };
-        WellLocation.plateTags = _.range(1, 69).map(function (i) { return "HT" + WellLocation.zfill(i, 2); });
-        WellLocation.columnTags = 'ABCDEFGHIJKLMNOP'.split('');
-        WellLocation.rowTags = _.range(4, 25).map(function (i) { return WellLocation.zfill(i, 3); });
         return WellLocation;
     })(WellCoordinates);
     exports.WellLocation = WellLocation;
@@ -450,50 +474,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     exports.WellSelection = WellSelection;
     var HistogramMatrix = (function () {
         function HistogramMatrix(matrixMap) {
-            var _this = this;
             if (matrixMap === void 0) { matrixMap = {}; }
-            this.matrices = [];
-            _.keys(matrixMap).forEach(function (kC) {
-                var cNr = Number(kC);
-                var ftrMatrices = matrixMap[kC];
-                console.log("Cluster key: " + kC);
-                if (!(cNr in _this.matrices)) {
-                    _this.matrices[cNr] = {};
-                }
-                _.keys(ftrMatrices).forEach(function (kF) {
-                    var ftrs = kF.split("..");
-                    if (!(ftrs[0] in _this.matrices[cNr])) {
-                        _this.matrices[cNr][ftrs[0]] = {};
-                    }
-                    _this.matrices[cNr][ftrs[0]][ftrs[1]] = ftrMatrices[kF];
-                });
-            });
-            console.log("Received new histogram matrix:");
-            console.log(matrixMap);
+            this.matrices = matrixMap;
         }
-        // Get matrix for given population id and feature pair.
-        HistogramMatrix.prototype.matrix = function (cluster, feature1, feature2) {
-            var clusterMatrices = this.matrices[cluster] || {};
-            var matrix = null;
-            if (feature1 in clusterMatrices) {
-                matrix = clusterMatrices[feature1][feature2] || null;
-            }
-            else if (feature2 in clusterMatrices) {
-                matrix = clusterMatrices[feature2][feature1] || null;
-            }
-            return matrix;
-        };
-        // Matrices by feature pair.
-        HistogramMatrix.prototype.matricesByFeaturePair = function (feature1, feature2) {
-            var _this = this;
-            var result = {};
-            _.keys(this.matrices).forEach(function (kC) {
-                var cNr = Number(kC);
-                var mat = _this.matrix(cNr, feature1, feature2);
-                if (mat)
-                    result[cNr] = mat;
-            });
-            return result;
+        HistogramMatrix.prototype.matricesFor = function (xFeature, yFeature) {
+            return (this.matrices[xFeature] || {})[yFeature] || null;
         };
         return HistogramMatrix;
     })();
