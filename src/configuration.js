@@ -1,5 +1,6 @@
 ///<reference path="references.d.ts"/>
-define(["require", "exports", './core/graphics/style', './core/math'], function (require, exports, style, math) {
+define(["require", "exports", './core/graphics/style', './core/graphics/snippet', './core/math'], function (require, exports, style, Snippet, math) {
+    var LabelStyle = Snippet.LabelStyle;
     var Color = style.Color;
     var Font = style.Font;
     var Vector = math.Vector;
@@ -21,6 +22,9 @@ define(["require", "exports", './core/graphics/style', './core/math'], function 
             this.baseDim = Color.grey(200);
             this.baseVeryDim = Color.grey(225);
             this.baseSelected = new Color(25, 50, 255); //new Color(185, 28, 48);  //Color.CRIMSON;
+            // Guide labels.
+            this.guideStyle = new LabelStyle(new Font(12, 150), Color.CRIMSON, 'left', 'bottom');
+            this.guideArrowLength = 5;
             // Features.
             this.featureTable = new NumberTableConfiguration(this.sideFont, this.base, [50, 10]);
             // Scatter plots.

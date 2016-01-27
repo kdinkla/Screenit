@@ -638,10 +638,10 @@ export class ViewContext {
         this.fill();
     }
 
-    strokeLine(x1: number, y1: number, x2: number, y2: number) {
+    strokeLine(pos1: number[], pos2: number[]) {
         this.context.beginPath();
-        this.context.moveTo(this.t(x1), this.t(y1));
-        this.context.lineTo(this.t(x2), this.t(y2));
+        this.context.moveTo(this.t(pos1[0]), this.t(pos1[1]));
+        this.context.lineTo(this.t(pos2[0]), this.t(pos2[1]));
         this.context.stroke();
     }
 

@@ -3,6 +3,9 @@
 import style = require('./core/graphics/style');
 import _ = require('lodash');
 
+import Snippet = require('./core/graphics/snippet');
+import LabelStyle = Snippet.LabelStyle;
+
 import Color = style.Color;
 import Font = style.Font;
 
@@ -29,6 +32,10 @@ export class BaseConfiguration {
     baseDim = Color.grey(200);
     baseVeryDim = Color.grey(225);
     baseSelected = new Color(25, 50, 255);    //new Color(185, 28, 48);  //Color.CRIMSON;
+
+    // Guide labels.
+    guideStyle = new LabelStyle(new Font(12, 150), Color.CRIMSON, 'left', 'bottom');
+    guideArrowLength = 5;
 
     // Features.
     featureTable = new NumberTableConfiguration(this.sideFont, this.base, [50, 10]);

@@ -227,6 +227,8 @@ def featureHistograms(featureSet, exemplars, bins):
 
     pool = Pool(initializer=setupWorkerShare, initargs=[partition])
     results = pool.imap(featureHistogram, tasks)
+    pool.close()
+    pool.join()
 
     histograms = {c: {} for c, table in partition.iteritems()}
     for feature, cluster, histogram in results:
@@ -267,11 +269,6 @@ def wellClusterSharesFlat(features, exemplars):
 #@lru_cache(maxsize=20)
 def objectHistogram2D(args):
     (xFeature, yFeature, bins) = args
-    # if yFeature < xFeature:
-    #     print "Invert histogram."
-    #     contours = {cls: mat.transpose()
-    #                 for cls, mat in objectHistogram2D(features, exemplars, bins, yFeature, xFeature).iteritems()}
-    # else:
 
     print "Compute histogram for " + xFeature + ", " + yFeature
     # Contour maps per cluster.
@@ -304,6 +301,8 @@ def objectHistogramMatrix(features, exemplars, bins):
     pool = Pool(initializer=setupWorkerShare, initargs=[partition])
     tasks = [(xFtr, yFtr, bins) for yFtr in features for xFtr in features if xFtr < yFtr]
     results = pool.imap(objectHistogram2D, tasks)
+    pool.close()
+    pool.join()
 
     histograms = {ftr2: {ftr1: {} for ftr1 in features} for ftr2 in features}
     for xFeature, yFeature, contours in results:
@@ -312,7 +311,3 @@ def objectHistogramMatrix(features, exemplars, bins):
             histograms[yFeature][xFeature][c] = lvlCnt.transpose().tolist()
 
     return histograms
-
-    # return {xFtr: {yFtr: {cls: mat.tolist()
-    #                       for cls, mat in objectHistogram2D(features, exemplars, bins, xFtr, yFtr).iteritems()}
-    #                for yFtr in features if yFtr is not xFtr} for xFtr in features}

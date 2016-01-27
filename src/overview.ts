@@ -292,43 +292,7 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
             });
 
             context.restore();
-        } else {
-            context.save();
-
-            var objectFeatures = this.model.objectInfo.value;
-            var x = objectFeatures.columnVector(this.feature1) || []; //objectFeatures.normalizedColumnVector(this.feature1) || [];
-            var y = objectFeatures.columnVector(this.feature2) || []; //objectFeatures.normalizedColumnVector(this.feature2) || [];
-            var cluster = objectFeatures.columnVector('population') || [];
-
-            // Large colored dots for background.
-            var r = cfg.splomClusterRadius;
-            //var clstr = mod.clusters.value;
-            for (var i = 0; i < x.length; i++) {
-                //var objId = objectFeatures.rows[i];
-                var pI = cluster[i];    //clstr.clusterMap[objId];
-                var population = mod.populationSpace.populations.byId(pI);
-                var color = population ? population.colorTrans : Color.NONE; //pI >= 0 ? cfg.clusterTransparentColors[clstr.identifierIndex[pI]] : Color.NONE;
-                context.fillStyle = color.toString();
-                this.paintOfflineDot(context, x[i] * size, (1 - y[i]) * size, r, r);
-                //context.fillEllipse(x[i] * size, y[i] * size, r, r);
-            }
-
-            // Plain dots for density.
-            r = cfg.splomDotRadius;
-            context.fillStyle = cfg.splomDotDensityColor.toString();
-            for (var i = 0; i < x.length; i++) {
-                this.paintOfflineDot(context, x[i] * size, (1 - y[i]) * size, r, r);
-                //context.fillEllipse(x[i] * size, y[i] * size, r, r);
-            }
-
-            context.restore();
         }
-    }
-
-    private paintOfflineDot(context: CanvasRenderingContext2D, cx: number, cy: number, rw: number, rh: number) {
-        context.beginPath();
-        context['ellipse'](cx, cy, rw, rh, 0, 2 * Math.PI, false);
-        context.fill();
     }
 
     paint(context: ViewContext) {
@@ -662,6 +626,8 @@ class FeatureHistogramTable extends PlacedSnippet {
     rowIndex: Label[];
     histograms: Histogram[][];
 
+    guide: GuideLabel;
+
     constructor(identifier: string,
                 topLeft: number[],
                 public state: EnrichedState) {
@@ -711,6 +677,15 @@ class FeatureHistogramTable extends PlacedSnippet {
 
         this.setDimensions([((configuration.visibleIndex ? 1 : 0) + 1) * configuration.cellOuterDimensions[0],
                             (features.length + (configuration.visibleHeader ? 1 : 0)) * configuration.cellOuterDimensions[1]]);
+
+        if(selected.length < 2) {
+            this.guide = new GuideLabel(
+                "Click on a feature label to add it to the phenotype model space.",
+                Vector.add(this.topRight, [15, 250]),
+                Vector.add(this.topLeft, [35, 250]),
+                25,
+                state);
+        }
     }
 
     paint(context: ViewContext) {
@@ -727,6 +702,8 @@ class FeatureHistogramTable extends PlacedSnippet {
         context.snippets(this.rowIndex);
         //context.snippets(this.histograms);
         this.histograms.forEach(hs => context.snippets(hs));
+
+        context.snippet(this.guide);
     }
 }
 
@@ -755,7 +732,7 @@ class Histogram extends BaseSnippet {
             var y1 = (1 - f1) * cfg.cellDimensions[1];
             var y2 = (1 - f2) * cfg.cellDimensions[1];
 
-            context.strokeLine(x1, y1, x2, y2);
+            context.strokeLine([x1, y1], [x2, y2]);
         }
 
         context.restore();
@@ -792,8 +769,8 @@ class Plate extends PlacedSnippet {
                     ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
                     ctx.fillRect(x + .25, y + .25, cfg.wellDiameter - .5, cfg.wellDiameter - .5);
                 } else {
-                    ctx.strokeLine(x + .25, y + .25, x + cfg.wellDiameter - .25, y + cfg.wellDiameter - .25);
-                    ctx.strokeLine(x + .25, y + cfg.wellDiameter - .25, x + cfg.wellDiameter - .25, y + .25);
+                    ctx.strokeLine([x + .25, y + .25], [x + cfg.wellDiameter - .25, y + cfg.wellDiameter - .25]);
+                    ctx.strokeLine([x + .25, y + cfg.wellDiameter - .25], [x + cfg.wellDiameter - .25, y + .25]);
                 }
             }
         }
@@ -1493,4 +1470,35 @@ class ConfigurationOptions extends PlacedSnippet {
     paint(context: ViewContext) {
         context.snippet(this.buttons);
     }
+}
+
+class GuideLabel extends Label {
+
+    constructor(text: string,
+                public position: number[],
+                public circleCenter: number[],
+                public circleRadius: number,
+                public state: InteractionState) {
+        super("gl_" + text, text, position, state.configuration.guideStyle);
+    }
+
+    paint(context: ViewContext) {
+        super.paint(context);
+
+        context.save();
+
+        var cfg = this.state.configuration;
+
+        var connectorVector = Vector.normalize(Vector.subtract(this.position, this.circleCenter));
+        var connectorEdge = Vector.add(this.circleCenter, Vector.mul(connectorVector, this.circleRadius));
+        var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
+
+        context.strokeStyle(cfg.guideStyle.color);
+        context.lineWidth(1.5);
+        context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
+        context.strokeLine(connectorEdge, connectorOuter);
+
+        context.restore();
+    }
+
 }

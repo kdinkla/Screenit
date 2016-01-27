@@ -492,10 +492,10 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             this.closePath();
             this.fill();
         };
-        ViewContext.prototype.strokeLine = function (x1, y1, x2, y2) {
+        ViewContext.prototype.strokeLine = function (pos1, pos2) {
             this.context.beginPath();
-            this.context.moveTo(this.t(x1), this.t(y1));
-            this.context.lineTo(this.t(x2), this.t(y2));
+            this.context.moveTo(this.t(pos1[0]), this.t(pos1[1]));
+            this.context.lineTo(this.t(pos2[0]), this.t(pos2[1]));
             this.context.stroke();
         };
         ViewContext.prototype.strokeEllipse = function (cx, cy, rw, rh) {

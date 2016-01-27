@@ -84,6 +84,15 @@ define(["require", "exports", 'lodash', './collection'], function (require, expo
                 target[i] += toAdd[i] * factor;
             }
         };
+        // Per element multiplication of two vectors.
+        Vector.mulEl = function (vector1, vector2) {
+            var result = [];
+            var len = vector1.length;
+            for (var i = 0; i < len; i++) {
+                result.push(vector1[i] * vector2[i]);
+            }
+            return result;
+        };
         // Subtract vector v2 from vector v1 and return new copy.
         Vector.subtract = function (v1, v2) {
             var result = [];
@@ -161,6 +170,10 @@ define(["require", "exports", 'lodash', './collection'], function (require, expo
         // Euclidian distance between two points expressed as vectors.
         Vector.distance = function (v1, v2) {
             return Vector.Euclidean(Vector.subtract(v2, v1));
+        };
+        // Clone the given array.
+        Vector.clone = function (v) {
+            return v.map(function (n) { return n; });
         };
         return Vector;
     })();

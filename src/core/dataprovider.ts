@@ -131,7 +131,7 @@ export class ProxyService<M> {
 
                 Promise
                     .resolve($.ajax({
-                        type: "GET",    //"POST",
+                        type: "POST",   //"GET",    //"POST",
                         url: this.url + "/" + proxyValue.name,
                         data: flatArgs,
                         dataType: "json"

@@ -104,6 +104,18 @@ export class Vector {
         }
     }
 
+    // Per element multiplication of two vectors.
+    static mulEl(vector1: number[], vector2: number[]) {
+        var result: number[] = [];
+
+        var len = vector1.length;
+        for (var i = 0; i < len; i++) {
+            result.push(vector1[i] * vector2[i]);
+        }
+
+        return result;
+    }
+
     // Subtract vector v2 from vector v1 and return new copy.
     static subtract(v1: number[], v2: number[]): number[] {
         var result: number[] = [];
@@ -202,6 +214,11 @@ export class Vector {
     // Euclidian distance between two points expressed as vectors.
     static distance(v1: number[], v2: number[]): number {
         return Vector.Euclidean(Vector.subtract(v2, v1));
+    }
+
+    // Clone the given array.
+    static clone(v: number[]) {
+        return v.map(n => n);
     }
 }
 

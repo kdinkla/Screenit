@@ -105,7 +105,7 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
                 //console.log("Call request:");
                 //console.log(flatArgs);
                 Promise.resolve($.ajax({
-                    type: "GET",
+                    type: "POST",
                     url: this.url + "/" + proxyValue.name,
                     data: flatArgs,
                     dataType: "json"
