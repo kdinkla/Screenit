@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from scipy.ndimage.morphology import grey_erosion
+from multiprocessing import Pool, Array
 import itertools
 import json
 from cache import lru_cache
@@ -193,19 +194,44 @@ def objectInfo(featureSet, column, row, plate, exemplars):
 
     return combined
 
+def featureHistogram(args):
+    (feature, cluster, bins) = args
+    clusterMap = workerShare[cluster]
+    prunedColumn = np.take(scaledArray(feature), clusterMap)
+    digitized = (prunedColumn * bins).astype(np.int8)
+    return feature, cluster, {i: cnt for i, cnt in enumerate(np.bincount(digitized, minlength=bins))}
+
+# Worker global variable set.
+def setupWorkerShare(value):
+    global workerShare
+    workerShare = value
+
 @lru_cache(maxsize=5)
 def featureHistograms(featureSet, exemplars, bins):
     partition = clustersAsMap(featureSet, exemplars)
-    histograms = {c: {} for c, table in partition.iteritems()}
 
+    # print "Compute feature histograms."
+    # for feature in data.imageFeatures():
+    #     column = scaledArray(feature)
+    #     for cluster, clusterMap in partition.iteritems():
+    #         prunedColumn = np.take(column, clusterMap)
+    #         digitized = (prunedColumn * bins).astype(np.int8)
+    #         histograms[cluster][feature] = {i: cnt for i, cnt in enumerate(np.bincount(digitized, minlength=bins))}
+    # print "Done computing feature histograms."
+
+    # All computation combinations.
     print "Compute feature histograms."
-    for feature in data.imageFeatures():
-        column = scaledArray(feature)
-        for cluster, clusterMap in partition.iteritems():
-            prunedColumn = np.take(column, clusterMap)
-            digitized = (prunedColumn * bins).astype(np.int8)
-            histograms[cluster][feature] = {i: cnt for i, cnt in enumerate(np.bincount(digitized, minlength=bins))}
-    print "Done computing feature histograms."
+    tasks = [(feature, cluster, bins)
+             for feature in data.imageFeatures()
+             for cluster, clusterMap in partition.iteritems()]
+
+    pool = Pool(initializer=setupWorkerShare, initargs=[partition])
+    results = pool.imap(featureHistogram, tasks)
+
+    histograms = {c: {} for c, table in partition.iteritems()}
+    for feature, cluster, histogram in results:
+        histograms[cluster][feature] = histogram
+    print "Finish compute feature histograms."
 
     return histograms
 
@@ -238,39 +264,55 @@ def wellClusterSharesFlat(features, exemplars):
 
     return wellShares.set_index('well').drop(['plate', 'column', 'row'], axis=1)
 
-@lru_cache(maxsize=20)
-def objectHistogram2D(features, exemplars, bins, xFeature, yFeature):
-    if yFeature < xFeature:
-        print "Invert histogram."
-        contours = {cls: mat.transpose()
-                    for cls, mat in objectHistogram2D(features, exemplars, bins, yFeature, xFeature).iteritems()}
-    else:
-        print "Compute histogram for " + xFeature + ", " + yFeature
-        # Contour maps per cluster.
-        contours = {}
-        kernel = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]  # Morphology kernel.
-        for cluster, table in clustersAsPartition(features, exemplars):
-            # Correct histogram array order by transpose.
-            tBins = bins - 1
-            xCol = (table[xFeature].values * tBins).astype(np.int16)
-            yCol = (table[yFeature].values * tBins).astype(np.int16)
-            digitized = (xCol * bins) + yCol
-            counts = np.bincount(digitized, minlength=bins*bins)
-            counts.shape = (bins, bins)
+#@lru_cache(maxsize=20)
+def objectHistogram2D(args):
+    (xFeature, yFeature, bins) = args
+    # if yFeature < xFeature:
+    #     print "Invert histogram."
+    #     contours = {cls: mat.transpose()
+    #                 for cls, mat in objectHistogram2D(features, exemplars, bins, yFeature, xFeature).iteritems()}
+    # else:
 
-            # Scale histogram densities to base 10 logarithm levels.
-            levels = np.where(counts > 0, (np.log(counts) + 1), 0).astype(np.int8)
+    print "Compute histogram for " + xFeature + ", " + yFeature
+    # Contour maps per cluster.
+    contours = {}
+    kernel = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]  # Morphology kernel.
+    for cluster, table in workerShare:
+        # Correct histogram array order by transpose.
+        tBins = bins - 1
+        xCol = (table[xFeature].values * tBins).astype(np.int16)
+        yCol = (table[yFeature].values * tBins).astype(np.int16)
+        digitized = (xCol * bins) + yCol
+        counts = np.bincount(digitized, minlength=bins*bins)
+        counts.shape = (bins, bins)
 
-            # Level set outlines as contours (retain level as outline number).
-            eroded = grey_erosion(levels, footprint=kernel, mode='constant')
-            difference = np.sign(levels - eroded)
-            levelContours = np.multiply(difference, levels)
+        # Scale histogram densities to base 10 logarithm levels.
+        levels = np.where(counts > 0, (np.log(counts) + 1), 0).astype(np.int8)
 
-            contours[str(cluster)] = levelContours
+        # Level set outlines as contours (retain level as outline number).
+        eroded = grey_erosion(levels, footprint=kernel, mode='constant')
+        difference = np.sign(levels - eroded)
+        levelContours = np.multiply(difference, levels)
 
-    return contours
+        contours[str(cluster)] = levelContours
+
+    return xFeature, yFeature, contours
 
 def objectHistogramMatrix(features, exemplars, bins):
-    return {xFtr: {yFtr: {cls: mat.tolist()
-                          for cls, mat in objectHistogram2D(features, exemplars, bins, xFtr, yFtr).iteritems()}
-                   for yFtr in features if yFtr is not xFtr} for xFtr in features}
+    partition = clustersAsPartition(features, exemplars)
+
+    pool = Pool(initializer=setupWorkerShare, initargs=[partition])
+    tasks = [(xFtr, yFtr, bins) for yFtr in features for xFtr in features if xFtr < yFtr]
+    results = pool.imap(objectHistogram2D, tasks)
+
+    histograms = {ftr2: {ftr1: {} for ftr1 in features} for ftr2 in features}
+    for xFeature, yFeature, contours in results:
+        for c, lvlCnt in contours.iteritems():
+            histograms[xFeature][yFeature][c] = lvlCnt.tolist()
+            histograms[yFeature][xFeature][c] = lvlCnt.transpose().tolist()
+
+    return histograms
+
+    # return {xFtr: {yFtr: {cls: mat.tolist()
+    #                       for cls, mat in objectHistogram2D(features, exemplars, bins, xFtr, yFtr).iteritems()}
+    #                for yFtr in features if yFtr is not xFtr} for xFtr in features}
