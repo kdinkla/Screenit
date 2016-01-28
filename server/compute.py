@@ -210,17 +210,8 @@ def setupWorkerShare(value):
 def featureHistograms(featureSet, exemplars, bins):
     partition = clustersAsMap(featureSet, exemplars)
 
-    # print "Compute feature histograms."
-    # for feature in data.imageFeatures():
-    #     column = scaledArray(feature)
-    #     for cluster, clusterMap in partition.iteritems():
-    #         prunedColumn = np.take(column, clusterMap)
-    #         digitized = (prunedColumn * bins).astype(np.int8)
-    #         histograms[cluster][feature] = {i: cnt for i, cnt in enumerate(np.bincount(digitized, minlength=bins))}
-    # print "Done computing feature histograms."
-
     # All computation combinations.
-    print "Compute feature histograms."
+    #print "Compute feature histograms."
     tasks = [(feature, cluster, bins)
              for feature in data.imageFeatures()
              for cluster, clusterMap in partition.iteritems()]
@@ -233,7 +224,7 @@ def featureHistograms(featureSet, exemplars, bins):
     histograms = {c: {} for c, table in partition.iteritems()}
     for feature, cluster, histogram in results:
         histograms[cluster][feature] = histogram
-    print "Finish compute feature histograms."
+    #print "Finish compute feature histograms."
 
     return histograms
 
@@ -270,7 +261,6 @@ def wellClusterSharesFlat(features, exemplars):
 def objectHistogram2D(args):
     (xFeature, yFeature, bins) = args
 
-    print "Compute histogram for " + xFeature + ", " + yFeature
     # Contour maps per cluster.
     contours = {}
     kernel = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]  # Morphology kernel.

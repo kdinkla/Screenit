@@ -34,8 +34,9 @@ export class BaseConfiguration {
     baseSelected = new Color(25, 50, 255);    //new Color(185, 28, 48);  //Color.CRIMSON;
 
     // Guide labels.
-    guideStyle = new LabelStyle(new Font(12, 150), Color.CRIMSON, 'left', 'bottom');
+    guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'bottom');
     guideArrowLength = 5;
+    guideVisible = true;
 
     // Features.
     featureTable = new NumberTableConfiguration(this.sideFont, this.base, [50, 10]);
@@ -96,7 +97,7 @@ export class BaseConfiguration {
 
     // Plate cluster shares.
     //shareWellDiameter = 2;
-    static voidColor = Color.NONE;  //Color.GREEN;
+    static voidColor = new Color(222, 220, 220);   //Color.NONE;  //Color.GREEN;
     static shareColorMap = (normVal: number) => (normVal >= 0 ? heatLookup[Math.ceil(255 * normVal)] : BaseConfiguration.voidColor);
 
     //(normVal: number) => style.Color.grey(0, normVal > 0 ? Math.sqrt(normVal) : 0); //style.Color.grey(Math.ceil(255 * (1 - normVal)));

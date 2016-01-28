@@ -680,6 +680,7 @@ class FeatureHistogramTable extends PlacedSnippet {
 
         if(selected.length < 2) {
             this.guide = new GuideLabel(
+                "ftr",
                 "Click on a feature label to add it to the phenotype model space.",
                 Vector.add(this.topRight, [15, 250]),
                 Vector.add(this.topLeft, [35, 250]),
@@ -1093,6 +1094,8 @@ class PlateIndexSelection extends PlacedSnippet {
 class WellDetailView extends PlacedSnippet {
     imageTypeOption: ConfigurationOptions;
 
+    guide: GuideLabel;
+
     constructor(topLeft: number[],
                 public state: EnrichedState) {
         super("WellDetailView", topLeft);
@@ -1109,6 +1112,17 @@ class WellDetailView extends PlacedSnippet {
             state,
             "imageType",
             wellOptions);
+
+        if(state.focused().object === null) {
+            this.guide = new GuideLabel(
+                "well",
+                "Hover over a cell to inspect it.",
+                Vector.add(this.bottomRight, [-200, 25]),
+                Vector.add(this.bottomRight, [-200, -50]),
+                20,
+                state
+            );
+        }
     }
 
     paint(ctx: ViewContext) {
@@ -1166,6 +1180,8 @@ class WellDetailView extends PlacedSnippet {
 
         // Well type button.
         ctx.snippet(this.imageTypeOption);
+
+        ctx.snippet(this.guide);
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[],
@@ -1276,6 +1292,7 @@ class ObjectDetailView extends PlacedSnippet {
 
 class PlateIndex extends PlacedSnippet {
     private heatmapColumns: List<List<PlateMiniHeatmap>>;
+    private guide: GuideLabel;
 
     constructor(public topLeft: number[], public state: EnrichedState) {
         super("pi", topLeft);
@@ -1297,6 +1314,16 @@ class PlateIndex extends PlacedSnippet {
 
         this.dimensions = this.heatmapColumns.dimensions; // [model.allWellSelections().length * cfg.plateIndexWidth(), cfg.plateIndexSpace * datInfo.plateCount];
         this.updatePositions();
+
+        if(state.focused().plate === null) {
+            this.guide = new GuideLabel(
+                "plate",
+                "Hover over a plate to inspect it and click to select it.",
+                Vector.add(this.topRight, [10, 60]),
+                Vector.add(this.topRight, [-10, 60]),
+                5,
+                state);
+        }
     }
 
     paint(context: ViewContext) {
@@ -1316,6 +1343,8 @@ class PlateIndex extends PlacedSnippet {
 
         // Heat maps.
         context.snippet(this.heatmapColumns);
+
+        context.snippet(this.guide);
     }
 }
 
@@ -1452,8 +1481,8 @@ class ConfigurationOptions extends PlacedSnippet {
         super(identifier, topLeft);
 
         var cfg = targetState.configuration;
-        var baseStyle: LabelStyle = new LabelStyle(cfg.sideFont, cfg.baseDim);
-        var selectedStyle: LabelStyle = new LabelStyle(cfg.sideFont, cfg.baseEmphasis);
+        var baseStyle: LabelStyle = new LabelStyle(cfg.sideFont, cfg.baseDim, 'left', 'top');
+        var selectedStyle: LabelStyle = new LabelStyle(cfg.sideFont, cfg.baseEmphasis, 'left', 'top');
 
         var buttonSnippets = _.pairs(targetMap).map((p, pI) => {
             var label = p[0];
@@ -1474,31 +1503,39 @@ class ConfigurationOptions extends PlacedSnippet {
 
 class GuideLabel extends Label {
 
-    constructor(text: string,
+    constructor(identifier: string,
+                text: string,
                 public position: number[],
                 public circleCenter: number[],
                 public circleRadius: number,
                 public state: InteractionState) {
-        super("gl_" + text, text, position, state.configuration.guideStyle);
+        super("gdlbl_" + identifier, text, position, state.configuration.guideStyle);
     }
 
     paint(context: ViewContext) {
-        super.paint(context);
+        if(this.state.configuration.guideVisible) {
+            super.paint(context);
 
-        context.save();
+            context.save();
 
-        var cfg = this.state.configuration;
+            var cfg = this.state.configuration;
 
-        var connectorVector = Vector.normalize(Vector.subtract(this.position, this.circleCenter));
-        var connectorEdge = Vector.add(this.circleCenter, Vector.mul(connectorVector, this.circleRadius));
-        var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
+            var connectorVector = Vector.normalize(Vector.subtract(this.position, this.circleCenter));
+            var connectorEdge = Vector.add(this.circleCenter, Vector.mul(connectorVector, this.circleRadius));
+            var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
 
-        context.strokeStyle(cfg.guideStyle.color);
-        context.lineWidth(1.5);
-        context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
-        context.strokeLine(connectorEdge, connectorOuter);
+            context.strokeStyle(cfg.backgroundColor);
+            context.lineWidth(3.5);
+            context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
+            context.strokeLine(connectorEdge, connectorOuter);
 
-        context.restore();
+            context.strokeStyle(cfg.guideStyle.color);
+            context.lineWidth(1.5);
+            context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
+            context.strokeLine(connectorEdge, connectorOuter);
+
+            context.restore();
+        }
     }
 
 }

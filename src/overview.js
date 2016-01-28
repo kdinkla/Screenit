@@ -480,7 +480,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             });
             this.setDimensions([((configuration.visibleIndex ? 1 : 0) + 1) * configuration.cellOuterDimensions[0], (features.length + (configuration.visibleHeader ? 1 : 0)) * configuration.cellOuterDimensions[1]]);
             if (selected.length < 2) {
-                this.guide = new GuideLabel("Click on a feature label to add it to the phenotype model space.", Vector.add(this.topRight, [15, 250]), Vector.add(this.topLeft, [35, 250]), 25, state);
+                this.guide = new GuideLabel("ftr", "Click on a feature label to add it to the phenotype model space.", Vector.add(this.topRight, [15, 250]), Vector.add(this.topLeft, [35, 250]), 25, state);
             }
         }
         FeatureHistogramTable.prototype.paint = function (context) {
@@ -839,6 +839,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var wellOptions = {};
             availableTypes.forEach(function (t) { return wellOptions[t] = t; });
             this.imageTypeOption = new ConfigurationOptions("WellDetailOptions", this.bottomLeft, state, "imageType", wellOptions);
+            if (state.focused().object === null) {
+                this.guide = new GuideLabel("well", "Hover over a cell to inspect it.", Vector.add(this.bottomRight, [-200, 25]), Vector.add(this.bottomRight, [-200, -50]), 20, state);
+            }
         }
         WellDetailView.prototype.paint = function (ctx) {
             var state = this.state;
@@ -884,6 +887,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             ctx.transitioning = true;
             // Well type button.
             ctx.snippet(this.imageTypeOption);
+            ctx.snippet(this.guide);
         };
         WellDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             var object = enriched.closestWellObject(coordinates);
@@ -985,6 +989,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.heatmapColumns = new List("pics", colMaps.map(function (c, cI) { return new List("pic_" + cI, c, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace); }), topLeft, [0, 0], 'horizontal', cfg.miniHeatSpace, 'left');
             this.dimensions = this.heatmapColumns.dimensions; // [model.allWellSelections().length * cfg.plateIndexWidth(), cfg.plateIndexSpace * datInfo.plateCount];
             this.updatePositions();
+            if (state.focused().plate === null) {
+                this.guide = new GuideLabel("plate", "Hover over a plate to inspect it and click to select it.", Vector.add(this.topRight, [10, 60]), Vector.add(this.topRight, [-10, 60]), 5, state);
+            }
         }
         PlateIndex.prototype.paint = function (context) {
             var state = this.state;
@@ -998,6 +1005,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
             // Heat maps.
             context.snippet(this.heatmapColumns);
+            context.snippet(this.guide);
         };
         return PlateIndex;
     })(PlacedSnippet);
@@ -1104,8 +1112,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.targetField = targetField;
             this.targetMap = targetMap;
             var cfg = targetState.configuration;
-            var baseStyle = new LabelStyle(cfg.sideFont, cfg.baseDim);
-            var selectedStyle = new LabelStyle(cfg.sideFont, cfg.baseEmphasis);
+            var baseStyle = new LabelStyle(cfg.sideFont, cfg.baseDim, 'left', 'top');
+            var selectedStyle = new LabelStyle(cfg.sideFont, cfg.baseEmphasis, 'left', 'top');
             var buttonSnippets = _.pairs(targetMap).map(function (p, pI) {
                 var label = p[0];
                 var value = p[1];
@@ -1122,25 +1130,31 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     })(PlacedSnippet);
     var GuideLabel = (function (_super) {
         __extends(GuideLabel, _super);
-        function GuideLabel(text, position, circleCenter, circleRadius, state) {
-            _super.call(this, "gl_" + text, text, position, state.configuration.guideStyle);
+        function GuideLabel(identifier, text, position, circleCenter, circleRadius, state) {
+            _super.call(this, "gdlbl_" + identifier, text, position, state.configuration.guideStyle);
             this.position = position;
             this.circleCenter = circleCenter;
             this.circleRadius = circleRadius;
             this.state = state;
         }
         GuideLabel.prototype.paint = function (context) {
-            _super.prototype.paint.call(this, context);
-            context.save();
-            var cfg = this.state.configuration;
-            var connectorVector = Vector.normalize(Vector.subtract(this.position, this.circleCenter));
-            var connectorEdge = Vector.add(this.circleCenter, Vector.mul(connectorVector, this.circleRadius));
-            var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
-            context.strokeStyle(cfg.guideStyle.color);
-            context.lineWidth(1.5);
-            context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
-            context.strokeLine(connectorEdge, connectorOuter);
-            context.restore();
+            if (this.state.configuration.guideVisible) {
+                _super.prototype.paint.call(this, context);
+                context.save();
+                var cfg = this.state.configuration;
+                var connectorVector = Vector.normalize(Vector.subtract(this.position, this.circleCenter));
+                var connectorEdge = Vector.add(this.circleCenter, Vector.mul(connectorVector, this.circleRadius));
+                var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
+                context.strokeStyle(cfg.backgroundColor);
+                context.lineWidth(3.5);
+                context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
+                context.strokeLine(connectorEdge, connectorOuter);
+                context.strokeStyle(cfg.guideStyle.color);
+                context.lineWidth(1.5);
+                context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
+                context.strokeLine(connectorEdge, connectorOuter);
+                context.restore();
+            }
         };
         return GuideLabel;
     })(Label);

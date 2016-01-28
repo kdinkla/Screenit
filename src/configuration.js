@@ -23,8 +23,9 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.baseVeryDim = Color.grey(225);
             this.baseSelected = new Color(25, 50, 255); //new Color(185, 28, 48);  //Color.CRIMSON;
             // Guide labels.
-            this.guideStyle = new LabelStyle(new Font(12, 150), Color.CRIMSON, 'left', 'bottom');
+            this.guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'bottom');
             this.guideArrowLength = 5;
+            this.guideVisible = true;
             // Features.
             this.featureTable = new NumberTableConfiguration(this.sideFont, this.base, [50, 10]);
             // Scatter plots.
@@ -87,7 +88,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
         BaseConfiguration.CONTROL_COLOR = style.Color.grey(0.2);
         // Plate cluster shares.
         //shareWellDiameter = 2;
-        BaseConfiguration.voidColor = Color.NONE; //Color.GREEN;
+        BaseConfiguration.voidColor = new Color(222, 220, 220); //Color.NONE;  //Color.GREEN;
         BaseConfiguration.shareColorMap = function (normVal) { return (normVal >= 0 ? heatLookup[Math.ceil(255 * normVal)] : BaseConfiguration.voidColor); };
         return BaseConfiguration;
     })();

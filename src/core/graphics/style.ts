@@ -12,7 +12,7 @@ export class Font {
 
     private static textCanvas:HTMLCanvasElement;
 
-    width(text:string) {
+    width(text: string) {
         var canvas = Font.textCanvas ||
             (Font.textCanvas = document.createElement("canvas"));
         var context = canvas.getContext("2d");
@@ -22,7 +22,7 @@ export class Font {
         return metrics.width;
     }
 
-    wordWrap(text:string):string[] {
+    wordWrap(text: string): string[] {
         var words = text.split(" ");
         var lines = [];
         words.forEach(wrd => {
