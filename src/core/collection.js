@@ -48,7 +48,10 @@ define(["require", "exports", 'lodash'], function (require, exports, _) {
             return this.index[id];
         };
         Chain.prototype.map = function (f) {
-            return this.elements.map(f);
+            return new Chain(this.elements.map(f));
+        };
+        Chain.prototype.filter = function (f) {
+            return new Chain(this.elements.filter(f));
         };
         Chain.prototype.forEach = function (f) {
             this.elements.forEach(f);
@@ -114,7 +117,7 @@ define(["require", "exports", 'lodash'], function (require, exports, _) {
         // Union of all given sets.
         Chain.union = function (targets) {
             var result = new Chain();
-            targets.forEach(function (t) { return t.elements.forEach(function (e) { return result.pushMutation(e); }); }); //result.pushAll(t.elements));
+            targets.forEach(function (t) { return t.elements.forEach(function (e) { return result.pushMutation(e); }); });
             return result;
         };
         // Intersection of all given sets.

@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
 from scipy.ndimage.morphology import grey_erosion
-from multiprocessing import Pool, Array
+from multiprocessing import Pool
 import itertools
 import json
 from cache import lru_cache
@@ -30,7 +30,7 @@ def exemplarDict(exemplars):
     return frozenset(tpls)
 
 # Load and combine multiple columns into a data frame.
-@lru_cache(maxsize=10)
+@lru_cache(maxsize=5)
 def columns(columns):
     cols = list(columns)
     return data.columnsDump(cols)
@@ -43,7 +43,7 @@ smallSample = data.objectSample(10**3)
 
 # Well coordinate information for all objects.
 print "Extracting system columns..."
-wellIndex = data.columnsDump(data.systemObjectColumns)  #['plate', 'column', 'row'])
+wellIndex = data.columnsDump(data.systemObjectColumns)
 
 #@memory.cache
 @lru_cache(maxsize=5)
@@ -52,11 +52,10 @@ def featureMetrics():
 
     def ftrMet(ftr):
         col = data.numpyDump(ftr)
-        return {metric: np.asscalar(getattr(np, metric)(col)) for metric in ['min', 'max']}
+        return {metric: np.asscalar(getattr(np, metric)(col)) for metric in ['min', 'max', 'mean']}
 
     return {feature: ftrMet(feature) for feature in data.imageFeatures()}
 
-@lru_cache(maxsize=5)
 def wellToObjects():
     return wellIndex.groupby(['plate', 'row', 'column']).groups
 
@@ -80,30 +79,31 @@ def selectImageFeatures(subset):
 #
 #     return logicleVec
 
-def minMaxScale(vec, minimum=None, maximum=None):
-    vecMin = vec.min() if minimum is None else minimum
-    vecMax = vec.max() if maximum is None else maximum
+def minMaxScale(vec, vecMin, vecMax):
     return (vec - vecMin) / (vecMax - vecMin)
+
+# TODO: add client-side marking for log scaled features.
+def adaptiveScale(vec, metrics):
+    vecMin = metrics['min']
+    vecMax = metrics['max']
+    vecMean = metrics['mean']
+    minMaxed = minMaxScale(vec, vecMin, vecMax)
+    return np.log(1 + 100000 * minMaxed) / np.log(100000) if vecMean - vecMin < 0.2 * (vecMax - vecMean) else minMaxed
 
 def scale(subset):
     subset = subset.copy()
     metrics = featureMetrics()
     for col in subset.columns:
-        #subset[col] = subset[col]   #(subset[col] - metrics[col]['min']) / (metrics[col]['max'] - metrics[col]['min']) #logicleSet(subset[col], metrics[col]['min'], metrics[col]['max'])
-        #subset[col] = logicleSet(subset[col].values, metrics[col]['min'], metrics[col]['max'])
-        subset[col] = minMaxScale(subset[col].values, metrics[col]['min'], metrics[col]['max'])
+        subset[col] = adaptiveScale(subset[col].values, metrics[col])
     return subset
 
 scaledSmallSample = scale(selectImageFeatures(smallSample))
-#scaledMediumSample = scale(selectImageFeatures(mediumSample))
-#scaledLargeSample = scale(selectImageFeatures(largeSample))
+
+@lru_cache(maxsize=2)
+def scaledArray(column):
+    return adaptiveScale(data.numpyDump(column), featureMetrics()[column])
 
 #@lru_cache(maxsize=20)
-def scaledArray(column):
-    metrics = featureMetrics()
-    return minMaxScale(data.numpyDump(column), metrics[column]['min'], metrics[column]['max'])
-
-@lru_cache(maxsize=20)
 def scaledColumn(column):
     return scale(data.columnsDump([column]))
 
@@ -168,23 +168,36 @@ def clustersAsTable(features, exemplars):
 
     return table
 
-@lru_cache(maxsize=5)
+#@lru_cache(maxsize=5)
 def clustersAsPartition(features, exemplars):
     return clustersAsTable(features, exemplars).groupby('population')
 
-@lru_cache(maxsize=5)
+#@lru_cache(maxsize=5)
 def clustersAsMap(features, exemplars):
     return {grp: table.index.values for grp, table in clustersAsPartition(features, exemplars)}
 
 @lru_cache(maxsize=5)
-def objectInfo(featureSet, column, row, plate, exemplars):
+def allObjects(column, row, plate, exemplars, colSelectA, colCoordinateA, colSelectB, colCoordinateB):
     allExemplars = list(itertools.chain.from_iterable(cls[1] for cls in exemplars))
     wellObjects = wellToObjectsMap[(plate, row, column)] if column >= 0 and (plate, row, column) in wellToObjectsMap else []
-    allObjects = list(set(list(smallSample.index) + allExemplars + wellObjects))
+    return list(set(allExemplars + wellObjects))   #list(set(list(smallSample.index) + allExemplars + wellObjects))
 
-    #embedding = mdsTSNE()
-    clusters = clustersAsTable(featureSet, exemplars).loc[allObjects]
-    wellInfo = wellIndex.loc[allObjects]
+# def allObjects(column, row, plate, exemplars):
+#     allExemplars = list(itertools.chain.from_iterable(cls[1] for cls in exemplars))
+#     wellObjects = wellToObjectsMap[(plate, row, column)] if column >= 0 and (plate, row, column) in wellToObjectsMap else []
+#     return list(set(allExemplars + wellObjects))   #list(set(list(smallSample.index) + allExemplars + wellObjects))
+
+def allObjects(column, row, plate, exemplars):
+    allExemplars = list(itertools.chain.from_iterable(cls[1] for cls in exemplars))
+    wellObjects = wellToObjectsMap[(plate, row, column)] if column >= 0 and (plate, row, column) in wellToObjectsMap else []
+    return list(set(allExemplars + wellObjects))   #list(set(list(smallSample.index) + allExemplars + wellObjects))
+
+@lru_cache(maxsize=5)
+def objectInfo(featureSet, column, row, plate, exemplars):
+    objects = allObjects(column, row, plate, exemplars)
+
+    clusters = clustersAsTable(featureSet, exemplars).loc[objects]
+    wellInfo = wellIndex.loc[objects]
     combined = clusters.join(wellInfo)
 
     # Generate well URLs on the spot, based on config.
@@ -193,6 +206,9 @@ def objectInfo(featureSet, column, row, plate, exemplars):
             lambda row: urlFunction(int(row['plate']), int(row['column']), int(row['row'])), axis=1)
 
     return combined
+
+def histoLog(counts):
+    return np.where(counts > 0, (np.log(counts) / 2 + 1), 0)
 
 def featureHistogram(args):
     (feature, cluster, bins) = args
@@ -265,7 +281,6 @@ def objectHistogram2D(args):
     contours = {}
     kernel = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]  # Morphology kernel.
     for cluster, table in workerShare:
-        # Correct histogram array order by transpose.
         tBins = bins - 1
         xCol = (table[xFeature].values * tBins).astype(np.int16)
         yCol = (table[yFeature].values * tBins).astype(np.int16)
@@ -274,7 +289,7 @@ def objectHistogram2D(args):
         counts.shape = (bins, bins)
 
         # Scale histogram densities to base 10 logarithm levels.
-        levels = np.where(counts > 0, (np.log(counts) + 1), 0).astype(np.int8)
+        levels = histoLog(counts).astype(np.int8)   #np.where(counts > 0, (np.log(counts) / 2 + 1), 0).astype(np.int8)
 
         # Level set outlines as contours (retain level as outline number).
         eroded = grey_erosion(levels, footprint=kernel, mode='constant')
@@ -298,6 +313,25 @@ def objectHistogramMatrix(features, exemplars, bins):
     for xFeature, yFeature, contours in results:
         for c, lvlCnt in contours.iteritems():
             histograms[xFeature][yFeature][c] = lvlCnt.tolist()
-            histograms[yFeature][xFeature][c] = lvlCnt.transpose().tolist()
+            histograms[yFeature][xFeature][c] = lvlCnt.transpose().tolist()     # Transpose for the inverse pair.
 
     return histograms
+
+def forObjectFeatureValues(col):
+    objects = workerShare
+    return col, np.take(scaledArray(col), objects)
+
+def objectFeatureValues(column, row, plate, exemplars):
+    objects = allObjects(column, row, plate, exemplars)
+    cols = data.imageFeatures()
+
+    pool = Pool(initializer=setupWorkerShare, initargs=[objects])
+    results = pool.imap(forObjectFeatureValues, cols)
+    pool.close()
+    pool.join()
+
+    mrg = pd.DataFrame(index=objects, columns=cols)
+    for c, vals in results:
+        mrg[c] = vals
+
+    return mrg

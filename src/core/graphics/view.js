@@ -290,7 +290,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             this.snippetList = []; // Fast snippet lookup.
         }
         DrawManager.mD = 100; // Movement duration.
-        DrawManager.pD = 100; // Presence duration.
+        DrawManager.pD = 500; // Presence duration.
         return DrawManager;
     })();
     // Additional information that is maintained for a snippet during its lifespan.
@@ -523,6 +523,9 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         ViewContext.prototype.lineTo = function (x, y) {
             this.context.lineTo(this.t(x), this.t(y));
         };
+        ViewContext.prototype.arc = function (x, y, radius, startRadius, endRadius) {
+            this.context.arc(this.t(x), this.t(y), this.t(radius), this.t(startRadius), this.t(endRadius));
+        };
         ViewContext.prototype.arcTo = function (x1, y1, x2, y2, radius) {
             this.context.arcTo(this.t(x1), this.t(y1), this.t(x2), this.t(y2), this.t(radius));
         };
@@ -561,7 +564,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             }
             else {
                 var oldAlpha = this.context.globalAlpha;
-                this.context.globalAlpha = this.sV.presence;
+                this.context.globalAlpha = Math.max(0, this.sV.presence);
                 this.context.drawImage(img, this.t(pos[0]), this.t(pos[1]));
                 // Mouse hit.
                 if (pos[0] <= this.mouseR[0] && pos[1] <= this.mouseR[1] && this.mouseR[0] <= pos[0] + img.width && this.mouseR[1] <= pos[1] + img.height)
@@ -571,7 +574,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         };
         ViewContext.prototype.drawImageScaled = function (img, pos, dim) {
             var oldAlpha = this.context.globalAlpha;
-            this.context.globalAlpha = this.sV.presence;
+            this.context.globalAlpha = Math.max(0, this.sV.presence);
             this.context.drawImage(img, this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
             // Mouse hit.
             if (pos[0] <= this.mouseR[0] && pos[1] <= this.mouseR[1] && this.mouseR[0] <= pos[0] + dim[0] && this.mouseR[1] <= pos[1] + dim[1])
@@ -580,7 +583,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         };
         ViewContext.prototype.drawImageClipped = function (img, spos, sdim, pos, dim) {
             var oldAlpha = this.context.globalAlpha;
-            this.context.globalAlpha = this.sV.presence;
+            this.context.globalAlpha = Math.max(0, this.sV.presence);
             this.context.drawImage(img, this.t(spos[0]), this.t(spos[1]), this.t(sdim[0]), this.t(sdim[1]), this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
             // Correct mouse coordinates for image scaling.
             this.mouseR = [this.mouseR[0] * sdim[0] / dim[0], this.mouseR[1] * sdim[1] / dim[1]];

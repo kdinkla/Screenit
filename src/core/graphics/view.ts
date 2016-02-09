@@ -370,7 +370,7 @@ export class ViewKeyEvent extends ViewEvent<KeyboardEvent> {
 // Manages the interpolation for a view.
 class DrawManager {
     static mD = 100;   // Movement duration.
-    static pD = 100;   // Presence duration.
+    static pD = 500;   // Presence duration.
 
     snippets: StringMap<SnippetValues> = {}; // Mapping of snippets to managed values.
     snippetList: SnippetValues[] = [];       // Fast snippet lookup.
@@ -677,6 +677,10 @@ export class ViewContext {
         this.context.lineTo(this.t(x), this.t(y));
     }
 
+    arc(x, y, radius, startRadius, endRadius) {
+        this.context.arc(this.t(x), this.t(y), this.t(radius), this.t(startRadius), this.t(endRadius));
+    }
+
     arcTo(x1: number, y1: number, x2: number, y2: number, radius) {
         this.context.arcTo(this.t(x1), this.t(y1), this.t(x2), this.t(y2), this.t(radius));
     }
@@ -719,7 +723,7 @@ export class ViewContext {
             this.drawImageScaled(img, pos, [img['originalWidth'], img['originalHeight']]);
         } else {
             var oldAlpha = this.context.globalAlpha;
-            this.context.globalAlpha = this.sV.presence;
+            this.context.globalAlpha = Math.max(0, this.sV.presence);
 
             this.context.drawImage(img, this.t(pos[0]), this.t(pos[1]));
 
@@ -734,7 +738,7 @@ export class ViewContext {
 
     drawImageScaled(img: any, pos: number[], dim: number[]) {
         var oldAlpha = this.context.globalAlpha;
-        this.context.globalAlpha = this.sV.presence;
+        this.context.globalAlpha = Math.max(0, this.sV.presence);
 
         this.context.drawImage(img, this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
 
@@ -749,7 +753,7 @@ export class ViewContext {
     drawImageClipped(img: any, spos: number[], sdim: number[],
                      pos: number[], dim: number[]) {
         var oldAlpha = this.context.globalAlpha;
-        this.context.globalAlpha = this.sV.presence;
+        this.context.globalAlpha = Math.max(0, this.sV.presence);
 
         this.context.drawImage(img,
             this.t(spos[0]), this.t(spos[1]), this.t(sdim[0]), this.t(sdim[1]),

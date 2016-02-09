@@ -46,77 +46,50 @@ import style = require('./core/graphics/style');
 import Color = style.Color;
 import Font = style.Font;
 
+// View identifiers and their constructors.
+var viewConstructors: () => StringMap<any> = () => {
+    return {
+        'features':   FeatureHistogramTable,
+        'splom':      Splom,
+        'exemplars':  ExemplarTable,
+        'plates':     PlateIndex,
+        'plate':      JointWellPlates,
+        'well':       WellDetailView
+    };
+};
+
 export class OverView extends View<EnrichedState> {
     background: ActiveBackground;
-
-    featureList: FeatureHistogramTable;
-    splom: Splom;
-    objectScatter: ObjectFeaturePlot;
-    plateIndex: PlateIndex;
-    templatePlate: Plate;
-    wellDetailView: WellDetailView;
-    hoveredObjectDetailView: ObjectDetailView;
-
-    exemplarTable: ExemplarTable;
+    panelColumns: List<PlacedSnippet>;
 
     constructor() {
         super("overView");
     }
 
-    updateScene(mod: EnrichedState) {
-        var cfg = mod.configuration;
+    updateScene(state: EnrichedState) {
+        var cfg = state.configuration;
 
         this.background = new ActiveBackground(cfg.backgroundColor);
 
-        var rootTopLeft = [cfg.windowMargin, cfg.windowMargin + cfg.panelHeaderSpace + cfg.panelHeaderFont.size];  // + 2 * cfg.font.size];
+        var rootTopLeft = [cfg.windowMargin, cfg.windowMargin];
 
-        var ftrListTopLeft = rootTopLeft;
-        this.featureList = new FeatureHistogramTable("ftrTable", ftrListTopLeft, mod);
+        // All panel constructors.
+        var constructors = viewConstructors();
 
-        // Scatter plots.
-        var splomScatterTopLeft = Vector.add(rootTopLeft, [this.featureList.dimensions[0] + cfg.panelSpace + 2 * cfg.splomSpace, 0]);
-        this.splom = new Splom(splomScatterTopLeft, mod, cfg);
-        var splomScatterTopRight = Vector.add(splomScatterTopLeft, [this.splom.dimensions()[0], 0]);
+        // Active panels.
+        var panels = state.openViews.elements.map(ov => new ColumnPanel(ov, new constructors[ov](state), state, true));
 
-        var objScatterTopLeft = Vector.add(splomScatterTopRight, [-2 * cfg.splomSize, 2 * cfg.splomSize]);
-        objScatterTopLeft = Vector.max(objScatterTopLeft, splomScatterTopLeft);
+        // All panel options.
+        var closedPanels = _.difference(_.keys(constructors), state.openViews.elements)
+                            .map(ov => new ColumnPanel(ov, new constructors[ov](state), state, false));
+        var closedList = new List("pnlClsCols", closedPanels, [0,0], [0,0], 'vertical', cfg.panelSpace, 'left');
 
-        if("mds1" in mod.objectInfo.value.columnIndex && "mds2" in mod.objectInfo.value.columnIndex) {
-            this.objectScatter = new ObjectFeaturePlot(
-                "mds2", "mds1",
-                objScatterTopLeft, mod,
-                cfg, cfg.scatterPlotSize, false,
-                false, "Landscape of All Features");
-        } else {
-            this.objectScatter = null;
-        }
-
-        var objScatterBottomLeft = Vector.add(objScatterTopLeft, [0, cfg.splomSize + cfg.splomSpace]);
-        var objScatterTopRight = Vector.add(objScatterTopLeft, [cfg.scatterPlotSize, 0]);
-        var allScatterTopRight = [Math.max(splomScatterTopRight[0], objScatterTopRight[0]) - cfg.splomSpace, splomScatterTopRight[1]];
-
-        // Population exemplar table.
-        var exemplarTableTopLeft = Vector.add(allScatterTopRight, [cfg.panelSpace, 0]);
-        this.exemplarTable = new ExemplarTable(exemplarTableTopLeft, mod);
-
-        var plateIndexTopLeft = Vector.add(this.exemplarTable.topRight, [cfg.panelSpace, 0]);
-        this.plateIndex = new PlateIndex(plateIndexTopLeft, mod);
-
-        // Template (well selection) plate.
-        if (mod.focused().plate === null) {
-            this.templatePlate = null;
-        } else {
-            var plateTopLeft = Vector.add(this.plateIndex.topRight, [cfg.panelSpace, 0]);
-            this.templatePlate = new TemplatePlate(plateTopLeft, mod);
-        }
-
-        // Well detail view.
-        if(mod.focused().well === null) {
-            this.wellDetailView = null;
-        } else {
-            var wellDetailTopLeft = Vector.add(this.templatePlate.bottomLeft, [0, cfg.panelSpace]);  //[this.dimensions()[0] - cfg.wellViewMaxDim[0] - cfg.windowMargin, cfg.windowMargin];
-            this.wellDetailView = new WellDetailView(wellDetailTopLeft, mod);
-        }
+        this.panelColumns = new List("pnlCols",
+            _.union<PlacedSnippet>(panels, [closedList]),
+            rootTopLeft, [0,0],
+            'horizontal',
+            cfg.panelSpace,
+            'left');
 
         //console.log("Model:");
         //console.log(mod);
@@ -125,24 +98,18 @@ export class OverView extends View<EnrichedState> {
     paint(c: ViewContext, iMod: EnrichedState) {
         var cfg = iMod.configuration;
 
-        //c.translate([0.5, 0.5]);
-
         c.snippet(new ActiveBackground(cfg.backgroundColor));
 
-        // Scatter plots.
-        c.snippet(this.featureList);
-        c.snippet(this.objectScatter);
-        c.snippet(this.hoveredObjectDetailView);
+        // Center panels.
+        var topLeft = Vector.mul(Vector.subtract(this.dimensions(), this.panelColumns.dimensions), .5);
+        //this.panelColumns.setTopLeft(topLeft);
 
-        // Distribution table.
-        //c.snippet(this.clusterList);
-        c.snippet(this.splom);
-        c.snippet(this.exemplarTable);
-
-        // Plate views.
-        c.snippet(this.plateIndex);
-        c.snippet(this.templatePlate);
-        c.snippet(this.wellDetailView);
+        this.panelColumns.setTopLeft([
+            Math.min(.5 * (this.dimensions()[0] - this.panelColumns.dimensions[0]),
+                    this.dimensions()[0] - this.panelColumns.dimensions[0] - cfg.windowMargin),
+            topLeft[1]
+        ]);
+        c.snippet(this.panelColumns);
     }
 }
 
@@ -173,77 +140,268 @@ class ActiveBackground extends Background {
     }
 }
 
-function panelHeader(context: ViewContext, cfg: BaseConfiguration, text: string, color: Color = null) {
-    context.save();
-    context.translate([0, -cfg.panelHeaderSpace]);
-    context.font(cfg.panelHeaderFont.toString());
-    context.textAlign('center');
-    context.fillStyle(color || cfg.panelHeaderColor);
-    context.fillText(text);
-    context.restore();
+class ColumnPanel extends List<PlacedSnippet> {
+    constructor(identifier: string,
+                public core: PlacedSnippet,
+                public state: EnrichedState,
+                public opened = false) {
+        super("cp_" + identifier,
+            _.union([new ColumnLabel(identifier, core.toString(), state)], opened ? [core] : []), //[new Label("hdr_" + identifier, core.toString(), [0,0], state.configuration.panelHeaderLabel), core],
+            [0,0],
+            [0,0],
+            'vertical',
+            state.configuration.panelSpace,
+            'middle');
+    }
 }
 
-export class Splom extends BaseSnippet {
-    plots: ObjectFeaturePlot[];
+class ColumnLabel extends Label {
+    constructor(public viewIdentifier: string, text: string, state: EnrichedState) {
+        super("clLbl_" + viewIdentifier, text, [0,0], state.configuration.panelHeaderLabel, true);
+    }
 
-    private features: string[];
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        interaction.pushView(this.viewIdentifier);
+    }
+}
 
-    constructor(public topLeft: number[],
-                public model: EnrichedState,
-                public configuration: BaseConfiguration) {
-        super("splom");
+class FeatureHistogramTable extends List<PlacedSnippet> {
+    guide: GuideLabel;
 
-        this.plots = [];
-        var objectFeatures = model.objectInfo.value;
-        this.features = model.populationSpace.features.elements;
-        var colLen = this.features.length;
-        for(var c1I = 0; c1I < colLen; c1I++) {
-            var c1II = colLen - c1I - 1;
-            var c1 = this.features[c1I];
+    constructor(public state: EnrichedState) {
+        super("ftrCols",
+            [
+                new FeatureList("ftrLbls", state, FeatureLabel, 'right'),
+                new FeatureList("ftrHistos", state, FeatureHistogram),
+                new FeatureParallelCoordinates(state)
+            ],
+            [0,0],
+            [0,0],
+            'horizontal',
+            state.configuration.featureCellSpace[0]
+        );
 
-            for(var c2I = 0; c2I < c1I; c2I++) {
-                var c2II = colLen - c2I - 1;
-                var c2 = this.features[c2I];
+        if(this.state.populationSpace.features.length < 2) {
+            this.guide = new GuideLabel(
+                "ftr",
+                "Click on a feature label to add it to the phenotype model space.",
+                [0,0],
+                [-80, 0],
+                25,
+                state);
+        }
+    }
 
-                if(c1 in objectFeatures.columnIndex && c2 in objectFeatures.columnIndex) {
-                    this.plots.push(new ObjectFeaturePlot(
-                        c1, c2,
-                        Vector.add(this.topLeft, [c1II * configuration.splomSize, c2I * configuration.splomSize]),
-                        model,
-                        configuration,
-                        configuration.splomInnerSize,
-                        c2I == 0,
-                        c1II == 0
-                    ));
-                }
-            }
+    setTopLeft(topLeft: number[]) {
+        super.setTopLeft(topLeft);
+        if(this.guide) this.guide.setTopLeft(Vector.add(this.topRight, [15, 250]));
+    }
+
+    paint(context: ViewContext) {
+        super.paint(context);
+
+        context.snippet(this.guide);
+    }
+
+    toString() {
+        return "Cell Features";
+    }
+}
+
+class FeatureList extends List<PlacedSnippet> {
+    constructor(identifier: string,
+                state: EnrichedState,
+                construct: new (ftr: string, erState: EnrichedState) => PlacedSnippet,
+                align: string = 'middle') {
+        super(identifier,
+            state.features.value.map(f => new construct(f, state)),
+            [0,0],
+            [0,0],
+            'vertical',
+            state.configuration.featureCellSpace[1],
+            align
+        );
+    }
+}
+
+class FeatureLabel extends Label {
+    constructor(public feature: string, state: EnrichedState) {
+        super("ftrLbl" + feature,
+            feature,
+            [0,0],
+            new LabelStyle(
+                    state.configuration.featureFont,
+                    state.populationSpace.features.has(feature) ?
+                        state.configuration.base :
+                        state.configuration.baseDim,
+                    'left',
+                    'top'),
+            true);
+    }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        interaction.populationSpace.features = enriched.populationSpace.features.toggle(this.feature);
+        interaction.pushView('splom');
+    }
+}
+
+class FeatureHistogram extends PlacedSnippet {
+    constructor(public feature: string, public state: EnrichedState) {
+        super("ftrHst_" + feature);
+
+        this.setDimensions(state.configuration.featureCellDimensions);
+    }
+
+    paint(context: ViewContext) {
+        var state = this.state;
+        var cfg = state.configuration;
+        var focusedPopulation = state.focused().population;
+        var histograms = state.featureHistograms.value;
+        var frames = state.featureHistograms.value.histograms;
+        var cacheTag = this.identifier + "_" + focusedPopulation;
+
+        var cachedImage = histograms[cacheTag];
+        if(!cachedImage) {
+            cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], plainContext => {
+                _.keys(frames).map((fK, fI) => {
+                    var frame = frames[fK];
+                    var normFrequencies = frame.matrix[frame.columnIndex[this.feature]];
+                    var fontColor = fK === '-1' ?
+                        cfg.baseDim :
+                        this.state.populationColor(this.state.populationSpace.populations.byId(fK));
+
+                    plainContext.fillStyle = fontColor.toString();
+                    //plainContext.beginPath();
+                    var len = normFrequencies.length - 1;
+                    var spanWidth = this.dimensions[0] - 1;
+                    var spanHeight = this.dimensions[1] - 1;
+                    for(var i = 0; i <= len; i++) {
+                        var x1 = i * spanWidth / len;
+                        var f1 = normFrequencies[i];
+                        var y1 = (1 - f1) * spanHeight;
+
+                        plainContext.fillRect(x1, y1, 1, 1);
+
+
+                        //if(i > 0)
+                        //    plainContext.lineTo(x1, y1);
+                        //else
+                        //    plainContext.moveTo(x1, y1);
+                    }
+                    //plainContext.stroke();
+                });
+            });
+
+            histograms[cacheTag] = cachedImage;
+        }
+
+        context.save();
+        context.translate(this.topLeft);
+        context.drawImage(cachedImage);
+        context.restore();
+    }
+}
+
+class FeatureParallelCoordinates extends PlacedSnippet {
+    constructor(public state: EnrichedState) {
+        super("ftrPrl_");
+
+        var cfg = state.configuration;
+        this.setDimensions([
+            cfg.featureCellDimensions[0],
+            state.features.value.length * (cfg.featureCellDimensions[1] + cfg.featureCellSpace[1]) - cfg.featureCellSpace[1]]);
+    }
+
+    paint(context: ViewContext) {
+        var state = this.state;
+        var cfg = state.configuration;
+
+        var populations = this.state.populationSpace.populations.elements;
+
+        context.save();
+        context.translate(this.topLeft);
+
+        context.transitioning = false;
+
+        //var allObjects = state.objectInfo.value.rows;
+        //var genStroke = new Color(0, 0, 0, 0.05);
+        //allObjects.forEach(ob => this.paintPolyLine(context, ob.toString(), genStroke));
+
+        populations.forEach(p =>
+            p.exemplars.elements.forEach(pE =>
+                this.paintPolyLine(context, pE.toString(), state.populationColorTranslucent(p))));
+
+        var focusedObject = state.focused().object;
+        if(focusedObject !== null) this.paintPolyLine(context, focusedObject.toString(), cfg.baseSelected);
+
+        context.transitioning = true;
+
+        context.restore();
+    }
+
+    private paintPolyLine(context: ViewContext, object: string, color: Color) {
+        var state = this.state;
+        //var cfg = state.configuration
+        var features = state.features.value;
+        var featureValues = state.objectFeatureValues.value;
+
+        var width = this.dimensions[0];
+        var height = this.dimensions[1];
+
+        if(object in featureValues.rowIndex) {
+            context.strokeStyle(color);
+            context.beginPath();
+            features.forEach((f, fI) => {
+                var x = featureValues.cell(f, object) * width;
+                var y = (fI + .5) * height / features.length;
+                return fI > 0 ? context.lineTo(x, y) : context.moveTo(x, y);
+            });
+            context.stroke();
+        }
+    }
+}
+
+class Splom extends PlacedSnippet {
+    plots: ObjectFeaturePlot[][];
+
+    constructor(public model: EnrichedState) {
+        super("splom", [0, 0]);
+
+        var cfg = model.configuration;
+        var features = model.populationSpace.features.elements;
+
+        this.plots = features
+            .map((f1, i1) => features.map((f2, i2) =>
+                i1 < i2 ?
+                    new ObjectFeaturePlot(f1, f2, [0,0], model, cfg, cfg.splomInnerSize, i2 === features.length - 1, i1 === 0):
+                    null));
+
+        var size = cfg.sideFont.size + Math.max(0, this.model.populationSpace.features.length - 1) * cfg.splomSize;
+        this.setDimensions([Math.max(size, cfg.splomSize + cfg.splomInnerSize), size]);
+    }
+
+    setTopLeft(topLeft: number[]) {
+        super.setTopLeft(topLeft);
+
+        if(this.plots) {
+            var configuration = this.model.configuration;
+            var marginTopLeft = Vector.add(this.topLeft, [configuration.sideFont.size, 0]);
+            this.plots.forEach((pC, pCI) => pC.forEach((p, pRI) => {
+                if(p) p.topLeft = Vector.add(marginTopLeft, [pCI * configuration.splomSize, (pRI-1) * configuration.splomSize])
+            }));
         }
     }
 
     paint(context: ViewContext) {
-        var mod = this.model;
-        var cfg = mod.configuration;
-
-        // Header.
-        context.save();
-        context.translate(this.topLeft);
-        context.translate([0.5 * this.dimensions()[0], 0]);
-        panelHeader(context, cfg, "Feature Space");
-        context.restore();
-
-        // Individual plots.
-        context.snippets(this.plots);
+        this.plots.map(plts => context.snippets(plts));
     }
 
-    // Total width and height.
-    dimensions() {
-        var cfg = this.model.configuration;
-        var size = Math.max(0, this.model.populationSpace.features.length - 1) * this.configuration.splomSize;
-        return [Math.max(size, cfg.splomSize + cfg.splomInnerSize), size];
+    toString() {
+        return "Feature Space";
     }
 }
 
-export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
+class ObjectFeaturePlot extends BaseSnippet implements Snippet {
     private cachedBackground: any;  // Cache image.
 
     constructor(public feature1: string,
@@ -257,15 +415,18 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
                 public footerLabel: string = null) {
         super("objPlt_" + feature1 + ".." + feature2);
 
-        // Cache heavy duty dot draw operations, optional.
-        this.cachedBackground = model.objectHistograms.value[this.identifier];  //model.objectInfo.value[this.identifier];
+        // Cache for changing histograms and hovered population.
+        var cachedBackgrounds = model.objectHistograms.value[this.identifier] || {};
+        var focusPopulation = (model.focused().population || -1).toString();
+        this.cachedBackground = cachedBackgrounds[focusPopulation];  //model.objectInfo.value[this.identifier];
         if(!this.cachedBackground) {
-            this.cachedBackground = view.View.renderToCanvas(size, size, c => this.paintDots(c));
+            this.cachedBackground = view.View.renderToCanvas(size, size, c => this.histogram2DtoImage(c));
             model.objectHistograms.value[this.identifier] = this.cachedBackground;
+            //model.objectHistograms.value[this.identifier] = this.cachedBackground;
         }
     }
 
-    paintDots(context: CanvasRenderingContext2D) {
+    histogram2DtoImage(context: CanvasRenderingContext2D) {
         var mod = this.model;
         var cfg = this.configuration;
         var size = this.size;
@@ -276,16 +437,17 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         if(pairHistos) {
             context.save();
 
+            var focusedPopulation = mod.focused().population;
             pairHistos.forEach(hP => {
                 var cK = hP[0];
                 var matrix = hP[1];
                 var population = mod.populationSpace.populations.byId(cK);
+                var focused = !(Number(cK) >= 0) || focusedPopulation === Number(cK);
 
-                var coreColor = Number(cK) >= 0 ? population.color : cfg.base;
-                //context.fillStyle = Number(cK) >= 0 ? population.colorTrans : cfg.base;
+                var coreColor = Number(cK) >= 0 ? mod.populationColor(population) : cfg.base;
                 matrix.forEach((c, xI) => c.forEach((cell, yI) => {
-                    if(cell) {
-                        context.fillStyle = coreColor.alpha(1 - 0.5 / cell);
+                    if((focused && cell) || (!focused && cell === 2)) {
+                        context.fillStyle = coreColor;  //coreColor.alpha(1 - 0.5 / cell);
                         context.fillRect(xI, size - yI, 1, 1);
                     }
                 }));
@@ -319,9 +481,7 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         context.strokeStyle(cfg.baseVeryDim);
         context.strokeRect(0, 0, size, size);
 
-        //context.context['imageSmoothingEnabled'] = false;
         context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
-        //context.context['imageSmoothingEnabled'] = true;
 
         context.transitioning = false;
         //context.transitioning = false;
@@ -337,7 +497,9 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
                 //var cI = clstr.clusterMap[pop.identifier];
                 //var color = cI >= 0 ? cfg.clusterColors[clstr.identifierIndex[cI]] : Color.NONE;
                 var oI = objectFeatures.rowIndex[ex];
-                ObjectFeaturePlot.drawBigDot(context, cfg, pop.color, x[oI] * size, (1 - y[oI]) * size);
+                ObjectFeaturePlot.drawBigDot(context,
+                    cfg, this.model.populationColor(pop) /*pop.color*/,
+                    x[oI] * size, (1 - y[oI]) * size);
             })
         );
 
@@ -364,15 +526,16 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         context.fillText(this.footerLabel, 0, 0);
         context.restore();
 
-        // Column (top) label.
-        context.textBaseline('bottom');
+        // Column (bottom) label.
+        context.textBaseline('top');
         context.save();
         context.fillStyle(this.columnLabel ? cfg.base : style.Color.NONE);
-        context.translate([.5 * this.size, 0]);
+        context.translate([.5 * this.size, this.size]);
         context.fillText(this.feature1, 0, 0);
         context.restore();
 
         // Row (left) label.
+        context.textBaseline('bottom');
         context.save();
         context.fillStyle(this.rowLabel ? cfg.base : style.Color.NONE);
         context.translate([0, .5 * this.size]);
@@ -388,13 +551,13 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
     static drawBigDot(context: ViewContext, cfg: BaseConfiguration, color: Color, x: number, y: number) {
         var rO = cfg.splomRepresentativeOuterDotRadius;
         var rI = cfg.splomRepresentativeInnerDotRadius;
-        var rM = 0.5 * (rO + rI);
+        //var rM = 0.5 * (rO + rI);
 
         context.fillStyle(cfg.backgroundColor);
         context.fillEllipse(x, y, rO, rO);
 
-        context.fillStyle(style.Color.BLACK);
-        context.fillEllipse(x, y, rM, rM);
+        //context.fillStyle(style.Color.BLACK);
+        //context.fillEllipse(x, y, rM, rM);
 
         context.fillStyle(color);
         context.fillEllipse(x, y, rI, rI);
@@ -425,73 +588,69 @@ export class ObjectFeaturePlot extends BaseSnippet implements Snippet {
     }
 }
 
-export class ExemplarTable extends PlacedSnippet {
+class ExemplarTable extends PlacedSnippet {
     columns: List<ExemplarColumn>;
     hoveredObjectDetailView: ObjectDetailView;
 
-    constructor(topLeft: number[],
-                public state: EnrichedState) {
-        super("ExemplarStack", topLeft);
+    constructor(public state: EnrichedState) {
+        super("ExemplarStack", [0,0]);
 
         var cfg = state.configuration;
-        var colSnippets = this.state.populationSpace.populations.map(p => new ExemplarColumn(state, p));
-        this.columns = new List("ExemplarColumns", colSnippets, topLeft, [0, 0], 'horizontal', cfg.clusterTileSpace, 'left');
+        var colSnippets = this.state.populationSpace.populations.elements.map(p => new ExemplarColumn(state, p));
+        this.columns = new List("ExemplarColumns", colSnippets, [0,0], [0, 0], 'horizontal', cfg.clusterTileSpace, 'left');
 
-        var hoveredObjectDetailsTopLeft = this.columns.dimensions[1] > 0 ?
-            Vector.add(this.columns.bottomLeft, [0, cfg.splomSpace]) :
-            this.columns.topLeft;
         if(state.hoveredCoordinates.object !== null && !state.hoveredObjectIsExemplar()) {
-            this.hoveredObjectDetailView = new ObjectDetailView(
-                state.hoveredCoordinates.object, state, hoveredObjectDetailsTopLeft);
-        } else {
-            this.hoveredObjectDetailView = null;
+            this.hoveredObjectDetailView = new ObjectDetailView(state.hoveredCoordinates.object, state, [0,0]);
         }
 
         this.dimensions = Vector.max(this.columns.dimensions, [cfg.splomInnerSize, cfg.splomInnerSize]);
         this.updatePositions();
     }
 
+    setTopLeft(topLeft: number[]) {
+        super.setTopLeft(topLeft);
+
+        if(this.columns) {
+            this.columns.setTopLeft(topLeft);
+        }
+
+        if(this.hoveredObjectDetailView) {
+            var cfg = this.state.configuration;
+            this.hoveredObjectDetailView.setTopLeft(
+                this.columns.dimensions[1] > 0 ?
+                    Vector.add(this.columns.bottomLeft, [0, cfg.splomSpace]) :
+                    this.columns.topLeft);
+        }
+    }
+
     paint(context: ViewContext) {
-        var cfg = this.state.configuration;
-
-        // Header.
-        context.save();
-        context.translate(this.topLeft);
-        context.translate([0.5 * this.dimensions[0], 0]);
-        panelHeader(context, cfg, "Exemplars");
-        context.restore();
-
         context.snippet(this.columns);
         context.snippet(this.hoveredObjectDetailView);
 
-        context.transitioning = false;
+        //context.transitioning = false;
+    }
+
+    toString() {
+        return "Phenotypes";
     }
 }
 
-export class ExemplarColumn extends List<ObjectDetailView> {
-    //exemplarDetails: List<ObjectDetailView>;
-
+class ExemplarColumn extends List<PlacedSnippet> {
     constructor(public state: EnrichedState,
                 public population: Population,
                 public topLeft = [0, 0]) {
         super(
-            "esc" + population.identifier,
-            population.exemplars.map(ex => new ObjectDetailView(ex, state)),    //, state.configuration.clusterTileSize)),
+            "esc_" + population.identifier,
+            _.union<PlacedSnippet>(
+                [new ExemplarLabel(population, state)],
+                population.exemplars.elements.map(ex => new ObjectDetailView(ex, state, [0,0], population.identifier))
+            ),
             topLeft,
             [state.configuration.clusterTileInnerSize, 0],
             'vertical',
-            state.configuration.clusterTileSpace,
+            state.configuration.exemplarSpace,
             'middle'
         );
-        //super("esc_" + population.identifier, );
-
-        //var cfg = state.configuration;
-
-        //var exemplarTiles = population.exemplars.map(ex => new ObjectDetailView(ex, state, cfg.clusterTileSize));
-        //this.exemplarDetails = new List("exlst_" + population.identifier, exemplarTiles, topLeft, 'vertical', cfg.clusterTileSpace);
-
-        //this.dimensions = this.exemplarDetails.dimensions;  // Guarantee width.
-        //this.updatePositions();
     }
 
     paint(context: ViewContext) {
@@ -501,45 +660,65 @@ export class ExemplarColumn extends List<ObjectDetailView> {
         context.save();
         context.translate(this.topLeft);
 
-        // Top header.
-        context.save();
+        /*var verticalFocusShift = state.hoveredCoordinates.population === this.population.identifier ?
+                cfg.sideFont.size :
+                0;*/
 
-        var verticalFocusShift = state.hoveredCoordinates.population === this.population.identifier ?
-            0.5 * cfg.sideFont.size :
-            0;
-
-        var tabHeight = verticalFocusShift + 1.5 * cfg.sideFont.size;
+        //var tabHeight = verticalFocusShift;// + 1.5 * cfg.sideFont.size;
 
         // Pickable background.
-        context.picking = true;
-        context.fillStyle(Color.NONE);
-        context.fillRect(0, -tabHeight, this.dimensions[0], this.dimensions[1] + tabHeight + cfg.splomSpace);
-        context.picking = false;
+        //context.picking = true;
+        //context.fillStyle(Color.NONE);
+        //context.fillRect(0, 0, this.dimensions[0], this.dimensions[1] - state.configuration.clusterLabel.font.size /* + tabHeight +*/);
+        //context.picking = false;
 
         // Colored tab.
-        context.fillStyle(this.population.colorTrans);
-        context.fillRect(0, -tabHeight, this.dimensions[0], this.dimensions[1] + tabHeight);   //tabHeight);
-
-        context.font(cfg.sideFont.string);
-        context.textBaseline('bottom');
-        context.textAlign('center');
-        context.fillStyle(cfg.base);
-        //context.lineWidth(3);
-        //context.strokeStyle(cfg.backgroundColor);
+        //context.fillStyle(state.populationColor(this.population));  //this.population.colorTrans);
+        //context.fillRect(0, 0, this.dimensions[0], this.dimensions[1] - state.configuration.clusterLabel.font.size); // + tabHeight);
 
         // Label.
-        context.translate([.5 * this.dimensions[0], -verticalFocusShift]);
-        //context.strokeText(this.population.name, 0, 0);
-        context.fillText(this.population.name, 0, 0);
-        context.restore();
+        /*context.font(cfg.sideFont.string);
+        context.textBaseline('top');
+        context.textAlign('center');
+        context.fillStyle(cfg.base);
+        context.fillText(this.population.name, .5 * this.dimensions[0], this.dimensions[1] + verticalFocusShift);*/
 
         context.restore();
 
         super.paint(context);
     }
+}
+
+class ExemplarLabel extends Label {
+    constructor(public population: Population,
+                public state: EnrichedState) {
+        super("lbl_" + population.identifier,
+            population.name,
+            [0,0],
+            state.focused().population === population.identifier ?
+                state.configuration.clusterSelectedLabel :
+                state.configuration.clusterLabel,
+            true);
+
+        this.setDimensions([state.configuration.clusterTileInnerSize, this.dimensions[1]]);
+    }
+
+    paint(context: ViewContext) {
+        var state = this.state;
+
+        context.save();
+        context.translate(this.topLeft);
+        context.picking = true;
+
+        context.fillStyle(state.populationColor(this.population));
+        context.fillRect(0, 0, state.configuration.clusterTileInnerSize, this.dimensions[1]);
+
+        context.restore();
+    }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.population = this.population.identifier;
+        interaction.pushView('plates');
     }
 
     mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
@@ -547,271 +726,19 @@ export class ExemplarColumn extends List<ObjectDetailView> {
     }
 }
 
-class NumberTable extends BaseSnippet {
-    columnHeader: Label[];
-    rowIndex: Label[];
-    bars: Rectangle[];
-
-    constructor(identifier: string,
-                public topLeft: number[],
-                public frame: NumberFrame,
-                public configuration: NumberTableConfiguration) {
-        super(identifier);
-
-        var accTopLeft = topLeft;
-        if(configuration.visibleIndex) {
-            //accTopLeft = Vector.add(accTopLeft, [configuration.cellOuterDimensions[0], 0]);
-        }
-
-        if(configuration.visibleHeader) {
-            var headerStyle = new LabelStyle(configuration.font, configuration.fontColor, 'middle', 'middle');
-            this.columnHeader = frame.columns.map((cL, i) =>
-                new Label(identifier + "_c_" + cL, cL, Vector.add(accTopLeft, [(i + .5) * configuration.cellOuterDimensions[0], 0]), headerStyle));
-            accTopLeft = Vector.add(accTopLeft, [0, configuration.cellOuterDimensions[1]]);
-        }
-
-        // Number bars.
-        var barsTopLeft = accTopLeft;
-        this.bars = _.flatten(frame.zeroNormalizedMatrix.map((c, cI) => c.map((val, rI) =>
-            new Rectangle(identifier + "_" + cI + "_" + rI,
-                                Vector.add(barsTopLeft, [cI * configuration.cellOuterDimensions[0],
-                                            configuration.cellSpace[1] + rI * configuration.cellOuterDimensions[1]]),
-                                [val * configuration.cellDimensions[0], configuration.cellDimensions[1]],
-                                configuration.fontColor)
-        )));
-
-        if(configuration.visibleIndex) {
-            var indexStyle = new LabelStyle(configuration.font, configuration.fontColor, 'left', 'middle');
-            this.rowIndex = frame.rows.map((rL, i) =>
-                new Label(
-                    identifier + "_r_" + rL,
-                    rL,
-                    Vector.add(topLeft, [frame.columns.length * configuration.cellOuterDimensions[0], (i + .5) * configuration.cellOuterDimensions[1]]),
-                    indexStyle,
-                    true)
-            );
-            //accTopLeft = Vector.add(accTopLeft, [0, frame.columns.length * configuration.cellDimensions[1]]);
-        }
-    }
-
-    paint(context: ViewContext) {
-        context.snippets(this.columnHeader);
-        context.snippets(this.rowIndex);
-        context.snippets(this.bars);
-    }
-
-    dimensions() {
-        var cfg = this.configuration;
-        return [(this.frame.columns.length + (this.configuration.visibleIndex ? 1 : 0)) * cfg.cellOuterDimensions[0],
-                (this.frame.rows.length + (this.configuration.visibleHeader ? 1 : 0)) * cfg.cellOuterDimensions[1]];
-    }
-}
-
-class FeatureLabel extends Label {
-
-    constructor(public feature: string,
-                position: number[],
-                style: LabelStyle) {
-        super(feature, feature, position, style, true);
-    }
-
-    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        interaction.populationSpace.features = enriched.populationSpace.features.toggle(this.feature);
-        //console.log("Mouse click: " + enriched.populationSpace.features.length);
-    }
-}
-
-class FeatureHistogramTable extends PlacedSnippet {
-    columnHeader: Label[];
-    rowIndex: Label[];
-    histograms: Histogram[][];
-
-    guide: GuideLabel;
-
-    constructor(identifier: string,
-                topLeft: number[],
-                public state: EnrichedState) {
-        super(identifier, topLeft);
-
-        var features = state.features.value;
-        var frames = state.featureHistograms.value.histograms;
-        //var frame = state.featureHistograms.value.histograms['objects'];   //state.features.value;
-        var cfg = state.configuration;
-        var configuration = cfg.featureTable;
-        var selected = state.populationSpace.features;
-
-        var accTopLeft = topLeft;
-
-        if(configuration.visibleIndex) {
-            this.rowIndex = features.map((rL, i) => {
-                var indexStyle = new LabelStyle(
-                    configuration.font,
-                    selected.has(rL) ? configuration.fontColor : cfg.baseDim,
-                    'right',
-                    'middle');
-
-                return new FeatureLabel(
-                    rL,
-                    Vector.add(topLeft,
-                        [configuration.cellOuterDimensions[0], (i + .5) * configuration.cellOuterDimensions[1]]),
-                        indexStyle);
-            });
-            accTopLeft = Vector.add(accTopLeft, [configuration.cellOuterDimensions[0] + cfg.splomSpace, 0]);
-        }
-
-        var barsTopLeft = accTopLeft;
-
-        this.histograms = _.keys(frames).map(fK => {
-            var frame = frames[fK];
-
-            var frameCfg = _.clone(configuration);
-            frameCfg.fontColor = fK === '-1' ? cfg.baseDim : state.populationSpace.populations.byId(fK).color;
-
-            return features.filter(c => c in frame.columnIndex).map((c, cI) =>
-                new Histogram(
-                    identifier + "_" + c,
-                    Vector.add(barsTopLeft, [0, configuration.cellSpace[1] + cI * configuration.cellOuterDimensions[1]]),
-                    frame.matrix[frame.columnIndex[c]],
-                    frameCfg));
-        });
-
-        this.setDimensions([((configuration.visibleIndex ? 1 : 0) + 1) * configuration.cellOuterDimensions[0],
-                            (features.length + (configuration.visibleHeader ? 1 : 0)) * configuration.cellOuterDimensions[1]]);
-
-        if(selected.length < 2) {
-            this.guide = new GuideLabel(
-                "ftr",
-                "Click on a feature label to add it to the phenotype model space.",
-                Vector.add(this.topRight, [15, 250]),
-                Vector.add(this.topLeft, [35, 250]),
-                25,
-                state);
-        }
-    }
-
-    paint(context: ViewContext) {
-        var cfg = this.state.configuration;
-
-        // Header.
-        context.save();
-        context.translate(this.topLeft);
-        context.translate([0.5 * this.dimensions[0], 0]);
-        panelHeader(context, cfg, "Cell Features");
-        context.restore();
-
-        context.snippets(this.columnHeader);
-        context.snippets(this.rowIndex);
-        //context.snippets(this.histograms);
-        this.histograms.forEach(hs => context.snippets(hs));
-
-        context.snippet(this.guide);
-    }
-}
-
-class Histogram extends BaseSnippet {
-
-    constructor(identifier: string,
-                public topLeft: number[],
-                public normFrequencies: number[],
-                public configuration: NumberTableConfiguration) {
-        super(identifier);
-    }
-
-    paint(context: ViewContext) {
-        var cfg = this.configuration;
-
-        context.save();
-        context.translate(this.topLeft);
-
-        context.strokeStyle(cfg.fontColor);
-        var shrLen = this.normFrequencies.length - 1;
-        for(var i = 0; i < shrLen; i++) {
-            var x1 = i * cfg.cellDimensions[0] / shrLen;
-            var x2 = (i + 1) * cfg.cellDimensions[0] / shrLen;
-            var f1 = this.normFrequencies[i];
-            var f2 = this.normFrequencies[i + 1];
-            var y1 = (1 - f1) * cfg.cellDimensions[1];
-            var y2 = (1 - f2) * cfg.cellDimensions[1];
-
-            context.strokeLine([x1, y1], [x2, y2]);
-        }
-
-        context.restore();
-    }
-}
-
-class Plate extends PlacedSnippet {
-    constructor(id: string,
-                topLeft: number[],
-                public model: EnrichedState) {
-        super(id, topLeft);
-
-        var cfg = model.configuration;
-        var info = model.dataSetInfo.value;
-        this.setDimensions([info.columnCount * cfg.wellDiameter, info.rowCount * cfg.wellDiameter]);
-    }
-
-    paintWellOutlines(ctx: ViewContext) {
-        var cfg = this.model.configuration;
-        var info = this.model.dataSetInfo.value;
-        var selection = this.model.focused();
-        var clusterShares = this.model.wellClusterShares.value.wellIndex[selection.populationOrTotal()] || [];
-        var wellShares = clusterShares[selection.plate] || [];
-
-        // Well outlines.
-        ctx.strokeStyle(cfg.baseMuted);
-        for(var c = 0; c < info.columnCount; c++) {
-            var x = c * cfg.wellDiameter;
-
-            for(var r = 0; r < info.rowCount; r++) {
-                var y = r * cfg.wellDiameter;
-
-                if(wellShares[c] && wellShares[c][r] >= -1) {
-                    ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
-                    ctx.fillRect(x + .25, y + .25, cfg.wellDiameter - .5, cfg.wellDiameter - .5);
-                } else {
-                    ctx.strokeLine([x + .25, y + .25], [x + cfg.wellDiameter - .25, y + cfg.wellDiameter - .25]);
-                    ctx.strokeLine([x + .25, y + cfg.wellDiameter - .25], [x + cfg.wellDiameter - .25, y + .25]);
-                }
-            }
-        }
-    }
-
-    paintWellLabels(ctx: ViewContext) {
-        var cfg = this.model.configuration;
-        var info = this.model.dataSetInfo.value;
-
-        var lblY = 0;   //info.rowCount * cfg.wellDiameter + cfg.plateColLabelMargin;
-        var lblX = info.columnCount * cfg.wellDiameter + cfg.plateRowLabelMargin;
-
-        ctx.save();
-
-        // Column labels at the top.
-        ctx.font(cfg.sideFont.string);
-        ctx.fillStyle(cfg.base);
-        ctx.textAlign('center');
-        ctx.textBaseline('bottom');
-        info.columnLabels.forEach((c, i) => ctx.fillText(c, (i+.5) * cfg.wellDiameter, lblY));
-
-        // Row labels at the right.
-        ctx.textAlign('left');
-        ctx.textBaseline('middle');
-        info.rowLabels.forEach((r, j) => ctx.fillText(r, lblX, (j+.5) * cfg.wellDiameter));
-
-        ctx.restore();
-    }
-}
-
-class TemplatePlate extends Plate {
+class AbstractPlate extends PlacedSnippet {
     selectionOutlines: jsts.geom.Geometry[];
 
-    constructor(topLeft: number[], public model: EnrichedState) {
-        super("tmpPlt", topLeft, model);
+    constructor(id: string, topLeft: number[],
+                public state: EnrichedState,
+                public columnLabels: boolean = true,
+                public rowLabels: boolean = true) {
+        super(id, topLeft);
 
-        var cfg = model.configuration;
+        var cfg = state.configuration;
 
         var gf = new jsts.geom.GeometryFactory();
-        this.selectionOutlines = model.allWellSelections().map(ws => {
+        this.selectionOutlines = state.allWellSelections().map(ws => {
             // Tile per well.
             var wellTiles = ws.wells.map(wc => {
                 var topLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter, wc.row * cfg.wellDiameter);
@@ -824,26 +751,21 @@ class TemplatePlate extends Plate {
 
             return new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
         });
+
+        var info = state.dataSetInfo.value;
+        this.setDimensions([info.columnCount * cfg.wellDiameter + cfg.plateColLabelMargin + cfg.sideFont.width("000"),
+                            info.rowCount * cfg.wellDiameter + cfg.plateRowLabelMargin + cfg.sideFont.size + 4]);
     }
 
     paint(context: ViewContext) {
-        var cfg = this.model.configuration;
-        var info = this.model.dataSetInfo.value;
-        var focusedPlate = this.model.focused().plate;
-
-        // Header.
-        context.save();
-        context.translate(this.topLeft);
-        context.translate([0.5 * info.columnCount * cfg.wellDiameter, 0]);
-        panelHeader(context, cfg, (focusedPlate === null ? "Plate Void" : "Plate " + info.plateLabels[focusedPlate]), cfg.baseSelected);
-        context.restore();
+        var cfg = this.state.configuration;
+        var info = this.state.dataSetInfo.value;
 
         context.save();
         context.translate(this.topLeft);
         context.transitioning = false;
 
         //this.paintSelectionBody(ctx);
-        this.paintWellOutlines(context);
         this.paintWellLabels(context);
         this.paintSelectionOutlines(context);
 
@@ -858,9 +780,38 @@ class TemplatePlate extends Plate {
         context.restore();
     }
 
+    paintWellLabels(ctx: ViewContext) {
+        var cfg = this.state.configuration;
+        var info = this.state.dataSetInfo.value;
+
+        var lblY = info.rowCount * cfg.wellDiameter + cfg.plateColLabelMargin;
+        var lblX = info.columnCount * cfg.wellDiameter + cfg.plateRowLabelMargin;
+
+        ctx.save();
+
+        ctx.font(cfg.sideFont.string);
+        ctx.fillStyle(cfg.base);
+
+        // Column labels at the top.
+        if(this.columnLabels) {
+            ctx.textAlign('center');
+            ctx.textBaseline('top');
+            info.columnLabels.forEach((c, i) => ctx.fillText(c, (i + .5) * cfg.wellDiameter, lblY));
+        }
+
+        // Row labels at the right.
+        if(this.rowLabels) {
+            ctx.textAlign('left');
+            ctx.textBaseline('middle');
+            info.rowLabels.forEach((r, j) => ctx.fillText(r, lblX, (j + .5) * cfg.wellDiameter));
+        }
+
+        ctx.restore();
+    }
+
     paintSelectionBody(ctx: ViewContext) {
-        var cfg = this.model.configuration;
-        var info = this.model.dataSetInfo.value;
+        var cfg = this.state.configuration;
+        var info = this.state.dataSetInfo.value;
 
         ctx.fillStyle(cfg.base.alpha(0.2));
         ctx.beginPath();
@@ -869,8 +820,8 @@ class TemplatePlate extends Plate {
     }
 
     paintSelectionOutlines(ctx: ViewContext) {
-        var cfg = this.model.configuration;
-        var info = this.model.dataSetInfo.value;
+        var cfg = this.state.configuration;
+        var info = this.state.dataSetInfo.value;
 
         this.selectionOutlines.forEach((so, i) => {
             ctx.strokeStyle(cfg.backgroundColor);
@@ -879,7 +830,7 @@ class TemplatePlate extends Plate {
             TemplatePlate.geometryToPath(ctx, so);
             ctx.stroke();
 
-            ctx.strokeStyle(this.model.allWellSelections()[i].id === "Selected" ? cfg.baseSelected : cfg.base);
+            ctx.strokeStyle(this.state.allWellSelections()[i].id === "Selected" ? cfg.baseSelected : cfg.base);
             ctx.lineWidth(2);
             ctx.beginPath();
             TemplatePlate.geometryToPath(ctx, so);
@@ -897,22 +848,6 @@ class TemplatePlate extends Plate {
         ctx.beginPath();
         this.selectionOutlines.forEach(so => TemplatePlate.geometryToPath(ctx, so));
         ctx.stroke();*/
-    }
-
-    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        var plate = this.model.focused().plate;
-        if(plate !== null) {
-            interaction.selectedCoordinates.plate = plate;
-            interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
-        }
-    }
-
-    mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        var plate = this.model.focused().plate;
-        if(plate !== null) {
-            interaction.hoveredCoordinates.plate = plate;
-            interaction.hoveredCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
-        }
     }
 
     static geometryToPath(context: ViewContext, geometry: jsts.geom.Geometry) {
@@ -1006,88 +941,159 @@ class TemplatePlate extends Plate {
         }
         context.closePath();
     }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        var plate = this.state.focused().plate;
+        if(plate !== null) {
+            interaction.selectedCoordinates.plate = plate;
+            interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
+            interaction.pushView('well');
+        }
+    }
+
+    mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        var plate = this.state.focused().plate;
+        if(plate !== null) {
+            interaction.hoveredCoordinates.plate = plate;
+            interaction.hoveredCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
+        }
+    }
 }
 
-/*class PlateIndex extends PlacedSnippet {
-    private selectionSnippets: PlateIndexSelection[];
-
-    constructor(public topLeft: number[], public model: EnrichedState) {
-        super("pi", topLeft);
-
-        this.selectionSnippets = model.allWellSelections().map((s, i) =>
-            new PlateIndexSelection([i * model.configuration.plateIndexWidth(), 0], s, model));
-
-        var cfg = model.configuration;
-        var datInfo = model.dataSetInfo.value;
-        this.dimensions = [model.allWellSelections().length * cfg.plateIndexWidth(), cfg.plateIndexSpace * datInfo.plateCount];
-        this.updatePositions();
+class TemplatePlate extends AbstractPlate {
+    constructor(topLeft: number[], public model: EnrichedState) {
+        super("tmpPlt", topLeft, model);
     }
 
-    paint(ctx: ViewContext) {
-        ctx.save();
+    paint(context: ViewContext) {
+        context.save();
+        context.translate(this.topLeft);
+        context.transitioning = false;
 
-        ctx.translate(this.topLeft);
-        ctx.snippets(this.selectionSnippets);
-        ctx.restore();
-    }
-}*/
+        this.paintWells(context);
 
-class PlateIndexSelection extends PlacedSnippet {
-    constructor(public topLeft: number[],
-                public selection: WellSelection,
-                public model: EnrichedState) {
-        super("pi_" + selection.id, topLeft);
+        context.transitioning = true;
+        context.restore();
 
-        var cfg = model.configuration;
-        var info = model.dataSetInfo.value;
-
-        this.dimensions = [cfg.plateIndexWidth(), cfg.plateIndexSpace * info.plateCount];
-        this.updatePositions();
+        super.paint(context);
     }
 
-    paint(ctx: ViewContext) {
-        var mod = this.model;
-        var cfg = mod.configuration;
-        var info = mod.dataSetInfo.value;
+    paintWells(ctx: ViewContext) {
+        var cfg = this.model.configuration;
+        var info = this.model.dataSetInfo.value;
+        var selection = this.model.focused();
+        var clusterShares = this.model.wellClusterShares.value.wellIndex[selection.populationOrTotal()] || [];
+        var wellShares = clusterShares[selection.plate] || [];
+
+        // Well outlines.
+        ctx.strokeStyle(cfg.baseMuted);
+        for(var c = 0; c < info.columnCount; c++) {
+            var x = c * cfg.wellDiameter;
+
+            for(var r = 0; r < info.rowCount; r++) {
+                var y = r * cfg.wellDiameter;
+
+                if(wellShares[c] && wellShares[c][r] >= -1) {
+                    ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
+                    ctx.fillRect(x + .25, y + .25, cfg.wellDiameter - .5, cfg.wellDiameter - .5);
+                } else {
+                    ctx.strokeLine([x + .25, y + .25], [x + cfg.wellDiameter - .25, y + cfg.wellDiameter - .25]);
+                    ctx.strokeLine([x + .25, y + cfg.wellDiameter - .25], [x + cfg.wellDiameter - .25, y + .25]);
+                }
+            }
+        }
+    }
+}
+
+class FlowerPlate extends AbstractPlate {
+    constructor(topLeft: number[], public state: EnrichedState) {
+        super("flwPlt", topLeft, state, false);
+    }
+
+    paint(context: ViewContext) {
+        // Selections behind well flowers.
+        super.paint(context);
+
+        context.save();
+        context.translate(this.topLeft);
+        context.transitioning = false;
+
+        this.paintWells(context);
+
+        context.transitioning = true;
+        context.restore();
+    }
+
+    paintWells(ctx: ViewContext) {
+        var cfg = this.state.configuration;
+        var info = this.state.dataSetInfo.value;
 
         ctx.save();
-        ctx.translate(this.topLeft);
 
-        ctx.transitioning = false;
+        // Population abundance flowers.
+        for(var c = 0; c < info.columnCount; c++)
+            for(var r = 0; r < info.rowCount; r++)
+                this.paintPopulationFlower(ctx, c, r);
 
-        ctx.save();
-        ctx.font(cfg.sideFont.string);
-        ctx.textAlign('left');
-        ctx.textBaseline('top');
-        ctx.fillStyle(cfg.base);
-
-        //ctx.translate([.5 * cfg.plateIndexInnerHeight, -cfg.clusterTileSpace]);
-        ctx.translate([1 * cfg.plateIndexInnerHeight, this.dimensions[1]]);
-        ctx.rotate(.25 * Math.PI);
-        ctx.fillText(this.selection.id);
         ctx.restore();
+    }
 
-        ctx.save();
-        ctx.scale(1, cfg.plateIndexSpace);
+    // Population abundance flower.
+    paintPopulationFlower(ctx: ViewContext, column: number, row: number) {
+        var cfg = this.state.configuration;
+        var selection = this.state.focused();
+        var x = (column + .5) * cfg.wellDiameter;
+        var y = (row + .5) * cfg.wellDiameter;
 
-        ctx.picking = true;
-        ctx.fillStyle(style.Color.NONE);
-        ctx.fillRect(0, 0, cfg.plateIndexWidth(), info.plateCount);
-        ctx.picking = false;
-        ctx.restore();
+        // Fetch total cellCount.
+        var wellClusterShares = this.state.wellClusterShares.value;
+        var totalPopulation = wellClusterShares.wellIndex[Population.POPULATION_TOTAL_NAME] || [];
+        var totalWellShares = totalPopulation[selection.plate] || [];
+        var totalColumnShares = totalWellShares[column] || [];
+        var cellCount = totalColumnShares[row];
 
-        this.selection.plates.forEach(p => {
-            for(var i = p[0]; i <= p[1]; i++) {
-                ctx.fillStyle(mod.focused().plate == i ? cfg.baseSelected : cfg.baseMuted);
-                ctx.fillRect(0, i * cfg.plateIndexSpace, cfg.plateIndexInnerHeight, cfg.plateWidth);
+        var maxObjectCount = wellClusterShares.maxObjectCount;
+        var normObjectCellCount = Math.sqrt(maxObjectCount);
+
+        // Draw flower slice
+        var populations = this.state.populationSpace.populations.elements;
+        populations.forEach((p, pI) => {
+            var clusterShares = this.state.wellClusterShares.value.wellIndex[p.identifier] || [];
+            var wellShares = clusterShares[selection.plate] || [];
+            var columnShares = wellShares[column] || [];
+            var share = columnShares[row];
+
+            ctx.fillStyle(this.state.populationColor(p));
+            ctx.strokeStyle(cfg.backgroundColor);
+            ctx.lineWidth(.25);
+
+            if(share >= 0 && cellCount >= 0) {
+                var beginRad = 0.25 * Math.PI + 2 * Math.PI * pI / populations.length;
+                var endRad = 0.25 * Math.PI + 2 * Math.PI * (pI + 1) / populations.length;
+
+                var normWellCount = Math.sqrt(share * cellCount) / normObjectCellCount;
+
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.arc(x, y, normWellCount * cfg.wellRadius, beginRad, endRad);
+                ctx.lineTo(x, y);
+
+                ctx.fill();
+
+                ctx.stroke();
             }
         });
+    }
+}
 
-        //this.selection.plates.forEach(p => ctx.fillRect(cfg.plateIndexSpace * p[0], 0, cfg.plateIndexSpace * (p[1] - p[0] + 1), cfg.plateIndexInnerHeight));
+class JointWellPlates extends List<AbstractPlate> {
+    constructor(public state: EnrichedState) {
+        super("jntPlt", [new TemplatePlate([0,0], state), new FlowerPlate([0,0], state)]);
+    }
 
-        ctx.textAlign('left');
-        ctx.textBaseline('alphabetic');
-        ctx.restore();
+    toString() {
+        var focusedPlate = this.state.focused().plate;
+        return "Plate " + this.state.dataSetInfo.value.plateLabels[focusedPlate];
     }
 }
 
@@ -1096,19 +1102,18 @@ class WellDetailView extends PlacedSnippet {
 
     guide: GuideLabel;
 
-    constructor(topLeft: number[],
-                public state: EnrichedState) {
-        super("WellDetailView", topLeft);
+    constructor(public state: EnrichedState) {
+        super("WellDetailView", []);
 
         var cfg = state.configuration;
-        this.setDimensions(cfg.wellViewMaxDim);
+        this.setDimensions([cfg.wellViewMaxWidth, cfg.wellViewMaxWidth]);      //(cfg.wellViewMaxDim);
 
         var availableTypes = _.keys(state.availableImageTypes());
         var wellOptions: StringMap<string> = {};
         availableTypes.forEach(t => wellOptions[t] = t);
         this.imageTypeOption = new ConfigurationOptions(
             "WellDetailOptions",
-            this.bottomLeft,
+            [0,0],
             state,
             "imageType",
             wellOptions);
@@ -1117,30 +1122,26 @@ class WellDetailView extends PlacedSnippet {
             this.guide = new GuideLabel(
                 "well",
                 "Hover over a cell to inspect it.",
-                Vector.add(this.bottomRight, [-200, 25]),
-                Vector.add(this.bottomRight, [-200, -50]),
+                [0,0],
+                [0, -75],
                 20,
                 state
             );
         }
     }
 
+    setTopLeft(topLeft: number[]) {
+        super.setTopLeft(topLeft);
+
+        if(this.imageTypeOption) this.imageTypeOption.setTopLeft(this.bottomLeft);
+        if(this.guide) this.guide.setTopLeft(Vector.add(this.bottomRight, [-200, 25]));
+    }
+
     paint(ctx: ViewContext) {
         var state = this.state;
         var cfg = state.configuration;
-        var focusedWell = state.focused().well;
-        var info = state.dataSetInfo.value;
 
-        // Header.
-        ctx.save();
-        ctx.translate(this.topLeft);
-        ctx.translate([0.75 * this.dimensions[0], cfg.panelHeaderSpace - cfg.panelSpace]);
-        panelHeader(ctx, cfg, (focusedWell === null ?
-            "Well Void" :
-            "Well " + info.columnLabels[focusedWell.column] + info.rowLabels[focusedWell.row]), cfg.baseSelected);
-        ctx.restore();
-
-        ctx.transitioning = false;
+        //ctx.transitioning = false;
         ctx.save();
         ctx.translate(this.topLeft);
 
@@ -1148,7 +1149,9 @@ class WellDetailView extends PlacedSnippet {
         if(well) {
             var img = well.image(cfg.imageType);
             if (img) {
-                var wellScale = Math.min(cfg.wellViewMaxDim[0] / img.width, 2 * cfg.wellViewMaxDim[1] / img.height);
+                ctx.transitioning = false;
+
+                var wellScale = Math.min(1, cfg.wellViewMaxWidth / img.width);   //Math.min(cfg.wellViewMaxDim[0] / img.width, 2 * cfg.wellViewMaxDim[1] / img.height);
                 ctx.picking = true;
                 ctx.drawImageClipped(
                     img,
@@ -1172,11 +1175,13 @@ class WellDetailView extends PlacedSnippet {
                         ctx.strokeRect(wellScale * x[i] - xRad, wellScale * y[i] - yRad, 2 * xRad, 2 * yRad);
                     }
                 });
+
+                ctx.transitioning = true;
             }
         }
 
         ctx.restore();
-        ctx.transitioning = true;
+        //ctx.transitioning = true;
 
         // Well type button.
         ctx.snippet(this.imageTypeOption);
@@ -1200,12 +1205,21 @@ class WellDetailView extends PlacedSnippet {
         }
 
         population.exemplars = population.exemplars.toggle(object);
+
+        interaction.pushView('exemplars');
+        interaction.pushView('features');
     }
 
     mouseMove(event: ViewMouseEvent, coordinates: number[],
               enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.object = enriched.closestWellObject(coordinates);
         enriched.conformHoveredCoordinates(interaction);
+    }
+
+    toString() {
+        var info = this.state.dataSetInfo.value;
+        var focusedWell = this.state.focused().well;
+        return "Well " + info.columnLabels[focusedWell.column] + info.rowLabels[focusedWell.row];
     }
 }
 
@@ -1214,7 +1228,8 @@ class ObjectDetailView extends PlacedSnippet {
 
     constructor(public object: number,
                 public state: EnrichedState,
-                topLeft = [0, 0]) {
+                topLeft = [0, 0],
+                public targetPopulation: number = null) {
         super("odv_" + object, topLeft);
 
         var cfg = state.configuration;
@@ -1263,6 +1278,16 @@ class ObjectDetailView extends PlacedSnippet {
                 // Focused highlight.
                 ctx.transitioning = false;
                 if(this.focused) {
+                    ctx.strokeStyle(cfg.backgroundColor);
+                    ctx.lineWidth(4);
+                } else {
+                    ctx.strokeStyle(Color.NONE);
+                }
+                ctx.transitioning = true;
+                ctx.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
+
+                ctx.transitioning = false;
+                if(this.focused) {
                     ctx.strokeStyle(cfg.baseSelected);
                     ctx.lineWidth(2);
                 } else {
@@ -1286,6 +1311,7 @@ class ObjectDetailView extends PlacedSnippet {
 
     mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.object = this.object;
+        interaction.hoveredCoordinates.population = this.targetPopulation;
         enriched.conformHoveredCoordinates(interaction);
     }
 }
@@ -1294,8 +1320,8 @@ class PlateIndex extends PlacedSnippet {
     private heatmapColumns: List<List<PlateMiniHeatmap>>;
     private guide: GuideLabel;
 
-    constructor(public topLeft: number[], public state: EnrichedState) {
-        super("pi", topLeft);
+    constructor(public state: EnrichedState) {
+        super("pi", [0,0]);
 
         var cfg = state.configuration;
         var datInfo = state.dataSetInfo.value;
@@ -1305,25 +1331,30 @@ class PlateIndex extends PlacedSnippet {
         var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
             _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
 
-        //var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI => new List("pic_" + cI, st))
-
         this.heatmapColumns = new List("pics",
             colMaps.map((c, cI) => new List("pic_" + cI, c, [0,0], [0,0], 'vertical', cfg.miniHeatSpace)),
-            topLeft, [0,0], 'horizontal', cfg.miniHeatSpace, 'left'
+            [0,0], [0,0], 'horizontal', cfg.miniHeatSpace, 'left'
         );
 
-        this.dimensions = this.heatmapColumns.dimensions; // [model.allWellSelections().length * cfg.plateIndexWidth(), cfg.plateIndexSpace * datInfo.plateCount];
+        this.dimensions = this.heatmapColumns.dimensions;
         this.updatePositions();
 
         if(state.focused().plate === null) {
             this.guide = new GuideLabel(
                 "plate",
                 "Hover over a plate to inspect it and click to select it.",
-                Vector.add(this.topRight, [10, 60]),
-                Vector.add(this.topRight, [-10, 60]),
+                [0,0],
+                [-20,0],
                 5,
                 state);
         }
+    }
+
+    setTopLeft(topLeft: number[]) {
+        super.setTopLeft(topLeft);
+
+        if(this.heatmapColumns) this.heatmapColumns.setTopLeft(topLeft);
+        if(this.guide) this.guide.setTopLeft(Vector.add(this.topRight, [10,60]));
     }
 
     paint(context: ViewContext) {
@@ -1332,19 +1363,22 @@ class PlateIndex extends PlacedSnippet {
         var focusedPopulation = state.focused().population;
 
         // Header.
-        context.save();
+        /*context.save();
         context.translate(this.topLeft);
         context.translate([0.5 * this.dimensions[0], 0]);
         panelHeader(context, cfg, focusedPopulation === null ?
             "Cell Counts" :
             "Cell Ratio of " + state.populationSpace.populations.byId(focusedPopulation).name,
             focusedPopulation === null ? null : state.populationSpace.populations.byId(focusedPopulation).color);
-        context.restore();
+        context.restore();*/
 
         // Heat maps.
         context.snippet(this.heatmapColumns);
-
         context.snippet(this.guide);
+    }
+
+    toString() {
+        return "Plates";
     }
 }
 
@@ -1437,12 +1471,14 @@ class PlateMiniHeatmap extends PlacedSnippet {
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.selectedCoordinates.plate = this.plateNumber;
-        interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
+        //interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
+
+        interaction.pushView('plate');
     }
 
     mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.plate = this.plateNumber;
-        interaction.hoveredCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
+        //interaction.hoveredCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
     }
 
     static wellCoordinatesAt(mouseCoordinates: number[], state: EnrichedState) {
@@ -1496,6 +1532,12 @@ class ConfigurationOptions extends PlacedSnippet {
         this.setDimensions(this.buttons.dimensions);
     }
 
+    setTopLeft(topLeft: number[]) {
+        super.setTopLeft(topLeft);
+
+        if(this.buttons) this.buttons.setTopLeft(topLeft);
+    }
+
     paint(context: ViewContext) {
         context.snippet(this.buttons);
     }
@@ -1520,22 +1562,25 @@ class GuideLabel extends Label {
 
             var cfg = this.state.configuration;
 
-            var connectorVector = Vector.normalize(Vector.subtract(this.position, this.circleCenter));
-            var connectorEdge = Vector.add(this.circleCenter, Vector.mul(connectorVector, this.circleRadius));
+            var circleAbsCenter = Vector.add(this.topLeft, this.circleCenter);
+            circleAbsCenter[1] += 0.5 * this.dimensions[1];
+
+            var connectorVector = Vector.mul(Vector.normalize(this.circleCenter), -1);
+            var connectorEdge = Vector.add(circleAbsCenter, Vector.mul(connectorVector, this.circleRadius));
             var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
+            //var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
 
             context.strokeStyle(cfg.backgroundColor);
             context.lineWidth(3.5);
-            context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
+            context.strokeEllipse(circleAbsCenter[0], circleAbsCenter[1], this.circleRadius, this.circleRadius);
             context.strokeLine(connectorEdge, connectorOuter);
 
             context.strokeStyle(cfg.guideStyle.color);
             context.lineWidth(1.5);
-            context.strokeEllipse(this.circleCenter[0], this.circleCenter[1], this.circleRadius, this.circleRadius);
+            context.strokeEllipse(circleAbsCenter[0], circleAbsCenter[1], this.circleRadius, this.circleRadius);
             context.strokeLine(connectorEdge, connectorOuter);
 
             context.restore();
         }
     }
-
 }

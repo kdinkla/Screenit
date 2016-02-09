@@ -33,13 +33,21 @@ export class InteractionState implements AbstractModel {
     constructor(public populationSpace: PopulationSpace = new PopulationSpace(),
                 public hoveredCoordinates = new SelectionCoordinates(),
                 public selectedCoordinates = new SelectionCoordinates(),
+                public openViews: Chain<string> = new Chain(['plates']),
                 public configuration: BaseConfiguration = new BaseConfiguration()) {
-
     }
 
     removeExemplar(object: number) {
+        // Remove given exemplar from any population (should be a single population).
         this.populationSpace.populations.forEach(p => p.exemplars = p.exemplars.pull(object));
+        // Remove empty populations.
+        //this.populationSpace.populations = this.populationSpace.populations.filter(p => p.length > 0);
         if(this.hoveredCoordinates.object === object) this.hoveredCoordinates.object = null;
+    }
+
+    pushView(identifier: string) {
+        this.openViews = this.openViews.push(identifier);    //this.openViews.toggle(identifier);
+        this.openViews = new Chain(_.takeRight(this.openViews.elements, 3));    // Limit number of open views.
     }
 }
 
@@ -53,24 +61,32 @@ export class EnrichedState extends InteractionState {
     objectHistograms: ProxyValue<HistogramMatrix>;      // 2D histograms for selected cluster and feature combinations.
     wellClusterShares: ProxyValue<WellClusterShares>;   // Cluster <-> well shares (normalized object count).
     featureHistograms: ProxyValue<FeatureHistograms>;
+    objectFeatureValues: ProxyValue<NumberFrame>;       // All features of active objects.
 
     constructor(state: InteractionState) {
         super(state.populationSpace,
-              state.hoveredCoordinates,
-              state.selectedCoordinates,
-              state.configuration);
+            state.hoveredCoordinates,
+            state.selectedCoordinates,
+            state.openViews,
+            state.configuration);
 
-        this.allExemplars = Chain.union<number>(this.populationSpace.populations.map(p => p.exemplars));
+        this.allExemplars = Chain.union<number>(this.populationSpace.populations.elements.map(p => p.exemplars));
         var focusedWell = this.focused();
+        var addWellInfo = (dict) => {
+            dict['column'] = focusedWell.well === null ? -1 : focusedWell.well.column;
+            dict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
+            dict['plate'] = focusedWell.plate === null ? - 1 : focusedWell.plate;
+        };
 
         var populationDict = this.populationSpace.toDict();
         var histogramDict = this.populationSpace.toDict();
         histogramDict['bins'] = state.configuration.splomInnerSize;
 
         var objectInfoDict = this.populationSpace.toDict();
-        objectInfoDict['column'] = focusedWell.well === null ? -1 : focusedWell.well.column;
-        objectInfoDict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
-        objectInfoDict['plate'] = focusedWell.plate === null ? - 1 : focusedWell.plate;
+        addWellInfo(objectInfoDict);
+
+        var objectValuesDict = this.populationSpace.toDict(false);
+        addWellInfo(objectValuesDict);
 
         this.dataSetInfo = new ProxyValue(
             "dataSetInfo",
@@ -102,6 +118,14 @@ export class EnrichedState extends InteractionState {
             populationDict,
             new FeatureHistograms(), hs => new FeatureHistograms(hs)
         );
+        this.objectFeatureValues = new ProxyValue(
+            "objectFeatureValues",
+            objectValuesDict,
+            new NumberFrame(), vs => new NumberFrame(vs)
+        );
+
+        console.log("Object feature values:");
+        console.log(this.objectFeatureValues.value);
     }
 
     cloneInteractionState() {
@@ -109,6 +133,7 @@ export class EnrichedState extends InteractionState {
             collection.snapshot(this.populationSpace),
             collection.snapshot(this.hoveredCoordinates),
             collection.snapshot(this.selectedCoordinates),
+            collection.snapshot(this.openViews),
             collection.snapshot(this.configuration)
         );
     }
@@ -167,7 +192,7 @@ export class EnrichedState extends InteractionState {
 
     // Well selections, including single focused well.
     allWellSelections() {
-        var location = this.selectionWell(this.focused());   //this.focused().wellLocation();
+        var location = this.selectionWell(this.focused());
         var focusedWell = location ? [location.toWellSelection("Selected")] : [];
         return _.union(this.dataSetInfo.value.wellSelections, focusedWell);
     }
@@ -177,35 +202,32 @@ export class EnrichedState extends InteractionState {
         return this.hoveredCoordinates.otherwise(this.selectedCoordinates);
     }
 
+    // Population color, includes focused population highlight.
+    populationColor(population: Population) {
+        return this.focused().population === population.identifier ? this.configuration.highlight : population.color;
+    }
+
+    // Translucent population color, includes population highlight.
+    populationColorTranslucent(population: Population) {
+        return this.focused().population === population.identifier ? this.configuration.highlight : population.colorTrans;
+    }
+
     // Complete, or correct, coordinates, from object level up to plate level.
     conformHoveredCoordinates(targetState: InteractionState) {
         var coordinates = targetState.hoveredCoordinates;
         if(coordinates !== null) {
-            var wellInfo = this.objectWellInfo(coordinates.object); //this.allObjectWells().location(targetState.hoveredCoordinates.object);
+            var wellInfo = this.objectWellInfo(coordinates.object);
             if (wellInfo) {
                 var location = wellInfo.location;
                 coordinates.well = location.coordinates();
                 coordinates.plate = location.plate;
             }
-
         }
     }
 
     hoveredObjectIsExemplar() {
         return this.hoveredCoordinates.object !== null && this.allExemplars.has(this.hoveredCoordinates.object);
     }
-
-    /*private allObjInfo: NumberFrame = null;
-    allObjectInfo() {
-        if(!this.allObjInfo) {
-            this.allObjInfo = new NumberFrame(this.wellObjectInfo.value.join(this.objectInfo.value).toDict());  //this.objectInfo.value.join(this.wellObjectInfo.value).toDict());
-        }
-        return this.allObjInfo;
-    }*/
-
-    /*allObjectWells() {
-        return new ObjectWells(this.objectInfo.value);
-    }*/
 
     selectionWell(selection: SelectionCoordinates) {
         return this.wellLocation(selection.well.column, selection.well.row, selection.plate);
@@ -232,24 +254,24 @@ export class EnrichedState extends InteractionState {
         if(!locationMap) {
             locationMap = {};
 
-            var imageURLs = this.availableImageTypes();    //objectTable.columns.filter(c => _.startsWith(c, "img_"));
+            var imageURLs = this.availableImageTypes();
 
             var plateVec = objectTable.columnVector('plate');
             var columnVec = objectTable.columnVector('column');
             var rowVec = objectTable.columnVector('row');
-            //var imageVecs = imageURLs.map(c => objectTable.columnVector(c));
 
-            for(var i = 0; i < plateVec.length; i++) {
-                var plateObj = plateVec[i];
-                var columnObj = columnVec[i];
-                var rowObj = rowVec[i];
+            if(plateVec && columnVec && rowVec) {
+                for (var i = 0; i < plateVec.length; i++) {
+                    var plateObj = plateVec[i];
+                    var columnObj = columnVec[i];
+                    var rowObj = rowVec[i];
 
-                var imgMap: StringMap<string> = {};
-                _.pairs(imageURLs).forEach((p, cnI) => imgMap[p[0]] = <any>objectTable.columnVector(p[1])[i]);
-                locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
+                    var imgMap:StringMap<string> = {};
+                    _.pairs(imageURLs).forEach((p, cnI) => imgMap[p[0]] = <any>objectTable.columnVector(p[1])[i]);
+                    locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
+                }
+                objectTable['wellLocations'] = locationMap;
             }
-
-            objectTable['wellLocations'] = locationMap;
         }
 
         return locationMap[column + "_" + row + "_" + plate] || new WellLocation(column, row, plate);
@@ -274,8 +296,8 @@ export class PopulationSpace {
     // Create a new population.
     createPopulation() {
         // Choose an available nominal color.
-        var takenColors = new Chain(this.populations.map(p => p.color));
-        var availableColors = new Chain(Color.colorMapNominal12);
+        var takenColors = this.populations.map(p => p.color);
+        var availableColors = new Chain(Color.colorMapNominal8);
         var freeColors = Chain.difference(availableColors, takenColors);
         var color = freeColors.length > 0 ? freeColors.elements[0] : Color.BLACK;
 
@@ -286,10 +308,12 @@ export class PopulationSpace {
     }
 
     // Dictionary for communicating population description.
-    toDict() {
+    toDict(includeFeatures = true) {
         var exemplars = {};
         this.populations.forEach(p => exemplars[p.identifier] = _.clone(p.exemplars.elements)); // DO NOT REMOVE!
-        return { features: this.features.elements, exemplars: exemplars };
+        return includeFeatures ?
+            { features: this.features.elements, exemplars: exemplars } :
+            { exemplars: exemplars };
     }
 
     // Whether given object is an exemplar.
@@ -313,7 +337,7 @@ export class Population {
         if(identifier === null) this.identifier = Population.POPULATION_ID_COUNTER++;
         if(name === null) this.name = this.identifier.toString();
 
-        this.colorTrans = color.alpha(0.5);
+        this.colorTrans = color.alpha(0.25);
     }
 
     /*toNumber() {
@@ -327,10 +351,10 @@ export class Population {
 
 // Field selection coordinates.
 export class SelectionCoordinates {
-    constructor(public population: number = null,    // Population id.
-                public object: number = null,        // Object (e.g. cell) id.
-                public well: WellCoordinates = null, // Well coordinates (column, row).
-                public plate: number = null) {       // Plate id.
+    constructor(public population: number = null,                           // Population id.
+                public object: number = null,                               // Object (e.g. cell) id.
+                public well: WellCoordinates = new WellCoordinates(0, 0),   // Well coordinates (column, row).
+                public plate: number = 0) {                                 // Plate id.
     }
 
     // Correct for missing values with given coordinates.
@@ -341,24 +365,6 @@ export class SelectionCoordinates {
             this.well === null ? that.well : this.well,
             this.plate === null ? that.plate : this.plate);
     }
-
-    // Well location. Returns null if it is invalid.
-    /*private static cachedLocation: WellLocation = null;
-    wellLocation() {
-        var location: WellLocation = null;
-
-        if(this.well !== null && this.plate !== null) {
-            location = new WellLocation(this.well.column, this.well.row, this.plate);
-
-            if (SelectionCoordinates.cachedLocation !== null && SelectionCoordinates.cachedLocation.equals(location)) {
-                location = SelectionCoordinates.cachedLocation;
-            } else {
-                SelectionCoordinates.cachedLocation = location;
-            }
-        }
-
-        return location;
-    }*/
 
     // Selected population, or total population fallback.
     populationOrTotal(): any {
@@ -383,56 +389,20 @@ export class DataSetInfo {
         // Well selection placeholder; complete selection and control wells, for now.
         this.wellSelections = [
             //new WellSelection("All", [[0, this.plateCount-1]], WellCoordinates.allWells(this.columnCount, this.rowCount)),
-            new WellSelection("Control", [[0, this.plateCount-1]], WellCoordinates.rowWells(this.columnCount, [0]))  // First two columns.
+            //new WellSelection("Control", [[0, this.plateCount-1]], WellCoordinates.rowWells(this.columnCount, [0]))  // First two columns.
         ];
     }
 }
 
-/*export class ObjectWells {
-    private wellLocations: WellLocation[];
-
-    constructor(public frame: DataFrame<any>) {
-        if(!frame['wellLocations']) {
-            var locations = [];
-            frame['wellLocations'] = locations;
-            frame.rows.forEach(r => {
-                var columnI = frame.columnIndex["column"];
-                var rowI = frame.columnIndex["row"];
-                var plateI = frame.columnIndex["plate"];
-                var rI = frame.rowIndex[r];
-
-                locations[r] = new WellLocation(
-                    frame.matrix[columnI][rI],
-                    frame.matrix[rowI][rI],
-                    frame.matrix[plateI][rI]
-                );
-            });
-        }
-    }
-
-    location(object: number) {
-        return this.frame['wellLocations'][object];
-    }
-
-    // Coordinates in well image.
-    coordinates(object: number) {
-        var xI = this.frame.columnIndex["x"];
-        var yI = this.frame.columnIndex["y"];
-        var rI = this.frame.rowIndex[object];
-        return [
-            this.frame.matrix[xI][rI],
-            this.frame.matrix[yI][rI]
-        ];
-    }
-}*/
-
 export class WellClusterShares extends NumberFrame {
     wellIndex: number[][][][];  // Index by cluster name (object nr), plate nr, col nr, row nr.
+    maxObjectCount: number;     // Maximum number of objects for all wells.
 
     constructor(dictionary: any = {}) {
         super(dictionary);
 
         this.wellIndex = [];
+        this.maxObjectCount = 0;
         this.columns.forEach(c => {
             var cI = this.columnIndex[c];
             var col = this.matrix[cI];
@@ -451,6 +421,7 @@ export class WellClusterShares extends NumberFrame {
 
         if(indices.length == 1) {
             subIndex[nextIndex] = value;
+            this.maxObjectCount = Math.max(this.maxObjectCount, value);
         } else {
             var targetIndex = subIndex[nextIndex];
             if(!targetIndex) {

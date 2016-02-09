@@ -14,20 +14,29 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var ProxyValue = data.ProxyValue;
     var BaseConfiguration = config.BaseConfiguration;
     var InteractionState = (function () {
-        function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, configuration) {
+        function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, openViews, configuration) {
             if (populationSpace === void 0) { populationSpace = new PopulationSpace(); }
             if (hoveredCoordinates === void 0) { hoveredCoordinates = new SelectionCoordinates(); }
             if (selectedCoordinates === void 0) { selectedCoordinates = new SelectionCoordinates(); }
+            if (openViews === void 0) { openViews = new Chain(['plates']); }
             if (configuration === void 0) { configuration = new BaseConfiguration(); }
             this.populationSpace = populationSpace;
             this.hoveredCoordinates = hoveredCoordinates;
             this.selectedCoordinates = selectedCoordinates;
+            this.openViews = openViews;
             this.configuration = configuration;
         }
         InteractionState.prototype.removeExemplar = function (object) {
+            // Remove given exemplar from any population (should be a single population).
             this.populationSpace.populations.forEach(function (p) { return p.exemplars = p.exemplars.pull(object); });
+            // Remove empty populations.
+            //this.populationSpace.populations = this.populationSpace.populations.filter(p => p.length > 0);
             if (this.hoveredCoordinates.object === object)
                 this.hoveredCoordinates.object = null;
+        };
+        InteractionState.prototype.pushView = function (identifier) {
+            this.openViews = this.openViews.push(identifier); //this.openViews.toggle(identifier);
+            this.openViews = new Chain(_.takeRight(this.openViews.elements, 3)); // Limit number of open views.
         };
         return InteractionState;
     })();
@@ -36,25 +45,33 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var EnrichedState = (function (_super) {
         __extends(EnrichedState, _super);
         function EnrichedState(state) {
-            _super.call(this, state.populationSpace, state.hoveredCoordinates, state.selectedCoordinates, state.configuration);
-            this.allExemplars = Chain.union(this.populationSpace.populations.map(function (p) { return p.exemplars; }));
+            _super.call(this, state.populationSpace, state.hoveredCoordinates, state.selectedCoordinates, state.openViews, state.configuration);
+            this.allExemplars = Chain.union(this.populationSpace.populations.elements.map(function (p) { return p.exemplars; }));
             var focusedWell = this.focused();
+            var addWellInfo = function (dict) {
+                dict['column'] = focusedWell.well === null ? -1 : focusedWell.well.column;
+                dict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
+                dict['plate'] = focusedWell.plate === null ? -1 : focusedWell.plate;
+            };
             var populationDict = this.populationSpace.toDict();
             var histogramDict = this.populationSpace.toDict();
             histogramDict['bins'] = state.configuration.splomInnerSize;
             var objectInfoDict = this.populationSpace.toDict();
-            objectInfoDict['column'] = focusedWell.well === null ? -1 : focusedWell.well.column;
-            objectInfoDict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
-            objectInfoDict['plate'] = focusedWell.plate === null ? -1 : focusedWell.plate;
+            addWellInfo(objectInfoDict);
+            var objectValuesDict = this.populationSpace.toDict(false);
+            addWellInfo(objectValuesDict);
             this.dataSetInfo = new ProxyValue("dataSetInfo", {}, new DataSetInfo(), function (ds) { return new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels); });
             this.features = new ProxyValue("features", {}, []);
             this.objectInfo = new ProxyValue("objectInfo", objectInfoDict, new NumberFrame(), function (o) { return new NumberFrame(o); });
             this.objectHistograms = new ProxyValue("objectHistograms2D", histogramDict, new HistogramMatrix(), function (m) { return new HistogramMatrix(m); });
             this.wellClusterShares = new ProxyValue("wellClusterShares", populationDict, new WellClusterShares(), function (s) { return new WellClusterShares(s); });
             this.featureHistograms = new ProxyValue("featureHistograms", populationDict, new FeatureHistograms(), function (hs) { return new FeatureHistograms(hs); });
+            this.objectFeatureValues = new ProxyValue("objectFeatureValues", objectValuesDict, new NumberFrame(), function (vs) { return new NumberFrame(vs); });
+            console.log("Object feature values:");
+            console.log(this.objectFeatureValues.value);
         }
         EnrichedState.prototype.cloneInteractionState = function () {
-            return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.configuration));
+            return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.configuration));
         };
         EnrichedState.prototype.closestObject = function (features, coordinates) {
             var bestIndex = -1;
@@ -100,7 +117,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Well selections, including single focused well.
         EnrichedState.prototype.allWellSelections = function () {
-            var location = this.selectionWell(this.focused()); //this.focused().wellLocation();
+            var location = this.selectionWell(this.focused());
             var focusedWell = location ? [location.toWellSelection("Selected")] : [];
             return _.union(this.dataSetInfo.value.wellSelections, focusedWell);
         };
@@ -108,11 +125,19 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         EnrichedState.prototype.focused = function () {
             return this.hoveredCoordinates.otherwise(this.selectedCoordinates);
         };
+        // Population color, includes focused population highlight.
+        EnrichedState.prototype.populationColor = function (population) {
+            return this.focused().population === population.identifier ? this.configuration.highlight : population.color;
+        };
+        // Translucent population color, includes population highlight.
+        EnrichedState.prototype.populationColorTranslucent = function (population) {
+            return this.focused().population === population.identifier ? this.configuration.highlight : population.colorTrans;
+        };
         // Complete, or correct, coordinates, from object level up to plate level.
         EnrichedState.prototype.conformHoveredCoordinates = function (targetState) {
             var coordinates = targetState.hoveredCoordinates;
             if (coordinates !== null) {
-                var wellInfo = this.objectWellInfo(coordinates.object); //this.allObjectWells().location(targetState.hoveredCoordinates.object);
+                var wellInfo = this.objectWellInfo(coordinates.object);
                 if (wellInfo) {
                     var location = wellInfo.location;
                     coordinates.well = location.coordinates();
@@ -123,16 +148,6 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         EnrichedState.prototype.hoveredObjectIsExemplar = function () {
             return this.hoveredCoordinates.object !== null && this.allExemplars.has(this.hoveredCoordinates.object);
         };
-        /*private allObjInfo: NumberFrame = null;
-        allObjectInfo() {
-            if(!this.allObjInfo) {
-                this.allObjInfo = new NumberFrame(this.wellObjectInfo.value.join(this.objectInfo.value).toDict());  //this.objectInfo.value.join(this.wellObjectInfo.value).toDict());
-            }
-            return this.allObjInfo;
-        }*/
-        /*allObjectWells() {
-            return new ObjectWells(this.objectInfo.value);
-        }*/
         EnrichedState.prototype.selectionWell = function (selection) {
             return this.wellLocation(selection.well.column, selection.well.row, selection.plate);
         };
@@ -152,19 +167,21 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var locationMap = objectTable['wellLocations'];
             if (!locationMap) {
                 locationMap = {};
-                var imageURLs = this.availableImageTypes(); //objectTable.columns.filter(c => _.startsWith(c, "img_"));
+                var imageURLs = this.availableImageTypes();
                 var plateVec = objectTable.columnVector('plate');
                 var columnVec = objectTable.columnVector('column');
                 var rowVec = objectTable.columnVector('row');
-                for (var i = 0; i < plateVec.length; i++) {
-                    var plateObj = plateVec[i];
-                    var columnObj = columnVec[i];
-                    var rowObj = rowVec[i];
-                    var imgMap = {};
-                    _.pairs(imageURLs).forEach(function (p, cnI) { return imgMap[p[0]] = objectTable.columnVector(p[1])[i]; });
-                    locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
+                if (plateVec && columnVec && rowVec) {
+                    for (var i = 0; i < plateVec.length; i++) {
+                        var plateObj = plateVec[i];
+                        var columnObj = columnVec[i];
+                        var rowObj = rowVec[i];
+                        var imgMap = {};
+                        _.pairs(imageURLs).forEach(function (p, cnI) { return imgMap[p[0]] = objectTable.columnVector(p[1])[i]; });
+                        locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
+                    }
+                    objectTable['wellLocations'] = locationMap;
                 }
-                objectTable['wellLocations'] = locationMap;
             }
             return locationMap[column + "_" + row + "_" + plate] || new WellLocation(column, row, plate);
         };
@@ -189,8 +206,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         // Create a new population.
         PopulationSpace.prototype.createPopulation = function () {
             // Choose an available nominal color.
-            var takenColors = new Chain(this.populations.map(function (p) { return p.color; }));
-            var availableColors = new Chain(Color.colorMapNominal12);
+            var takenColors = this.populations.map(function (p) { return p.color; });
+            var availableColors = new Chain(Color.colorMapNominal8);
             var freeColors = Chain.difference(availableColors, takenColors);
             var color = freeColors.length > 0 ? freeColors.elements[0] : Color.BLACK;
             var population = new Population(null, "Tag", new Chain(), color);
@@ -198,10 +215,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return population;
         };
         // Dictionary for communicating population description.
-        PopulationSpace.prototype.toDict = function () {
+        PopulationSpace.prototype.toDict = function (includeFeatures) {
+            if (includeFeatures === void 0) { includeFeatures = true; }
             var exemplars = {};
             this.populations.forEach(function (p) { return exemplars[p.identifier] = _.clone(p.exemplars.elements); }); // DO NOT REMOVE!
-            return { features: this.features.elements, exemplars: exemplars };
+            return includeFeatures ? { features: this.features.elements, exemplars: exemplars } : { exemplars: exemplars };
         };
         // Whether given object is an exemplar.
         PopulationSpace.prototype.isExemplar = function (object) {
@@ -225,7 +243,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.identifier = Population.POPULATION_ID_COUNTER++;
             if (name === null)
                 this.name = this.identifier.toString();
-            this.colorTrans = color.alpha(0.5);
+            this.colorTrans = color.alpha(0.25);
         }
         /*toNumber() {
             return this.identifier;
@@ -246,8 +264,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             plate) {
             if (population === void 0) { population = null; }
             if (object === void 0) { object = null; }
-            if (well === void 0) { well = null; }
-            if (plate === void 0) { plate = null; }
+            if (well === void 0) { well = new WellCoordinates(0, 0); }
+            if (plate === void 0) { plate = 0; }
             this.population = population;
             this.object = object;
             this.well = well;
@@ -257,23 +275,6 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         SelectionCoordinates.prototype.otherwise = function (that) {
             return new SelectionCoordinates(this.population === null ? that.population : this.population, this.object === null ? that.object : this.object, this.well === null ? that.well : this.well, this.plate === null ? that.plate : this.plate);
         };
-        // Well location. Returns null if it is invalid.
-        /*private static cachedLocation: WellLocation = null;
-        wellLocation() {
-            var location: WellLocation = null;
-    
-            if(this.well !== null && this.plate !== null) {
-                location = new WellLocation(this.well.column, this.well.row, this.plate);
-    
-                if (SelectionCoordinates.cachedLocation !== null && SelectionCoordinates.cachedLocation.equals(location)) {
-                    location = SelectionCoordinates.cachedLocation;
-                } else {
-                    SelectionCoordinates.cachedLocation = location;
-                }
-            }
-    
-            return location;
-        }*/
         // Selected population, or total population fallback.
         SelectionCoordinates.prototype.populationOrTotal = function () {
             return this.population || Population.POPULATION_TOTAL_NAME;
@@ -294,49 +295,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.rowCount = rowLabels.length;
             // Well selection placeholder; complete selection and control wells, for now.
             this.wellSelections = [
-                new WellSelection("Control", [[0, this.plateCount - 1]], WellCoordinates.rowWells(this.columnCount, [0]))
             ];
         }
         return DataSetInfo;
     })();
     exports.DataSetInfo = DataSetInfo;
-    /*export class ObjectWells {
-        private wellLocations: WellLocation[];
-    
-        constructor(public frame: DataFrame<any>) {
-            if(!frame['wellLocations']) {
-                var locations = [];
-                frame['wellLocations'] = locations;
-                frame.rows.forEach(r => {
-                    var columnI = frame.columnIndex["column"];
-                    var rowI = frame.columnIndex["row"];
-                    var plateI = frame.columnIndex["plate"];
-                    var rI = frame.rowIndex[r];
-    
-                    locations[r] = new WellLocation(
-                        frame.matrix[columnI][rI],
-                        frame.matrix[rowI][rI],
-                        frame.matrix[plateI][rI]
-                    );
-                });
-            }
-        }
-    
-        location(object: number) {
-            return this.frame['wellLocations'][object];
-        }
-    
-        // Coordinates in well image.
-        coordinates(object: number) {
-            var xI = this.frame.columnIndex["x"];
-            var yI = this.frame.columnIndex["y"];
-            var rI = this.frame.rowIndex[object];
-            return [
-                this.frame.matrix[xI][rI],
-                this.frame.matrix[yI][rI]
-            ];
-        }
-    }*/
     var WellClusterShares = (function (_super) {
         __extends(WellClusterShares, _super);
         function WellClusterShares(dictionary) {
@@ -344,6 +307,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (dictionary === void 0) { dictionary = {}; }
             _super.call(this, dictionary);
             this.wellIndex = [];
+            this.maxObjectCount = 0;
             this.columns.forEach(function (c) {
                 var cI = _this.columnIndex[c];
                 var col = _this.matrix[cI];
@@ -359,6 +323,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var remainder = _.tail(indices);
             if (indices.length == 1) {
                 subIndex[nextIndex] = value;
+                this.maxObjectCount = Math.max(this.maxObjectCount, value);
             }
             else {
                 var targetIndex = subIndex[nextIndex];

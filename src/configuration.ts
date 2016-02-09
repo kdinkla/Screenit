@@ -12,14 +12,9 @@ import Font = style.Font;
 import math = require('./core/math');
 import Vector = math.Vector;
 
-function zfill(num: number, len: number) {
-    return (Array(len).join("0") + num).slice(-len);
-}
-
 export class BaseConfiguration {
     backgroundColor = new Color(247, 247, 240);
     font = new Font(16, 200);
-    featureFont = new Font(12);
     sideFont = new Font(10);
 
     // User adjustable options.
@@ -32,14 +27,26 @@ export class BaseConfiguration {
     baseDim = Color.grey(200);
     baseVeryDim = Color.grey(225);
     baseSelected = new Color(25, 50, 255);    //new Color(185, 28, 48);  //Color.CRIMSON;
+    highlight = Color.grey(50);     // Focused highlight color.
+    highlightTrans = Color.grey(50, 0.75);
+
+    // Panel configuration.
+    panelSpace = 20;
+    panelHeaderFont = new Font(16);
+    panelHeaderSpace = this.panelHeaderFont.size + 15;
+    panelHeaderColor = this.baseMuted;
+    panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
 
     // Guide labels.
-    guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'bottom');
+    guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
     guideArrowLength = 5;
-    guideVisible = true;
+    guideVisible = false;
 
     // Features.
-    featureTable = new NumberTableConfiguration(this.sideFont, this.base, [50, 10]);
+    featureFont = new Font(10);
+    featureCellSpace = [4, 2];
+    featureCellDimensions = [50, this.featureFont.size];
+    featureSplit = 'joint'; // else 'separate'
 
     // Scatter plots.
     minDotSize = 1;
@@ -63,24 +70,22 @@ export class BaseConfiguration {
     splomClusterRadius = 3;
     splomDotRadius = 1;
     splomDotDensityColor = Color.grey(0, 0.2);
-    splomRepresentativeOuterDotRadius = 4;
+    splomRepresentativeOuterDotRadius = 3;
     splomRepresentativeInnerDotRadius = 2;
     scatterPlotSize = this.splomSize + this.splomInnerSize;
-
-    // Panels.
-    panelSpace = 2 * this.splomSpace;
-    panelHeaderFont = new Font(16);
-    panelHeaderSpace = this.panelHeaderFont.size + 10;
-    panelHeaderColor = this.baseMuted;
 
     // Cluster list.
     clusterTileSpace = 5;
     clusterTileInnerSize = 0.5 * (this.splomInnerSize - this.clusterTileSpace);
     clusterTileSize = this.clusterTileInnerSize + this.clusterTileSpace;
     clusterPlateDotRadius = 1.5;
+    clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
+    clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
+    exemplarSpace = 2;
 
     // Plate view.
-    wellDiameter = 12;
+    wellRadius = 7;
+    wellDiameter = 2 * this.wellRadius;
     wellInnerRadius = 4;
     plateColLabelMargin = 1;
     plateRowLabelMargin = 3;
@@ -89,16 +94,12 @@ export class BaseConfiguration {
     plateWidth = 4;
     plateIndexInnerHeight = 10;
     plateIndexSpace = 5;
-    plateIndexWidth() { return this.plateIndexInnerHeight + this.plateIndexSpace; }
     plateIndexMargin = 5;
 
-    static CONTROL_BASE = style.Color.grey(0.5);
-    static CONTROL_COLOR = style.Color.grey(0.2);
-
     // Plate cluster shares.
-    //shareWellDiameter = 2;
     static voidColor = new Color(222, 220, 220);   //Color.NONE;  //Color.GREEN;
-    static shareColorMap = (normVal: number) => (normVal >= 0 ? heatLookup[Math.ceil(255 * normVal)] : BaseConfiguration.voidColor);
+    static shareColorMap = (normVal: number) =>
+                                (normVal >= 0 ? heatLookup[Math.ceil(255 * normVal)] : BaseConfiguration.voidColor);
 
     //(normVal: number) => style.Color.grey(0, normVal > 0 ? Math.sqrt(normVal) : 0); //style.Color.grey(Math.ceil(255 * (1 - normVal)));
 
@@ -108,7 +109,8 @@ export class BaseConfiguration {
     miniHeatColumnCount = 5;
 
     // Well details view.
-    wellViewMaxDim = [500, 370];
+    wellViewMaxWidth = 600;
+    //wellViewMaxDim = [500, 370];
 
     // Object details view.
     objectViewImageRadius = 40;

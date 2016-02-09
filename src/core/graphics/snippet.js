@@ -26,13 +26,14 @@ define(["require", "exports", './view', './style', '../math'], function (require
     // Positioned snippet with dimensions. Abstract class
     var PlacedSnippet = (function (_super) {
         __extends(PlacedSnippet, _super);
+        // Identifier and top left position of snippet.
         function PlacedSnippet(identifier, topLeft) {
             if (topLeft === void 0) { topLeft = [0, 0]; }
             _super.call(this, identifier);
-            this.topLeft = topLeft;
+            //this.topLeft = topLeft;
             this.dimensions = [0, 0];
-            //this.setTopLeft(topLeft);
-            this.updatePositions();
+            this.setTopLeft(topLeft);
+            //this.updatePositions();
         }
         // Sets top left position.
         PlacedSnippet.prototype.setTopLeft = function (topLeft) {
@@ -83,21 +84,23 @@ define(["require", "exports", './view', './style', '../math'], function (require
         };
         List.prototype.updateLayout = function () {
             var _this = this;
-            var lAxis = this.orientation === 'vertical' ? 1 : 0;
-            var wAxis = this.orientation === 'vertical' ? 0 : 1;
-            // Column width is snippets maximum width.
-            var span = this.snippets.length > 0 ? Math.max.apply(null, this.snippets.map(function (s) { return s.dimensions[wAxis]; })) : 0;
-            span = Math.max(span, this.dimensions[wAxis]);
-            var lAcc = this.topLeft[lAxis];
-            this.snippets.forEach(function (s) {
-                var wPos = _this.topLeft[wAxis] + (_this.alignment === 'right' ? span - s.dimensions[wAxis] : _this.alignment === 'middle' ? .5 * (span - s.dimensions[wAxis]) : 0);
-                s.setTopLeft(_this.orientation === 'vertical' ? [wPos, lAcc] : [lAcc, wPos]);
-                s.updatePositions();
-                lAcc += s.dimensions[lAxis] + _this.space;
-            });
-            this.dimensions = this.snippets.length > 0 ? Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) : [0, 0];
-            //this.dimensions[lAxis] = Math.max(0, lAcc - this.space);
-            this.dimensions[wAxis] = span;
+            if (this.snippets) {
+                var lAxis = this.orientation === 'vertical' ? 1 : 0;
+                var wAxis = this.orientation === 'vertical' ? 0 : 1;
+                // Column width is snippets maximum width.
+                var span = this.snippets.length > 0 ? Math.max.apply(null, this.snippets.map(function (s) { return s.dimensions[wAxis]; })) : 0;
+                span = Math.max(span, this.dimensions[wAxis]);
+                var lAcc = this.topLeft[lAxis];
+                this.snippets.forEach(function (s) {
+                    var wPos = _this.topLeft[wAxis] + (_this.alignment === 'right' ? span - s.dimensions[wAxis] : _this.alignment === 'middle' ? .5 * (span - s.dimensions[wAxis]) : 0);
+                    s.setTopLeft(_this.orientation === 'vertical' ? [wPos, lAcc] : [lAcc, wPos]);
+                    s.updatePositions();
+                    lAcc += s.dimensions[lAxis] + _this.space;
+                });
+                this.dimensions = this.snippets.length > 0 ? Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) : [0, 0];
+                //this.dimensions[lAxis] = Math.max(0, lAcc - this.space);
+                this.dimensions[wAxis] = span;
+            }
             this.updatePositions();
         };
         List.prototype.paint = function (context) {
@@ -197,24 +200,25 @@ define(["require", "exports", './view', './style', '../math'], function (require
         function Label(identifier, text, position, style, pickable) {
             if (style === void 0) { style = new LabelStyle(); }
             if (pickable === void 0) { pickable = false; }
-            _super.call(this, identifier);
+            _super.call(this, identifier, position);
             this.identifier = identifier;
+            this.position = position;
             this.style = style;
             this.pickable = pickable;
             // Multiple lines and their dimension.
             this.lines = style.font.wordWrap(text);
             var dimensions = style.font.wrapDimensions(this.lines);
             // Determine top left position from position and align.
-            this.topLeft = position;
-            if (style.horizontalAnchor === 'middle')
-                this.topLeft[0] -= dimensions[0] / 2;
-            else if (style.horizontalAnchor === 'right')
-                this.topLeft[0] -= dimensions[0];
-            if (style.verticalAnchor === 'middle')
-                this.topLeft[1] += dimensions[1] / 2;
-            else if (style.verticalAnchor === 'top')
-                this.topLeft[1] += dimensions[1];
-            this.setDimensions(dimensions);
+            this.topLeft = Vector.clone(this.position);
+            if (this.style.horizontalAnchor === 'middle')
+                this.topLeft[0] -= .5 * this.dimensions[0];
+            else if (this.style.horizontalAnchor === 'right')
+                this.topLeft[0] -= this.dimensions[0];
+            if (this.style.verticalAnchor === 'middle')
+                this.topLeft[1] += .5 * this.dimensions[1];
+            else if (this.style.verticalAnchor === 'top')
+                this.topLeft[1] += this.dimensions[1];
+            _super.prototype.setDimensions.call(this, dimensions);
         }
         Label.prototype.paint = function (context) {
             var _this = this;
@@ -226,8 +230,8 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.rotate(this.style.rotation);
             var dY = 0;
             this.lines.forEach(function (l) {
-                context.fillText(l, 0, dY);
                 dY += _this.style.font.size;
+                context.fillText(l, 0, dY);
             });
             context.restore();
         };

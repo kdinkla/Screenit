@@ -38,14 +38,14 @@ export class PlacedSnippet extends BaseSnippet implements Dimensional {
     bottomLeft: number[];
     bottomRight: number[];
 
-    constructor(identifier: string,
-                topLeft: number[] = [0, 0]) { // Top left position of snippet.
+    // Identifier and top left position of snippet.
+    constructor(identifier: string, topLeft: number[] = [0, 0]) {
         super(identifier);
 
-        this.topLeft = topLeft;
+        //this.topLeft = topLeft;
         this.dimensions = [0, 0];
-        //this.setTopLeft(topLeft);
-        this.updatePositions();
+        this.setTopLeft(topLeft);
+        //this.updatePositions();
     }
 
     // Sets top left position.
@@ -103,29 +103,32 @@ export class List<S extends PlacedSnippet> extends PlacedSnippet {
     }
 
     private updateLayout() {
-        var lAxis = this.orientation === 'vertical' ? 1 : 0;
-        var wAxis = this.orientation === 'vertical' ? 0 : 1;
+        if(this.snippets) {
+            var lAxis = this.orientation === 'vertical' ? 1 : 0;
+            var wAxis = this.orientation === 'vertical' ? 0 : 1;
 
-        // Column width is snippets maximum width.
-        var span = this.snippets.length > 0 ? Math.max.apply(null, this.snippets.map(s => s.dimensions[wAxis])) : 0;
-        span = Math.max(span, this.dimensions[wAxis]);
+            // Column width is snippets maximum width.
+            var span = this.snippets.length > 0 ? Math.max.apply(null, this.snippets.map(s => s.dimensions[wAxis])) : 0;
+            span = Math.max(span, this.dimensions[wAxis]);
 
-        var lAcc = this.topLeft[lAxis];
-        this.snippets.forEach(s => {
-            var wPos = this.topLeft[wAxis] +
-                (this.alignment === 'right' ? span - s.dimensions[wAxis] :
-                 this.alignment === 'middle' ? .5 * (span - s.dimensions[wAxis]) : 0);
+            var lAcc = this.topLeft[lAxis];
+            this.snippets.forEach(s => {
+                var wPos = this.topLeft[wAxis] +
+                    (this.alignment === 'right' ? span - s.dimensions[wAxis] :
+                        this.alignment === 'middle' ? .5 * (span - s.dimensions[wAxis]) : 0);
 
-            s.setTopLeft(this.orientation === 'vertical' ? [wPos, lAcc] : [lAcc, wPos]);
-            s.updatePositions();
+                s.setTopLeft(this.orientation === 'vertical' ? [wPos, lAcc] : [lAcc, wPos]);
+                s.updatePositions();
 
-            lAcc += s.dimensions[lAxis] + this.space;
-        });
+                lAcc += s.dimensions[lAxis] + this.space;
+            });
 
-        this.dimensions = this.snippets.length > 0 ?
-            Vector.subtract(this.snippets[this.snippets.length-1].bottomRight, this.snippets[0].topLeft) : [0, 0];
-        //this.dimensions[lAxis] = Math.max(0, lAcc - this.space);
-        this.dimensions[wAxis] = span;
+            this.dimensions = this.snippets.length > 0 ?
+                Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) : [0, 0];
+            //this.dimensions[lAxis] = Math.max(0, lAcc - this.space);
+            this.dimensions[wAxis] = span;
+        }
+
         this.updatePositions();
     }
 
@@ -209,23 +212,23 @@ export class Label extends PlacedSnippet {
 
     constructor(public identifier: string,
                 text: string,
-                position: number[],
+                public position: number[],
                 public style: LabelStyle = new LabelStyle(),
                 public pickable: boolean = false) {
-        super(identifier);
+        super(identifier, position);
 
         // Multiple lines and their dimension.
         this.lines = style.font.wordWrap(text);
         var dimensions = style.font.wrapDimensions(this.lines);
 
         // Determine top left position from position and align.
-        this.topLeft = position;
-        if(style.horizontalAnchor === 'middle') this.topLeft[0] -= dimensions[0] / 2;
-        else if(style.horizontalAnchor === 'right') this.topLeft[0] -= dimensions[0];
-        if(style.verticalAnchor === 'middle') this.topLeft[1] += dimensions[1] / 2;
-        else if(style.verticalAnchor === 'top') this.topLeft[1] += dimensions[1];
+        this.topLeft = Vector.clone(this.position);
+        if (this.style.horizontalAnchor === 'middle') this.topLeft[0] -= .5 * this.dimensions[0];
+        else if (this.style.horizontalAnchor === 'right') this.topLeft[0] -= this.dimensions[0];
+        if (this.style.verticalAnchor === 'middle') this.topLeft[1] += .5 * this.dimensions[1];
+        else if (this.style.verticalAnchor === 'top') this.topLeft[1] += this.dimensions[1];
 
-        this.setDimensions(dimensions);
+        super.setDimensions(dimensions);
     }
 
     paint(context: ViewContext) {
@@ -238,8 +241,8 @@ export class Label extends PlacedSnippet {
         context.rotate(this.style.rotation);
         var dY = 0;
         this.lines.forEach(l => {
-            context.fillText(l, 0, dY);
             dY += this.style.font.size;
+            context.fillText(l, 0, dY);
         });
         context.restore();
     }

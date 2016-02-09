@@ -86,6 +86,7 @@ define(["require", "exports"], function (require, exports) {
         Color.NONE = new Color(0, 0, 0, 0);
         // Colorbrewer 12 nominal value color mapping.
         Color.colorMapNominal12 = [new Color(190, 186, 218), new Color(251, 128, 114), new Color(128, 177, 211), new Color(253, 180, 98), new Color(179, 222, 105), new Color(252, 205, 229), new Color(188, 128, 189), new Color(204, 235, 197), new Color(255, 237, 111), new Color(141, 211, 199), new Color(255, 255, 179)];
+        Color.colorMapNominal8 = [new Color(228, 26, 28), new Color(55, 126, 184), new Color(77, 175, 74), new Color(152, 78, 163), new Color(255, 127, 0), new Color(255, 255, 51), new Color(166, 86, 40), new Color(247, 129, 191)];
         return Color;
     })();
     exports.Color = Color;

@@ -70,7 +70,8 @@ export class Chain<E extends Identifiable> {
     }
 
     byId(id: string | number) { return this.index[<any>id]; }
-    map<F>(f: (E, number?) => F) { return this.elements.map(f); }
+    map<F>(f: (E, number?) => F) { return new Chain<F>(this.elements.map(f)); }
+    filter<F>(f: (E, number?) => boolean) { return new Chain<E>(this.elements.filter(f)); }
     forEach(f: (E, number?) => any) { this.elements.forEach(f); }
 
     // Add an element at the end if it is not present yet.
@@ -151,7 +152,7 @@ export class Chain<E extends Identifiable> {
     static union<E extends Identifiable>(targets: Chain<E>[]) {
         var result = new Chain<E>();
 
-        targets.forEach(t => t.elements.forEach(e => result.pushMutation(e))); //result.pushAll(t.elements));
+        targets.forEach(t => t.elements.forEach(e => result.pushMutation(e)));
 
         return result;
     }

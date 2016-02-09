@@ -108,4 +108,14 @@ export class Color {
             new Color(255, 237, 111),
             new Color(141, 211, 199),
             new Color(255, 255, 179)];
+
+    static colorMapNominal8 =
+        [new Color(228, 26, 28),
+            new Color(55, 126, 184),
+            new Color(77, 175, 74),
+            new Color(152, 78, 163),
+            new Color(255, 127, 0),
+            new Color(255, 255, 51),
+            new Color(166, 86, 40),
+            new Color(247, 129, 191)];
 }

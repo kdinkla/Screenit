@@ -4,14 +4,10 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
     var Color = style.Color;
     var Font = style.Font;
     var Vector = math.Vector;
-    function zfill(num, len) {
-        return (Array(len).join("0") + num).slice(-len);
-    }
     var BaseConfiguration = (function () {
         function BaseConfiguration() {
             this.backgroundColor = new Color(247, 247, 240);
             this.font = new Font(16, 200);
-            this.featureFont = new Font(12);
             this.sideFont = new Font(10);
             // User adjustable options.
             this.imageType = null; // The type of image to present.
@@ -22,12 +18,23 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.baseDim = Color.grey(200);
             this.baseVeryDim = Color.grey(225);
             this.baseSelected = new Color(25, 50, 255); //new Color(185, 28, 48);  //Color.CRIMSON;
+            this.highlight = Color.grey(50); // Focused highlight color.
+            this.highlightTrans = Color.grey(50, 0.75);
+            // Panel configuration.
+            this.panelSpace = 20;
+            this.panelHeaderFont = new Font(16);
+            this.panelHeaderSpace = this.panelHeaderFont.size + 15;
+            this.panelHeaderColor = this.baseMuted;
+            this.panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
             // Guide labels.
-            this.guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'bottom');
+            this.guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
             this.guideArrowLength = 5;
-            this.guideVisible = true;
+            this.guideVisible = false;
             // Features.
-            this.featureTable = new NumberTableConfiguration(this.sideFont, this.base, [50, 10]);
+            this.featureFont = new Font(10);
+            this.featureCellSpace = [4, 2];
+            this.featureCellDimensions = [50, this.featureFont.size];
+            this.featureSplit = 'joint'; // else 'separate'
             // Scatter plots.
             this.minDotSize = 1;
             this.maxDotSize = 3;
@@ -48,21 +55,20 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.splomClusterRadius = 3;
             this.splomDotRadius = 1;
             this.splomDotDensityColor = Color.grey(0, 0.2);
-            this.splomRepresentativeOuterDotRadius = 4;
+            this.splomRepresentativeOuterDotRadius = 3;
             this.splomRepresentativeInnerDotRadius = 2;
             this.scatterPlotSize = this.splomSize + this.splomInnerSize;
-            // Panels.
-            this.panelSpace = 2 * this.splomSpace;
-            this.panelHeaderFont = new Font(16);
-            this.panelHeaderSpace = this.panelHeaderFont.size + 10;
-            this.panelHeaderColor = this.baseMuted;
             // Cluster list.
             this.clusterTileSpace = 5;
             this.clusterTileInnerSize = 0.5 * (this.splomInnerSize - this.clusterTileSpace);
             this.clusterTileSize = this.clusterTileInnerSize + this.clusterTileSpace;
             this.clusterPlateDotRadius = 1.5;
+            this.clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
+            this.clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
+            this.exemplarSpace = 2;
             // Plate view.
-            this.wellDiameter = 12;
+            this.wellRadius = 7;
+            this.wellDiameter = 2 * this.wellRadius;
             this.wellInnerRadius = 4;
             this.plateColLabelMargin = 1;
             this.plateRowLabelMargin = 3;
@@ -77,17 +83,12 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.miniHeatSpace = 1;
             this.miniHeatColumnCount = 5;
             // Well details view.
-            this.wellViewMaxDim = [500, 370];
+            this.wellViewMaxWidth = 600;
+            //wellViewMaxDim = [500, 370];
             // Object details view.
             this.objectViewImageRadius = 40;
         }
-        BaseConfiguration.prototype.plateIndexWidth = function () {
-            return this.plateIndexInnerHeight + this.plateIndexSpace;
-        };
-        BaseConfiguration.CONTROL_BASE = style.Color.grey(0.5);
-        BaseConfiguration.CONTROL_COLOR = style.Color.grey(0.2);
         // Plate cluster shares.
-        //shareWellDiameter = 2;
         BaseConfiguration.voidColor = new Color(222, 220, 220); //Color.NONE;  //Color.GREEN;
         BaseConfiguration.shareColorMap = function (normVal) { return (normVal >= 0 ? heatLookup[Math.ceil(255 * normVal)] : BaseConfiguration.voidColor); };
         return BaseConfiguration;
