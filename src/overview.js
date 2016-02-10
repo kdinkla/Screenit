@@ -44,8 +44,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var panels = state.openViews.elements.map(function (ov) { return new ColumnPanel(ov, new constructors[ov](state), state, true); });
             // All panel options.
             var closedPanels = _.difference(_.keys(constructors), state.openViews.elements).map(function (ov) { return new ColumnPanel(ov, new constructors[ov](state), state, false); });
-            var closedList = new List("pnlClsCols", closedPanels, [0, 0], [0, 0], 'vertical', cfg.panelSpace, 'left');
-            this.panelColumns = new List("pnlCols", _.union(panels, [closedList]), rootTopLeft, [0, 0], 'horizontal', cfg.panelSpace, 'left');
+            var closedList = new List("pnlClsCols", closedPanels, [0, 0], [0, 0], 'vertical', cfg.panelSpace, 'right');
+            this.panelColumns = new List("pnlCols", _.union([closedList], panels), rootTopLeft, [0, 0], 'horizontal', cfg.panelSpace, 'left');
             //console.log("Model:");
             //console.log(mod);
         };
@@ -179,7 +179,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     _.keys(frames).map(function (fK, fI) {
                         var frame = frames[fK];
                         var normFrequencies = frame.matrix[frame.columnIndex[_this.feature]];
-                        var fontColor = fK === '-1' ? cfg.baseDim : _this.state.populationColor(_this.state.populationSpace.populations.byId(fK));
+                        var fontColor = fK === '-1' ? cfg.baseDim : _this.state.populationColorTranslucent(_this.state.populationSpace.populations.byId(fK));
                         plainContext.fillStyle = fontColor.toString();
                         //plainContext.beginPath();
                         var len = normFrequencies.length - 1;
@@ -323,9 +323,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     var matrix = hP[1];
                     var population = mod.populationSpace.populations.byId(cK);
                     var focused = !(Number(cK) >= 0) || focusedPopulation === Number(cK);
-                    var coreColor = Number(cK) >= 0 ? mod.populationColor(population) : cfg.base;
+                    var coreColor = Number(cK) >= 0 ? mod.populationColorTranslucent(population) : cfg.base;
                     matrix.forEach(function (c, xI) { return c.forEach(function (cell, yI) {
-                        if ((focused && cell) || (!focused && cell === 2)) {
+                        if ((focused && cell) || (!focused && (cell === 2 || cell === 3))) {
                             context.fillStyle = coreColor; //coreColor.alpha(1 - 0.5 / cell);
                             context.fillRect(xI, size - yI, 1, 1);
                         }
@@ -525,7 +525,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         ExemplarLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             interaction.hoveredCoordinates.population = this.population.identifier;
-            interaction.pushView('plates');
+            //interaction.pushView('plates');
         };
         ExemplarLabel.prototype.mouseMove = function (event, coordinates, enriched, interaction) {
             interaction.hoveredCoordinates.population = this.population.identifier;
@@ -922,8 +922,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 interaction.hoveredCoordinates.population = population.identifier;
             }
             population.exemplars = population.exemplars.toggle(object);
-            interaction.pushView('exemplars');
-            interaction.pushView('features');
+            //interaction.pushView('exemplars');
+            //interaction.pushView('features');
         };
         WellDetailView.prototype.mouseMove = function (event, coordinates, enriched, interaction) {
             interaction.hoveredCoordinates.object = enriched.closestWellObject(coordinates);

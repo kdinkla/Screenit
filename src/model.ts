@@ -29,11 +29,13 @@ import controller = require('./core/graphics/controller');
 import config = require('./configuration');
 import BaseConfiguration = config.BaseConfiguration;
 
+var viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
+
 export class InteractionState implements AbstractModel {
     constructor(public populationSpace: PopulationSpace = new PopulationSpace(),
                 public hoveredCoordinates = new SelectionCoordinates(),
                 public selectedCoordinates = new SelectionCoordinates(),
-                public openViews: Chain<string> = new Chain(['plates']),
+                public openViews: Chain<string> = new Chain(['plates', 'exemplars']),
                 public configuration: BaseConfiguration = new BaseConfiguration()) {
     }
 
@@ -46,8 +48,14 @@ export class InteractionState implements AbstractModel {
     }
 
     pushView(identifier: string) {
-        this.openViews = this.openViews.push(identifier);    //this.openViews.toggle(identifier);
-        this.openViews = new Chain(_.takeRight(this.openViews.elements, 3));    // Limit number of open views.
+        var index = viewCycle.indexOf(identifier);
+
+        this.openViews = new Chain([viewCycle[Math.max(0, index - 1)], viewCycle[index], 'exemplars']);
+
+        //this.openViews.push(identifier);
+
+        //this.openViews = this.openViews.push(identifier);    //this.openViews.toggle(identifier);
+        //this.openViews = new Chain(_.takeRight(this.openViews.elements, 3));    // Limit number of open views.
     }
 }
 

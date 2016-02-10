@@ -82,10 +82,10 @@ export class OverView extends View<EnrichedState> {
         // All panel options.
         var closedPanels = _.difference(_.keys(constructors), state.openViews.elements)
                             .map(ov => new ColumnPanel(ov, new constructors[ov](state), state, false));
-        var closedList = new List("pnlClsCols", closedPanels, [0,0], [0,0], 'vertical', cfg.panelSpace, 'left');
+        var closedList = new List("pnlClsCols", closedPanels, [0,0], [0,0], 'vertical', cfg.panelSpace, 'right');
 
         this.panelColumns = new List("pnlCols",
-            _.union<PlacedSnippet>(panels, [closedList]),
+            _.union<PlacedSnippet>([closedList], panels),
             rootTopLeft, [0,0],
             'horizontal',
             cfg.panelSpace,
@@ -268,7 +268,7 @@ class FeatureHistogram extends PlacedSnippet {
                     var normFrequencies = frame.matrix[frame.columnIndex[this.feature]];
                     var fontColor = fK === '-1' ?
                         cfg.baseDim :
-                        this.state.populationColor(this.state.populationSpace.populations.byId(fK));
+                        this.state.populationColorTranslucent(this.state.populationSpace.populations.byId(fK));
 
                     plainContext.fillStyle = fontColor.toString();
                     //plainContext.beginPath();
@@ -444,9 +444,9 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
                 var population = mod.populationSpace.populations.byId(cK);
                 var focused = !(Number(cK) >= 0) || focusedPopulation === Number(cK);
 
-                var coreColor = Number(cK) >= 0 ? mod.populationColor(population) : cfg.base;
+                var coreColor = Number(cK) >= 0 ? mod.populationColorTranslucent(population) : cfg.base;
                 matrix.forEach((c, xI) => c.forEach((cell, yI) => {
-                    if((focused && cell) || (!focused && cell === 2)) {
+                    if((focused && cell) || (!focused && (cell === 2 || cell === 3))) {
                         context.fillStyle = coreColor;  //coreColor.alpha(1 - 0.5 / cell);
                         context.fillRect(xI, size - yI, 1, 1);
                     }
@@ -718,7 +718,7 @@ class ExemplarLabel extends Label {
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.population = this.population.identifier;
-        interaction.pushView('plates');
+        //interaction.pushView('plates');
     }
 
     mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
@@ -1206,8 +1206,8 @@ class WellDetailView extends PlacedSnippet {
 
         population.exemplars = population.exemplars.toggle(object);
 
-        interaction.pushView('exemplars');
-        interaction.pushView('features');
+        //interaction.pushView('exemplars');
+        //interaction.pushView('features');
     }
 
     mouseMove(event: ViewMouseEvent, coordinates: number[],

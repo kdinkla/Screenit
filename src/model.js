@@ -13,12 +13,13 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var NumberFrame = dataframe.NumberFrame;
     var ProxyValue = data.ProxyValue;
     var BaseConfiguration = config.BaseConfiguration;
+    var viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
     var InteractionState = (function () {
         function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, openViews, configuration) {
             if (populationSpace === void 0) { populationSpace = new PopulationSpace(); }
             if (hoveredCoordinates === void 0) { hoveredCoordinates = new SelectionCoordinates(); }
             if (selectedCoordinates === void 0) { selectedCoordinates = new SelectionCoordinates(); }
-            if (openViews === void 0) { openViews = new Chain(['plates']); }
+            if (openViews === void 0) { openViews = new Chain(['plates', 'exemplars']); }
             if (configuration === void 0) { configuration = new BaseConfiguration(); }
             this.populationSpace = populationSpace;
             this.hoveredCoordinates = hoveredCoordinates;
@@ -35,8 +36,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.hoveredCoordinates.object = null;
         };
         InteractionState.prototype.pushView = function (identifier) {
-            this.openViews = this.openViews.push(identifier); //this.openViews.toggle(identifier);
-            this.openViews = new Chain(_.takeRight(this.openViews.elements, 3)); // Limit number of open views.
+            var index = viewCycle.indexOf(identifier);
+            this.openViews = new Chain([viewCycle[Math.max(0, index - 1)], viewCycle[index], 'exemplars']);
+            //this.openViews.push(identifier);
+            //this.openViews = this.openViews.push(identifier);    //this.openViews.toggle(identifier);
+            //this.openViews = new Chain(_.takeRight(this.openViews.elements, 3));    // Limit number of open views.
         };
         return InteractionState;
     })();
