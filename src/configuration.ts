@@ -39,6 +39,7 @@ export class BaseConfiguration {
 
     // Guide labels.
     guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
+    bigGuideStyle = new LabelStyle(new Font(32, 180), Color.CRIMSON, 'left', 'top');
     guideArrowLength = 5;
     guideVisible = false;
 
@@ -81,7 +82,8 @@ export class BaseConfiguration {
     clusterPlateDotRadius = 1.5;
     clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
     clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
-    exemplarSpace = 2;
+    clusterAdditionLabel = new Font(34);    //new LabelStyle(new Font(30), this.baseSelected);
+    exemplarSpace = 1;
 
     // Plate view.
     wellRadius = 7;

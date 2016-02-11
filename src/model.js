@@ -13,7 +13,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var NumberFrame = dataframe.NumberFrame;
     var ProxyValue = data.ProxyValue;
     var BaseConfiguration = config.BaseConfiguration;
-    var viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
+    exports.viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
     var InteractionState = (function () {
         function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, openViews, configuration) {
             if (populationSpace === void 0) { populationSpace = new PopulationSpace(); }
@@ -36,8 +36,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.hoveredCoordinates.object = null;
         };
         InteractionState.prototype.pushView = function (identifier) {
-            var index = viewCycle.indexOf(identifier);
-            this.openViews = new Chain([viewCycle[Math.max(0, index - 1)], viewCycle[index], 'exemplars']);
+            var index = exports.viewCycle.indexOf(identifier);
+            this.openViews = new Chain([exports.viewCycle[Math.max(0, index - 1)], exports.viewCycle[index], 'exemplars']);
             //this.openViews.push(identifier);
             //this.openViews = this.openViews.push(identifier);    //this.openViews.toggle(identifier);
             //this.openViews = new Chain(_.takeRight(this.openViews.elements, 3));    // Limit number of open views.
@@ -127,7 +127,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Focused coordinates.
         EnrichedState.prototype.focused = function () {
-            return this.hoveredCoordinates.otherwise(this.selectedCoordinates);
+            return this.selectedCoordinates; //this.hoveredCoordinates.otherwise(this.selectedCoordinates);
         };
         // Population color, includes focused population highlight.
         EnrichedState.prototype.populationColor = function (population) {
@@ -150,7 +150,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             }
         };
         EnrichedState.prototype.hoveredObjectIsExemplar = function () {
-            return this.hoveredCoordinates.object !== null && this.allExemplars.has(this.hoveredCoordinates.object);
+            return this.focused().object !== null && this.allExemplars.has(this.focused().object);
         };
         EnrichedState.prototype.selectionWell = function (selection) {
             return this.wellLocation(selection.well.column, selection.well.row, selection.plate);
@@ -195,6 +195,36 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             columns.forEach(function (c) { return result[c.slice(4)] = c; });
             return result;
         };
+        // Get range of all plates.
+        EnrichedState.prototype.plates = function () {
+            var plateCount = this.dataSetInfo.converged ? this.dataSetInfo.value.plateCount : 0;
+            return _.range(plateCount);
+        };
+        // Column partition ordering of plates by score (TODO: by population/count vector.)
+        EnrichedState.prototype.platePartition = function () {
+            // Compute score from total cell count, for now.
+            var shares = this.wellClusterShares.value.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
+            //Population.POPULATION_TOTAL_NAME];
+            // Plate score by id.
+            var plateRange = this.plates();
+            var plateScores = plateRange.map(function (i) { return i; }); // Stick to in-order partition in case of no well shares.
+            var platesOrdered = _.clone(plateRange);
+            // Score has been loaded.
+            console.log("Plate shares:");
+            console.log(this.wellClusterShares.value);
+            if (shares) {
+                console.log("Enabled share based plate scores");
+                // For each plate. Take maximum object count, for now.
+                shares.forEach(function (pS, pI) { return plateScores[pI] = _.max(pS.map(function (cS) { return _.max(cS); })); });
+                // Order plate range by score.
+                platesOrdered = platesOrdered.sort(function (p1, p2) { return plateScores[p1] - plateScores[p2]; });
+            }
+            var datInfo = this.dataSetInfo.value;
+            var cfg = this.configuration;
+            var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
+            var colMaps = _.range(0, cfg.miniHeatColumnCount).map(function (cI) { return _.compact(_.range(0, colCapacity).map(function (rI) { return platesOrdered[cI * colCapacity + rI]; })).sort(function (p1, p2) { return p1 - p2; }); });
+            return colMaps;
+        };
         return EnrichedState;
     })(InteractionState);
     exports.EnrichedState = EnrichedState;
@@ -206,7 +236,18 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (populations === void 0) { populations = new Chain(); }
             this.features = features;
             this.populations = populations;
+            this.conformPopulations();
         }
+        PopulationSpace.prototype.conformPopulations = function () {
+            this.populations = this.populations.filter(function (p) { return p.exemplars.length > 0; }); // Remove any empty populations.
+            this.createPopulation(); // Add one empty population at end.
+        };
+        // Add given object to given population.
+        PopulationSpace.prototype.addExemplar = function (object, population) {
+            var target = this.populations.byId(population);
+            target.exemplars = target.exemplars.push(object);
+            this.conformPopulations();
+        };
         // Create a new population.
         PopulationSpace.prototype.createPopulation = function () {
             // Choose an available nominal color.
@@ -222,7 +263,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         PopulationSpace.prototype.toDict = function (includeFeatures) {
             if (includeFeatures === void 0) { includeFeatures = true; }
             var exemplars = {};
-            this.populations.forEach(function (p) { return exemplars[p.identifier] = _.clone(p.exemplars.elements); }); // DO NOT REMOVE!
+            this.populations.filter(function (p) { return p.exemplars.length > 0; }).forEach(function (p) { return exemplars[p.identifier] = _.clone(p.exemplars.elements); }); // DO NOT REMOVE!
             return includeFeatures ? { features: this.features.elements, exemplars: exemplars } : { exemplars: exemplars };
         };
         // Whether given object is an exemplar.
@@ -247,7 +288,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.identifier = Population.POPULATION_ID_COUNTER++;
             if (name === null)
                 this.name = this.identifier.toString();
-            this.colorTrans = color.alpha(0.25);
+            this.colorTrans = color.alpha(0.333);
         }
         /*toNumber() {
             return this.identifier;

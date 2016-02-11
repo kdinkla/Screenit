@@ -59,7 +59,7 @@ var viewConstructors: () => StringMap<any> = () => {
 };
 
 export class OverView extends View<EnrichedState> {
-    background: ActiveBackground;
+    //background: ActiveBackground;
     panelColumns: List<PlacedSnippet>;
 
     constructor() {
@@ -69,7 +69,7 @@ export class OverView extends View<EnrichedState> {
     updateScene(state: EnrichedState) {
         var cfg = state.configuration;
 
-        this.background = new ActiveBackground(cfg.backgroundColor);
+        //this.background = new ActiveBackground(cfg.backgroundColor);
 
         var rootTopLeft = [cfg.windowMargin, cfg.windowMargin];
 
@@ -80,7 +80,7 @@ export class OverView extends View<EnrichedState> {
         var panels = state.openViews.elements.map(ov => new ColumnPanel(ov, new constructors[ov](state), state, true));
 
         // All panel options.
-        var closedPanels = _.difference(_.keys(constructors), state.openViews.elements)
+        var closedPanels = _.difference(model.viewCycle, state.openViews.elements)
                             .map(ov => new ColumnPanel(ov, new constructors[ov](state), state, false));
         var closedList = new List("pnlClsCols", closedPanels, [0,0], [0,0], 'vertical', cfg.panelSpace, 'right');
 
@@ -97,8 +97,10 @@ export class OverView extends View<EnrichedState> {
 
     paint(c: ViewContext, iMod: EnrichedState) {
         var cfg = iMod.configuration;
+        var dim = this.dimensions();
 
-        c.snippet(new ActiveBackground(cfg.backgroundColor));
+        c.context.clearRect(0, 0, dim[0], dim[1]);
+        //c.snippet(new ActiveBackground(cfg.backgroundColor));
 
         // Center panels.
         var topLeft = Vector.mul(Vector.subtract(this.dimensions(), this.panelColumns.dimensions), .5);
@@ -110,10 +112,30 @@ export class OverView extends View<EnrichedState> {
             topLeft[1]
         ]);
         c.snippet(this.panelColumns);
+
+
+        // Show data loading text.
+        var isLoading = _.keys(iMod).filter(prp => 'converged' in iMod[prp]).some(prp => !iMod[prp].converged);
+        var secondsMod = Math.round(Date.now() / 1000) % 3;
+        c.save();
+
+        c.fillStyle(isLoading ? cfg.baseEmphasis : Color.NONE);
+        c.strokeStyle(isLoading ? cfg.backgroundColor : Color.NONE);
+        c.lineWidth(3);
+        c.font(cfg.bigGuideStyle.font.toString());
+        c.textBaseline('bottom');
+        c.textAlign('left');
+
+        var compTxt = 'Computing' + (secondsMod === 1 ? '.' : secondsMod === 2 ? '..' : '...');
+        c.translate([.5 * this.dimensions()[0] - 20, this.dimensions()[1] - cfg.windowMargin]);
+        c.strokeText(compTxt);
+        c.fillText(compTxt);
+
+        c.restore();
     }
 }
 
-class ActiveBackground extends Background {
+/*class ActiveBackground extends Background {
     constructor(color: Color) {
         super(color);
     }
@@ -138,7 +160,7 @@ class ActiveBackground extends Background {
         interaction.hoveredCoordinates.well = null;
         interaction.hoveredCoordinates.plate = null;
     }
-}
+}*/
 
 class ColumnPanel extends List<PlacedSnippet> {
     constructor(identifier: string,
@@ -204,7 +226,7 @@ class FeatureHistogramTable extends List<PlacedSnippet> {
     }
 
     toString() {
-        return "Cell Features";
+        return "Features";
     }
 }
 
@@ -332,14 +354,17 @@ class FeatureParallelCoordinates extends PlacedSnippet {
                 this.paintPolyLine(context, pE.toString(), state.populationColorTranslucent(p))));
 
         var focusedObject = state.focused().object;
-        if(focusedObject !== null) this.paintPolyLine(context, focusedObject.toString(), cfg.baseSelected);
+        if(focusedObject !== null) {
+            this.paintPolyLine(context, focusedObject.toString(), cfg.backgroundColor, 4);
+            this.paintPolyLine(context, focusedObject.toString(), cfg.baseSelected, 2);
+        }
 
         context.transitioning = true;
 
         context.restore();
     }
 
-    private paintPolyLine(context: ViewContext, object: string, color: Color) {
+    private paintPolyLine(context: ViewContext, object: string, color: Color, lineWidth = 1) {
         var state = this.state;
         //var cfg = state.configuration
         var features = state.features.value;
@@ -350,6 +375,7 @@ class FeatureParallelCoordinates extends PlacedSnippet {
 
         if(object in featureValues.rowIndex) {
             context.strokeStyle(color);
+            context.lineWidth(lineWidth);
             context.beginPath();
             features.forEach((f, fI) => {
                 var x = featureValues.cell(f, object) * width;
@@ -397,7 +423,7 @@ class Splom extends PlacedSnippet {
     }
 
     toString() {
-        return "Feature Space";
+        return "Space";
     }
 }
 
@@ -481,7 +507,7 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         context.strokeStyle(cfg.baseVeryDim);
         context.strokeRect(0, 0, size, size);
 
-        context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
+        context.drawImageScaled(this.cachedBackground, [0,0], [this.size, this.size]);
 
         context.transitioning = false;
         //context.transitioning = false;
@@ -504,7 +530,7 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         );
 
         // Color dot for hovered object.
-        var focusedObject = mod.hoveredCoordinates.object;
+        var focusedObject = mod.focused().object;
         if(focusedObject !== null) {
             var oI = objectFeatures.rowIndex[focusedObject];
             ObjectFeaturePlot.drawBigDot(context, cfg, cfg.baseSelected, x[oI] * size, (1 - y[oI]) * size);
@@ -581,57 +607,96 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         population.exemplars = population.exemplars.toggle(object);
     }
 
-    mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+    /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         var invCs = [coordinates[0], 1 - coordinates[1]];
         interaction.hoveredCoordinates.object = enriched.closestObject([this.feature1, this.feature2], invCs);
         enriched.conformHoveredCoordinates(interaction);
-    }
+    }*/
 }
 
 class ExemplarTable extends PlacedSnippet {
-    columns: List<ExemplarColumn>;
-    hoveredObjectDetailView: ObjectDetailView;
+    segments: List<PlacedSnippet>;
 
     constructor(public state: EnrichedState) {
         super("ExemplarStack", [0,0]);
 
         var cfg = state.configuration;
         var colSnippets = this.state.populationSpace.populations.elements.map(p => new ExemplarColumn(state, p));
-        this.columns = new List("ExemplarColumns", colSnippets, [0,0], [0, 0], 'horizontal', cfg.clusterTileSpace, 'left');
+        var columns = new List("ExemplarColumns", colSnippets, [0,0], [0,0], 'horizontal', cfg.clusterTileSpace, 'left');
 
-        if(state.hoveredCoordinates.object !== null && !state.hoveredObjectIsExemplar()) {
-            this.hoveredObjectDetailView = new ObjectDetailView(state.hoveredCoordinates.object, state, [0,0]);
-        }
+        var exemplarSelected = state.focused().object !== null && !state.hoveredObjectIsExemplar();
 
-        this.dimensions = Vector.max(this.columns.dimensions, [cfg.splomInnerSize, cfg.splomInnerSize]);
-        this.updatePositions();
+        var additionButtons = exemplarSelected ?
+            new List("ExemplarAdditionButton",
+                this.state.populationSpace.populations.elements
+                    .map(p => new ExemplarAdditionButton(state.focused().object, p, state)),
+                [0,0], [0,0], 'horizontal', cfg.clusterTileSpace, 'left') :
+            null;
+
+        var selectedObjectDetailView = exemplarSelected ?
+                new ObjectDetailView(state.focused().object, state, [0,0]) :
+                null;
+        var segSnippets: PlacedSnippet[] = _.compact([columns, additionButtons, selectedObjectDetailView]);
+        this.segments = new List("ExemplarSegments", segSnippets, [0,0], [0,0], 'vertical', cfg.panelSpace);
+
+        this.setDimensions(this.segments.dimensions);
     }
 
     setTopLeft(topLeft: number[]) {
         super.setTopLeft(topLeft);
-
-        if(this.columns) {
-            this.columns.setTopLeft(topLeft);
-        }
-
-        if(this.hoveredObjectDetailView) {
-            var cfg = this.state.configuration;
-            this.hoveredObjectDetailView.setTopLeft(
-                this.columns.dimensions[1] > 0 ?
-                    Vector.add(this.columns.bottomLeft, [0, cfg.splomSpace]) :
-                    this.columns.topLeft);
-        }
+        if(this.segments) this.segments.setTopLeft(topLeft);
     }
 
     paint(context: ViewContext) {
-        context.snippet(this.columns);
-        context.snippet(this.hoveredObjectDetailView);
-
-        //context.transitioning = false;
+        context.snippet(this.segments);
     }
 
     toString() {
         return "Phenotypes";
+    }
+}
+
+class ExemplarAdditionButton extends PlacedSnippet {
+    labelStyle: LabelStyle;
+
+    constructor(public object, public population: Population, public state: EnrichedState) {
+        super("ExemplarLabel_" + population, [0,0]);
+
+        this.labelStyle = new LabelStyle(state.configuration.clusterAdditionLabel, state.populationColor(population));
+
+        var cfg = state.configuration;
+        this.setDimensions([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize]);
+    }
+
+    paint(context: ViewContext) {
+        super.paint(context);
+
+        var cfg = this.state.configuration;
+
+        context.save();
+        context.translate(this.topLeft);
+        context.strokeStyle(cfg.baseDim);
+        context.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
+
+        context.picking = true;
+        context.fillStyle(Color.NONE);
+        context.fillRect(0, 0, this.dimensions[0], this.dimensions[1]);
+        context.picking = false;
+
+        context.translate(Vector.mul(this.dimensions, .5));
+        context.translate([0, -1]);
+        context.textBaseline('middle');
+        context.textAlign('center');
+        context.fillStyle(cfg.baseDim);
+        context.font(this.labelStyle.font.toString());
+        context.fillText('+');
+        context.restore();
+    }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        interaction.populationSpace.addExemplar(this.object, this.population.identifier);
+        //var population = interaction.populationSpace.populations.byId(this.population.identifier);
+        //population.exemplars = population.exemplars.push(this.object);
     }
 }
 
@@ -643,7 +708,7 @@ class ExemplarColumn extends List<PlacedSnippet> {
             "esc_" + population.identifier,
             _.union<PlacedSnippet>(
                 [new ExemplarLabel(population, state)],
-                population.exemplars.elements.map(ex => new ObjectDetailView(ex, state, [0,0], population.identifier))
+                population.exemplars.elements.map(ex => new ObjectDetailView(ex, state, [0,0]))
             ),
             topLeft,
             [state.configuration.clusterTileInnerSize, 0],
@@ -717,13 +782,14 @@ class ExemplarLabel extends Label {
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        interaction.hoveredCoordinates.population = this.population.identifier;
+        interaction.selectedCoordinates.population = this.population.identifier;
+        //interaction.hoveredCoordinates.population = this.population.identifier;
         //interaction.pushView('plates');
     }
 
-    mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+    /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.population = this.population.identifier;
-    }
+    }*/
 }
 
 class AbstractPlate extends PlacedSnippet {
@@ -951,13 +1017,13 @@ class AbstractPlate extends PlacedSnippet {
         }
     }
 
-    mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+    /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         var plate = this.state.focused().plate;
         if(plate !== null) {
             interaction.hoveredCoordinates.plate = plate;
             interaction.hoveredCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
         }
-    }
+    }*/
 }
 
 class TemplatePlate extends AbstractPlate {
@@ -1193,9 +1259,11 @@ class WellDetailView extends PlacedSnippet {
                enriched: EnrichedState, interaction: InteractionState) {
         var object = enriched.closestWellObject(coordinates);
 
+        interaction.selectedCoordinates.object = object;
+
         // Toggle given exemplar for the focused population.
         // If no population is focused, create a new population for the exemplar, and focus the population.
-        var popSpace = interaction.populationSpace;
+        /*var popSpace = interaction.populationSpace;
         var population = popSpace.populations.byId(interaction.hoveredCoordinates.population);
 
         // Create and focus a new population if one is lacking.
@@ -1204,17 +1272,17 @@ class WellDetailView extends PlacedSnippet {
             interaction.hoveredCoordinates.population = population.identifier;
         }
 
-        population.exemplars = population.exemplars.toggle(object);
+        population.exemplars = population.exemplars.toggle(object);*/
 
         //interaction.pushView('exemplars');
         //interaction.pushView('features');
     }
 
-    mouseMove(event: ViewMouseEvent, coordinates: number[],
+    /*mouseMove(event: ViewMouseEvent, coordinates: number[],
               enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.object = enriched.closestWellObject(coordinates);
         enriched.conformHoveredCoordinates(interaction);
-    }
+    }*/
 
     toString() {
         var info = this.state.dataSetInfo.value;
@@ -1228,12 +1296,11 @@ class ObjectDetailView extends PlacedSnippet {
 
     constructor(public object: number,
                 public state: EnrichedState,
-                topLeft = [0, 0],
-                public targetPopulation: number = null) {
+                topLeft = [0, 0]) {
         super("odv_" + object, topLeft);
 
         var cfg = state.configuration;
-        this.focused = state.hoveredCoordinates.object === object;
+        this.focused = state.focused().object === object;
         this.dimensions = this.focused && !state.populationSpace.isExemplar(object) ?
             [cfg.splomInnerSize, cfg.splomInnerSize] :
             [cfg.clusterTileInnerSize, cfg.clusterTileInnerSize];
@@ -1306,14 +1373,18 @@ class ObjectDetailView extends PlacedSnippet {
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        interaction.removeExemplar(this.object);
+        //interaction.removeExemplar(this.object);
+        interaction.selectedCoordinates.object = this.object;
+
+        // Remove exemplar status of object (on second click).
+        if(this.focused) interaction.removeExemplar(this.object);
     }
 
-    mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+    /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.object = this.object;
         interaction.hoveredCoordinates.population = this.targetPopulation;
         enriched.conformHoveredCoordinates(interaction);
-    }
+    }*/
 }
 
 class PlateIndex extends PlacedSnippet {
@@ -1324,16 +1395,18 @@ class PlateIndex extends PlacedSnippet {
         super("pi", [0,0]);
 
         var cfg = state.configuration;
-        var datInfo = state.dataSetInfo.value;
+        //var datInfo = state.dataSetInfo.value;
 
-        var heatMaps = _.range(0, datInfo.plateCount).map(pI => new PlateMiniHeatmap([0,0], pI, state));
-        var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
+        //var heatMaps = _.range(0, datInfo.plateCount).map(pI => );
+        /*var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
         var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
-            _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
+            _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));*/
+
+        var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
 
         this.heatmapColumns = new List("pics",
             colMaps.map((c, cI) => new List("pic_" + cI, c, [0,0], [0,0], 'vertical', cfg.miniHeatSpace)),
-            [0,0], [0,0], 'horizontal', cfg.miniHeatSpace, 'left'
+            [0,0], [0,0], 'horizontal', 2 * cfg.miniHeatSpace, 'left'
         );
 
         this.dimensions = this.heatmapColumns.dimensions;
@@ -1385,10 +1458,8 @@ class PlateIndex extends PlacedSnippet {
 class PlateMiniHeatmap extends PlacedSnippet {
     private shareImg: any;
 
-    constructor(public topLeft: number[],
-                public plateNumber: number,
-                public state: EnrichedState) {
-        super("mh_" + plateNumber, topLeft);
+    constructor(public plateNumber: number, public state: EnrichedState) {
+        super("mh_" + plateNumber, [0,0]);
 
         var cfg = state.configuration;
         var info = state.dataSetInfo.value;
@@ -1476,10 +1547,10 @@ class PlateMiniHeatmap extends PlacedSnippet {
         interaction.pushView('plate');
     }
 
-    mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+    /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.hoveredCoordinates.plate = this.plateNumber;
         //interaction.hoveredCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
-    }
+    }*/
 
     static wellCoordinatesAt(mouseCoordinates: number[], state: EnrichedState) {
         var info = state.dataSetInfo.value;

@@ -28,6 +28,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
             // Guide labels.
             this.guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
+            this.bigGuideStyle = new LabelStyle(new Font(32, 180), Color.CRIMSON, 'left', 'top');
             this.guideArrowLength = 5;
             this.guideVisible = false;
             // Features.
@@ -65,7 +66,8 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.clusterPlateDotRadius = 1.5;
             this.clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
             this.clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
-            this.exemplarSpace = 2;
+            this.clusterAdditionLabel = new Font(34); //new LabelStyle(new Font(30), this.baseSelected);
+            this.exemplarSpace = 1;
             // Plate view.
             this.wellRadius = 7;
             this.wellDiameter = 2 * this.wellRadius;

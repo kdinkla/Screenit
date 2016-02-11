@@ -29,7 +29,7 @@ import controller = require('./core/graphics/controller');
 import config = require('./configuration');
 import BaseConfiguration = config.BaseConfiguration;
 
-var viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
+export var viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
 
 export class InteractionState implements AbstractModel {
     constructor(public populationSpace: PopulationSpace = new PopulationSpace(),
@@ -207,7 +207,7 @@ export class EnrichedState extends InteractionState {
 
     // Focused coordinates.
     focused() {
-        return this.hoveredCoordinates.otherwise(this.selectedCoordinates);
+        return this.selectedCoordinates;    //this.hoveredCoordinates.otherwise(this.selectedCoordinates);
     }
 
     // Population color, includes focused population highlight.
@@ -234,7 +234,7 @@ export class EnrichedState extends InteractionState {
     }
 
     hoveredObjectIsExemplar() {
-        return this.hoveredCoordinates.object !== null && this.allExemplars.has(this.hoveredCoordinates.object);
+        return this.focused().object !== null && this.allExemplars.has(this.focused().object);
     }
 
     selectionWell(selection: SelectionCoordinates) {
@@ -293,12 +293,65 @@ export class EnrichedState extends InteractionState {
 
         return result;
     }
+
+    // Get range of all plates.
+    plates() {
+        var plateCount = this.dataSetInfo.converged ? this.dataSetInfo.value.plateCount : 0;
+        return _.range(plateCount);
+    }
+
+    // Column partition ordering of plates by score (TODO: by population/count vector.)
+    platePartition() {
+        // Compute score from total cell count, for now.
+        var shares = this.wellClusterShares.value.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
+        //Population.POPULATION_TOTAL_NAME];
+
+        // Plate score by id.
+        var plateRange = this.plates();
+        var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
+        var platesOrdered = _.clone(plateRange);
+
+        // Score has been loaded.
+        console.log("Plate shares:");
+        console.log(this.wellClusterShares.value);
+        if(shares) {
+            console.log("Enabled share based plate scores");
+
+            // For each plate. Take maximum object count, for now.
+            shares.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
+
+            // Order plate range by score.
+            platesOrdered = platesOrdered.sort((p1, p2) => plateScores[p1] - plateScores[p2]);
+        }
+
+        var datInfo = this.dataSetInfo.value;
+        var cfg = this.configuration;
+        var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
+        var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
+                            _.compact(_.range(0, colCapacity)
+                                .map(rI => platesOrdered[cI * colCapacity + rI])).sort((p1, p2) => p1 - p2));
+
+        return colMaps;
+    }
 }
 
 // Populations and their feature space.
 export class PopulationSpace {
     constructor(public features: Chain<string> = new Chain<string>(), // Feature axes of space to model in.
                 public populations: Chain<Population> = new Chain<Population>()) {
+        this.conformPopulations();
+    }
+
+    private conformPopulations() {
+        this.populations = this.populations.filter(p => p.exemplars.length > 0);   // Remove any empty populations.
+        this.createPopulation();    // Add one empty population at end.
+    }
+
+    // Add given object to given population.
+    addExemplar(object: number, population: number) {
+        var target = this.populations.byId(population);
+        target.exemplars = target.exemplars.push(object);
+        this.conformPopulations();
     }
 
     // Create a new population.
@@ -318,7 +371,7 @@ export class PopulationSpace {
     // Dictionary for communicating population description.
     toDict(includeFeatures = true) {
         var exemplars = {};
-        this.populations.forEach(p => exemplars[p.identifier] = _.clone(p.exemplars.elements)); // DO NOT REMOVE!
+        this.populations.filter(p => p.exemplars.length > 0).forEach(p => exemplars[p.identifier] = _.clone(p.exemplars.elements)); // DO NOT REMOVE!
         return includeFeatures ?
             { features: this.features.elements, exemplars: exemplars } :
             { exemplars: exemplars };
@@ -345,7 +398,7 @@ export class Population {
         if(identifier === null) this.identifier = Population.POPULATION_ID_COUNTER++;
         if(name === null) this.name = this.identifier.toString();
 
-        this.colorTrans = color.alpha(0.25);
+        this.colorTrans = color.alpha(0.333);
     }
 
     /*toNumber() {
