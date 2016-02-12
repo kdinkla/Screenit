@@ -953,6 +953,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         WellDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             var object = enriched.closestWellObject(coordinates);
             interaction.selectedCoordinates.object = object;
+            enriched.conformSelectedCoordinates(interaction);
             // Toggle given exemplar for the focused population.
             // If no population is focused, create a new population for the exemplar, and focus the population.
             /*var popSpace = interaction.populationSpace;
@@ -1050,6 +1051,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         ObjectDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             //interaction.removeExemplar(this.object);
             interaction.selectedCoordinates.object = this.object;
+            enriched.conformSelectedCoordinates(interaction);
             // Remove exemplar status of object (on second click).
             if (this.focused)
                 interaction.removeExemplar(this.object);

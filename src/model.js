@@ -15,32 +15,29 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var BaseConfiguration = config.BaseConfiguration;
     exports.viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
     var InteractionState = (function () {
-        function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, openViews, configuration) {
+        function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, openViews, populationScoreVector, configuration) {
             if (populationSpace === void 0) { populationSpace = new PopulationSpace(); }
             if (hoveredCoordinates === void 0) { hoveredCoordinates = new SelectionCoordinates(); }
             if (selectedCoordinates === void 0) { selectedCoordinates = new SelectionCoordinates(); }
             if (openViews === void 0) { openViews = new Chain(['plates', 'exemplars']); }
+            if (populationScoreVector === void 0) { populationScoreVector = {}; }
             if (configuration === void 0) { configuration = new BaseConfiguration(); }
             this.populationSpace = populationSpace;
             this.hoveredCoordinates = hoveredCoordinates;
             this.selectedCoordinates = selectedCoordinates;
             this.openViews = openViews;
+            this.populationScoreVector = populationScoreVector;
             this.configuration = configuration;
         }
         InteractionState.prototype.removeExemplar = function (object) {
             // Remove given exemplar from any population (should be a single population).
             this.populationSpace.populations.forEach(function (p) { return p.exemplars = p.exemplars.pull(object); });
-            // Remove empty populations.
-            //this.populationSpace.populations = this.populationSpace.populations.filter(p => p.length > 0);
             if (this.hoveredCoordinates.object === object)
                 this.hoveredCoordinates.object = null;
         };
         InteractionState.prototype.pushView = function (identifier) {
             var index = exports.viewCycle.indexOf(identifier);
             this.openViews = new Chain([exports.viewCycle[Math.max(0, index - 1)], exports.viewCycle[index], 'exemplars']);
-            //this.openViews.push(identifier);
-            //this.openViews = this.openViews.push(identifier);    //this.openViews.toggle(identifier);
-            //this.openViews = new Chain(_.takeRight(this.openViews.elements, 3));    // Limit number of open views.
         };
         return InteractionState;
     })();
@@ -49,7 +46,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var EnrichedState = (function (_super) {
         __extends(EnrichedState, _super);
         function EnrichedState(state) {
-            _super.call(this, state.populationSpace, state.hoveredCoordinates, state.selectedCoordinates, state.openViews, state.configuration);
+            _super.call(this, state.populationSpace, state.hoveredCoordinates, state.selectedCoordinates, state.openViews, state.populationScoreVector, state.configuration);
             this.allExemplars = Chain.union(this.populationSpace.populations.elements.map(function (p) { return p.exemplars; }));
             var focusedWell = this.focused();
             var addWellInfo = function (dict) {
@@ -75,7 +72,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             console.log(this.objectFeatureValues.value);
         }
         EnrichedState.prototype.cloneInteractionState = function () {
-            return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.configuration));
+            return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.populationScoreVector), collection.snapshot(this.configuration));
         };
         EnrichedState.prototype.closestObject = function (features, coordinates) {
             var bestIndex = -1;
@@ -149,6 +146,17 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 }
             }
         };
+        EnrichedState.prototype.conformSelectedCoordinates = function (targetState) {
+            var coordinates = targetState.selectedCoordinates;
+            if (coordinates !== null) {
+                var wellInfo = this.objectWellInfo(coordinates.object);
+                if (wellInfo) {
+                    var location = wellInfo.location;
+                    coordinates.well = location.coordinates();
+                    coordinates.plate = location.plate;
+                }
+            }
+        };
         EnrichedState.prototype.hoveredObjectIsExemplar = function () {
             return this.focused().object !== null && this.allExemplars.has(this.focused().object);
         };
@@ -203,22 +211,29 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         // Column partition ordering of plates by score (TODO: by population/count vector.)
         EnrichedState.prototype.platePartition = function () {
             // Compute score from total cell count, for now.
-            var shares = this.wellClusterShares.value.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
-            //Population.POPULATION_TOTAL_NAME];
+            var datasetInfo = this.dataSetInfo.value;
+            var wellShares = this.wellClusterShares.value;
+            var objectCount = wellShares.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
             // Plate score by id.
             var plateRange = this.plates();
             var plateScores = plateRange.map(function (i) { return i; }); // Stick to in-order partition in case of no well shares.
             var platesOrdered = _.clone(plateRange);
-            // Score has been loaded.
-            console.log("Plate shares:");
-            console.log(this.wellClusterShares.value);
-            if (shares) {
-                console.log("Enabled share based plate scores");
-                // For each plate. Take maximum object count, for now.
-                shares.forEach(function (pS, pI) { return plateScores[pI] = _.max(pS.map(function (cS) { return _.max(cS); })); });
+            // Shares have been loaded.
+            /*if(objectCount) {
+                // If target vector is not specified: take maximum object count of each plate.
+                if(_.keys(this.populationScoreVector).length === 0) {
+                    objectCount.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
+                } else {
+                    var popKeys = _.keys(this.populationScoreVector);
+                    var populationMatrices = _.compact(popKeys.map(k => wellShares[k]));
+                    var targetVector = popKeys.map(p => this.populationScoreVector[p]);
+    
+                    plateRange.forEach(plate => plateScores[plate] = this.plateScore(targetVector, populationMatrices));
+                }
+    
                 // Order plate range by score.
-                platesOrdered = platesOrdered.sort(function (p1, p2) { return plateScores[p1] - plateScores[p2]; });
-            }
+                platesOrdered = platesOrdered.sort((p1, p2) => plateScores[p1] - plateScores[p2]);
+            }*/
             var datInfo = this.dataSetInfo.value;
             var cfg = this.configuration;
             var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);

@@ -36,26 +36,19 @@ export class InteractionState implements AbstractModel {
                 public hoveredCoordinates = new SelectionCoordinates(),
                 public selectedCoordinates = new SelectionCoordinates(),
                 public openViews: Chain<string> = new Chain(['plates', 'exemplars']),
+                public populationScoreVector: StringMap<number> = {},
                 public configuration: BaseConfiguration = new BaseConfiguration()) {
     }
 
     removeExemplar(object: number) {
         // Remove given exemplar from any population (should be a single population).
         this.populationSpace.populations.forEach(p => p.exemplars = p.exemplars.pull(object));
-        // Remove empty populations.
-        //this.populationSpace.populations = this.populationSpace.populations.filter(p => p.length > 0);
         if(this.hoveredCoordinates.object === object) this.hoveredCoordinates.object = null;
     }
 
     pushView(identifier: string) {
         var index = viewCycle.indexOf(identifier);
-
         this.openViews = new Chain([viewCycle[Math.max(0, index - 1)], viewCycle[index], 'exemplars']);
-
-        //this.openViews.push(identifier);
-
-        //this.openViews = this.openViews.push(identifier);    //this.openViews.toggle(identifier);
-        //this.openViews = new Chain(_.takeRight(this.openViews.elements, 3));    // Limit number of open views.
     }
 }
 
@@ -76,6 +69,7 @@ export class EnrichedState extends InteractionState {
             state.hoveredCoordinates,
             state.selectedCoordinates,
             state.openViews,
+            state.populationScoreVector,
             state.configuration);
 
         this.allExemplars = Chain.union<number>(this.populationSpace.populations.elements.map(p => p.exemplars));
@@ -142,6 +136,7 @@ export class EnrichedState extends InteractionState {
             collection.snapshot(this.hoveredCoordinates),
             collection.snapshot(this.selectedCoordinates),
             collection.snapshot(this.openViews),
+            collection.snapshot(this.populationScoreVector),
             collection.snapshot(this.configuration)
         );
     }
@@ -233,6 +228,18 @@ export class EnrichedState extends InteractionState {
         }
     }
 
+    conformSelectedCoordinates(targetState: InteractionState) {
+        var coordinates = targetState.selectedCoordinates;
+        if(coordinates !== null) {
+            var wellInfo = this.objectWellInfo(coordinates.object);
+            if (wellInfo) {
+                var location = wellInfo.location;
+                coordinates.well = location.coordinates();
+                coordinates.plate = location.plate;
+            }
+        }
+    }
+
     hoveredObjectIsExemplar() {
         return this.focused().object !== null && this.allExemplars.has(this.focused().object);
     }
@@ -303,26 +310,31 @@ export class EnrichedState extends InteractionState {
     // Column partition ordering of plates by score (TODO: by population/count vector.)
     platePartition() {
         // Compute score from total cell count, for now.
-        var shares = this.wellClusterShares.value.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
-        //Population.POPULATION_TOTAL_NAME];
+        var datasetInfo = this.dataSetInfo.value;
+        var wellShares = this.wellClusterShares.value;
+        var objectCount = wellShares.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
 
         // Plate score by id.
         var plateRange = this.plates();
         var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
         var platesOrdered = _.clone(plateRange);
 
-        // Score has been loaded.
-        console.log("Plate shares:");
-        console.log(this.wellClusterShares.value);
-        if(shares) {
-            console.log("Enabled share based plate scores");
+        // Shares have been loaded.
+        /*if(objectCount) {
+            // If target vector is not specified: take maximum object count of each plate.
+            if(_.keys(this.populationScoreVector).length === 0) {
+                objectCount.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
+            } else {
+                var popKeys = _.keys(this.populationScoreVector);
+                var populationMatrices = _.compact(popKeys.map(k => wellShares[k]));
+                var targetVector = popKeys.map(p => this.populationScoreVector[p]);
 
-            // For each plate. Take maximum object count, for now.
-            shares.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
+                plateRange.forEach(plate => plateScores[plate] = this.plateScore(targetVector, populationMatrices));
+            }
 
             // Order plate range by score.
             platesOrdered = platesOrdered.sort((p1, p2) => plateScores[p1] - plateScores[p2]);
-        }
+        }*/
 
         var datInfo = this.dataSetInfo.value;
         var cfg = this.configuration;
@@ -333,6 +345,23 @@ export class EnrichedState extends InteractionState {
 
         return colMaps;
     }
+
+    /*private plateScore(targetVector: number[], populationMatrices: number[][][], colCount: number, rowCount: number) {
+        var result: number = 0;
+
+        // Compute cosine similarity for all wells.
+        var wellCompositions: number[] = [];
+
+        populationMatrices.forEach((p, pI) =>
+            p.forEach((c, cI) =>
+                c.forEach((r, rI) => {
+
+                })
+            )
+        );
+
+        return result;
+    }*/
 }
 
 // Populations and their feature space.

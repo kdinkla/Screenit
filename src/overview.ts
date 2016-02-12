@@ -1260,6 +1260,7 @@ class WellDetailView extends PlacedSnippet {
         var object = enriched.closestWellObject(coordinates);
 
         interaction.selectedCoordinates.object = object;
+        enriched.conformSelectedCoordinates(interaction);
 
         // Toggle given exemplar for the focused population.
         // If no population is focused, create a new population for the exemplar, and focus the population.
@@ -1375,6 +1376,7 @@ class ObjectDetailView extends PlacedSnippet {
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         //interaction.removeExemplar(this.object);
         interaction.selectedCoordinates.object = this.object;
+        enriched.conformSelectedCoordinates(interaction);
 
         // Remove exemplar status of object (on second click).
         if(this.focused) interaction.removeExemplar(this.object);
