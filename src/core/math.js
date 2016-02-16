@@ -39,6 +39,10 @@ define(["require", "exports", 'lodash', './collection'], function (require, expo
                 vector[i] = val;
             }
         };
+        // Replace NaN and null by zero.
+        Vector.invalidToZero = function (vector) {
+            return vector.map(function (n) { return isNaN(n) || n === null ? 0 : n; });
+        };
         // Add up components.
         Vector.sum = function (vector) {
             var result = 0;
@@ -288,6 +292,17 @@ define(["require", "exports", 'lodash', './collection'], function (require, expo
         return Rectangle;
     })();
     exports.Rectangle = Rectangle;
+    // Returns mean and standard deviation of given numbers.
+    function statistics(values) {
+        // Mean has to be computed anyways.
+        var mn = Vector.sum(values) / values.length;
+        var stnDev = Math.sqrt((Vector.sum(values.map(function (n) { return n * n; })) / values.length) - (mn * mn));
+        return {
+            mean: mn,
+            standardDeviation: stnDev
+        };
+    }
+    exports.statistics = statistics;
     // Combinatorial optimization functions.
     var Optimize = (function () {
         function Optimize() {

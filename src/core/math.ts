@@ -47,6 +47,11 @@ export class Vector {
         }
     }
 
+    // Replace NaN and null by zero.
+    static invalidToZero(vector: number[]) {
+        return vector.map(n => isNaN(n) || n === null ? 0 : n);
+    }
+
     // Add up components.
     static sum(vector: number[]): number {
         var result = 0;
@@ -356,6 +361,19 @@ export class Rectangle implements Positioned, Dimensional {
             Vector.interpolate(this.dimensions, target.dimensions, s));
     }
 }
+
+// Returns mean and standard deviation of given numbers.
+export function statistics(values: number[]): {mean: number; standardDeviation: number} {
+    // Mean has to be computed anyways.
+    var mn = Vector.sum(values) / values.length;
+    var stnDev = Math.sqrt((Vector.sum(values.map(n => n * n)) / values.length) - (mn * mn));
+
+    return {
+        mean: mn,
+        standardDeviation: stnDev
+    };
+}
+
 
 // Combinatorial optimization functions.
 export class Optimize {

@@ -77,15 +77,16 @@ export class OverView extends View<EnrichedState> {
         var constructors = viewConstructors();
 
         // Active panels.
-        var panels = state.openViews.elements.map(ov => new ColumnPanel(ov, new constructors[ov](state), state, true));
+        var panels = //state.openViews.elements.map(ov => new ColumnPanel(ov, new constructors[ov](state), state, true));
+                     model.viewCycle.map(ov => new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)));
 
         // All panel options.
-        var closedPanels = _.difference(model.viewCycle, state.openViews.elements)
-                            .map(ov => new ColumnPanel(ov, new constructors[ov](state), state, false));
-        var closedList = new List("pnlClsCols", closedPanels, [0,0], [0,0], 'vertical', cfg.panelSpace, 'right');
+        //var closedPanels = _.difference(model.viewCycle, state.openViews.elements)
+        //                    .map(ov => new ColumnPanel(ov, new constructors[ov](state), state, false));
+        //var closedList = new List("pnlClsCols", closedPanels, [0,0], [0,0], 'vertical', cfg.panelSpace, 'right');
 
         this.panelColumns = new List("pnlCols",
-            _.union<PlacedSnippet>([closedList], panels),
+            _.union<PlacedSnippet>(/*[closedList],*/ panels),
             rootTopLeft, [0,0],
             'horizontal',
             cfg.panelSpace,
@@ -100,7 +101,6 @@ export class OverView extends View<EnrichedState> {
         var dim = this.dimensions();
 
         c.context.clearRect(0, 0, dim[0], dim[1]);
-        //c.snippet(new ActiveBackground(cfg.backgroundColor));
 
         // Center panels.
         var topLeft = Vector.mul(Vector.subtract(this.dimensions(), this.panelColumns.dimensions), .5);
@@ -115,7 +115,7 @@ export class OverView extends View<EnrichedState> {
 
 
         // Show data loading text.
-        var isLoading = _.keys(iMod).filter(prp => 'converged' in iMod[prp]).some(prp => !iMod[prp].converged);
+        var isLoading = _.keys(iMod).filter(prp => iMod[prp] && 'converged' in iMod[prp]).some(prp => !iMod[prp].converged);
         var secondsMod = Math.round(Date.now() / 1000) % 3;
         c.save();
 
@@ -135,40 +135,13 @@ export class OverView extends View<EnrichedState> {
     }
 }
 
-/*class ActiveBackground extends Background {
-    constructor(color: Color) {
-        super(color);
-    }
-
-    paint(context: ViewContext) {
-        context.transitioning = false;
-        context.picking = true;
-        super.paint(context);
-        context.picking = false;
-    }
-
-    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        interaction.hoveredCoordinates.population = null;
-
-        interaction.selectedCoordinates.object = null;
-        //interaction.selectedCoordinates.well = null;
-        //interaction.selectedCoordinates.plate = null;
-    }
-
-    mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        interaction.hoveredCoordinates.object = null;
-        interaction.hoveredCoordinates.well = null;
-        interaction.hoveredCoordinates.plate = null;
-    }
-}*/
-
 class ColumnPanel extends List<PlacedSnippet> {
     constructor(identifier: string,
                 public core: PlacedSnippet,
                 public state: EnrichedState,
                 public opened = false) {
         super("cp_" + identifier,
-            _.union([new ColumnLabel(identifier, core.toString(), state)], opened ? [core] : []), //[new Label("hdr_" + identifier, core.toString(), [0,0], state.configuration.panelHeaderLabel), core],
+            _.union([new ColumnLabel(identifier, core.toString(), opened, state)], opened ? [core] : []), //[new Label("hdr_" + identifier, core.toString(), [0,0], state.configuration.panelHeaderLabel), core],
             [0,0],
             [0,0],
             'vertical',
@@ -178,8 +151,11 @@ class ColumnPanel extends List<PlacedSnippet> {
 }
 
 class ColumnLabel extends Label {
-    constructor(public viewIdentifier: string, text: string, state: EnrichedState) {
-        super("clLbl_" + viewIdentifier, text, [0,0], state.configuration.panelHeaderLabel, true);
+    constructor(public viewIdentifier: string, text: string, opened: boolean, state: EnrichedState) {
+        super("clLbl_" + viewIdentifier, text, [0,0],
+                opened ? state.configuration.panelHeaderOpenLabel : state.configuration.panelHeaderLabel, true);
+
+        if(!opened) this.setDimensions([.25 * this.dimensions[0] + 2 * this.dimensions[1], this.dimensions[1]]);
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
@@ -444,11 +420,10 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         // Cache for changing histograms and hovered population.
         var cachedBackgrounds = model.objectHistograms.value[this.identifier] || {};
         var focusPopulation = (model.focused().population || -1).toString();
-        this.cachedBackground = cachedBackgrounds[focusPopulation];  //model.objectInfo.value[this.identifier];
+        this.cachedBackground = cachedBackgrounds[focusPopulation];
         if(!this.cachedBackground) {
             this.cachedBackground = view.View.renderToCanvas(size, size, c => this.histogram2DtoImage(c));
             model.objectHistograms.value[this.identifier] = this.cachedBackground;
-            //model.objectHistograms.value[this.identifier] = this.cachedBackground;
         }
     }
 
@@ -473,7 +448,7 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
                 var coreColor = Number(cK) >= 0 ? mod.populationColorTranslucent(population) : cfg.base;
                 matrix.forEach((c, xI) => c.forEach((cell, yI) => {
                     if((focused && cell) || (!focused && (cell === 2 || cell === 3))) {
-                        context.fillStyle = coreColor;  //coreColor.alpha(1 - 0.5 / cell);
+                        context.fillStyle = coreColor;
                         context.fillRect(xI, size - yI, 1, 1);
                     }
                 }));
@@ -533,7 +508,7 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         var focusedObject = mod.focused().object;
         if(focusedObject !== null) {
             var oI = objectFeatures.rowIndex[focusedObject];
-            ObjectFeaturePlot.drawBigDot(context, cfg, cfg.baseSelected, x[oI] * size, (1 - y[oI]) * size);
+            ObjectFeaturePlot.drawBigDot(context, cfg, cfg.baseSelected, x[oI] * size, (1 - y[oI]) * size, true);
         }
 
         context.transitioning = true;
@@ -574,16 +549,12 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
         context.restore();
     }
 
-    static drawBigDot(context: ViewContext, cfg: BaseConfiguration, color: Color, x: number, y: number) {
-        var rO = cfg.splomRepresentativeOuterDotRadius;
-        var rI = cfg.splomRepresentativeInnerDotRadius;
-        //var rM = 0.5 * (rO + rI);
+    static drawBigDot(context: ViewContext, cfg: BaseConfiguration, color: Color, x: number, y: number, enlarge = false) {
+        var rO = (enlarge ? 1.5 : 1) * cfg.splomRepresentativeOuterDotRadius;
+        var rI = (enlarge ? 1.5 : 1) * cfg.splomRepresentativeInnerDotRadius;
 
         context.fillStyle(cfg.backgroundColor);
         context.fillEllipse(x, y, rO, rO);
-
-        //context.fillStyle(style.Color.BLACK);
-        //context.fillEllipse(x, y, rM, rM);
 
         context.fillStyle(color);
         context.fillEllipse(x, y, rI, rI);
@@ -606,12 +577,6 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
 
         population.exemplars = population.exemplars.toggle(object);
     }
-
-    /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        var invCs = [coordinates[0], 1 - coordinates[1]];
-        interaction.hoveredCoordinates.object = enriched.closestObject([this.feature1, this.feature2], invCs);
-        enriched.conformHoveredCoordinates(interaction);
-    }*/
 }
 
 class ExemplarTable extends PlacedSnippet {
@@ -622,22 +587,31 @@ class ExemplarTable extends PlacedSnippet {
 
         var cfg = state.configuration;
         var colSnippets = this.state.populationSpace.populations.elements.map(p => new ExemplarColumn(state, p));
-        var columns = new List("ExemplarColumns", colSnippets, [0,0], [0,0], 'horizontal', cfg.clusterTileSpace, 'left');
+
+        var exemplarLabel = new Label("ExemplarLbl", "Exemplars", [0,0], state.configuration.subPanelHeaderLabel, true);
+        var columns = new List("ExemplarColumns", colSnippets, [0,0], [0,0], 'horizontal', cfg.exemplarColumnSpace, 'left');
 
         var exemplarSelected = state.focused().object !== null && !state.hoveredObjectIsExemplar();
 
         var additionButtons = exemplarSelected ?
-            new List("ExemplarAdditionButton",
+            new List("ExemplarAdditions",
+                    this.state.populationSpace.populations.elements
+                        .map(p => new ExemplarAdditionButton(state.focused().object, p, state)),
+                    [0,0], [0,0], 'horizontal', cfg.exemplarColumnSpace, 'left') :
+                null;
+
+        var transferLabel = new Label("PopulationTransfersLbl", "Well Score", [0,0], state.configuration.subPanelHeaderLabel, true);
+        var transferButtons = new List("PopulationTransfers",
                 this.state.populationSpace.populations.elements
-                    .map(p => new ExemplarAdditionButton(state.focused().object, p, state)),
-                [0,0], [0,0], 'horizontal', cfg.clusterTileSpace, 'left') :
-            null;
+                    .map(p => new PopulationTransferEdit(p, state)),
+                [0,0], [0,0], 'horizontal', cfg.exemplarColumnSpace, 'left');
 
         var selectedObjectDetailView = exemplarSelected ?
                 new ObjectDetailView(state.focused().object, state, [0,0]) :
                 null;
-        var segSnippets: PlacedSnippet[] = _.compact([columns, additionButtons, selectedObjectDetailView]);
-        this.segments = new List("ExemplarSegments", segSnippets, [0,0], [0,0], 'vertical', cfg.panelSpace);
+        var segSnippets: PlacedSnippet[] = _.compact(
+                [transferLabel, transferButtons, exemplarLabel, columns, additionButtons, selectedObjectDetailView]);
+        this.segments = new List("ExemplarSegments", segSnippets, [0,0], [0,0], 'vertical', cfg.subPanelSpace);
 
         this.setDimensions(this.segments.dimensions);
     }
@@ -695,8 +669,6 @@ class ExemplarAdditionButton extends PlacedSnippet {
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.populationSpace.addExemplar(this.object, this.population.identifier);
-        //var population = interaction.populationSpace.populations.byId(this.population.identifier);
-        //population.exemplars = population.exemplars.push(this.object);
     }
 }
 
@@ -754,6 +726,85 @@ class ExemplarColumn extends List<PlacedSnippet> {
     }
 }
 
+class PopulationTransferEdit extends PlacedSnippet {
+    constructor(public population: Population, public state: EnrichedState) {
+        super("TransferEdit_" + population.identifier, [0,0]);
+
+        var cfg = state.configuration;
+        this.setDimensions([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize]);
+    }
+
+    paint(context: ViewContext) {
+        super.paint(context);
+
+        var cfg = this.state.configuration;
+        var center = Vector.mul(this.dimensions, .5);
+
+        context.save();
+        context.translate(this.topLeft);
+
+        // Internal axes.
+        context.strokeStyle(cfg.baseVeryDim);
+        context.strokeLine([center[0], 0], [center[0], this.dimensions[1]]);
+        context.strokeLine([0, center[1]], [this.dimensions[1], center[1]]);
+
+        // Outlines.
+        context.strokeStyle(cfg.baseDim);
+        context.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
+
+        var funcPoint = (cs: number[]) => [.5 * (1 + cs[0]) * this.dimensions[0], .5 * (1 - cs[1]) * this.dimensions[1]];
+
+        // Function curve.
+        context.strokeStyle(this.population.color);
+        context.lineWidth(2);
+        context.beginPath();
+        var startPoint = funcPoint([-1, this.population.activate(-1)]);
+        context.moveTo(startPoint[0], startPoint[1]);
+        for(var x = 1; x <= this.dimensions[0]; x += 3) {
+            var actInput = (2 * x / this.dimensions[0]) - 1;
+            var pnt = funcPoint([actInput, this.population.activate(actInput)]);
+            context.lineTo(pnt[0], pnt[1]);
+        }
+        context.stroke();
+
+        // Control points.
+        context.fillStyle(this.population.color);
+        this.population.activation.forEach(cP => {
+            var pnt = funcPoint(cP);
+            context.fillEllipse(pnt[0], pnt[1], 2, 2);
+        });
+
+        context.picking = true;
+        context.translate(Vector.mul(this.dimensions, 0.5));
+        context.scale(.5 * this.dimensions[0], -.5 * this.dimensions[1])
+        context.fillStyle(Color.NONE);
+        context.fillRect(-1, -1, 2, 2);
+        context.picking = false;
+
+        context.restore();
+    }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        // Control points.
+        var controlPoints = interaction.populationSpace.populations.byId(this.population.identifier).activation;
+
+        var closestIndex = -1;
+        var minDistance = Number.MAX_VALUE;
+        controlPoints.forEach((c, cI) => {
+            var distance = Math.abs(c[0] - coordinates[0]); //Vector.distance(c, coordinates);
+            if(distance < minDistance) {
+                closestIndex = cI;
+                minDistance = distance;
+            }
+        });
+
+        controlPoints[closestIndex] = coordinates;
+
+        // Enforce control point x ordering.
+        for(var i = 1; i < 3; i++) controlPoints[i][0] = Math.max(controlPoints[i][0], controlPoints[i-1][0]);
+    }
+}
+
 class ExemplarLabel extends Label {
     constructor(public population: Population,
                 public state: EnrichedState) {
@@ -783,13 +834,7 @@ class ExemplarLabel extends Label {
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.selectedCoordinates.population = this.population.identifier;
-        //interaction.hoveredCoordinates.population = this.population.identifier;
-        //interaction.pushView('plates');
     }
-
-    /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        interaction.hoveredCoordinates.population = this.population.identifier;
-    }*/
 }
 
 class AbstractPlate extends PlacedSnippet {
@@ -1049,10 +1094,11 @@ class TemplatePlate extends AbstractPlate {
         var info = this.model.dataSetInfo.value;
         var selection = this.model.focused();
         var clusterShares = this.model.wellClusterShares.value.wellIndex[selection.populationOrTotal()] || [];
-        var wellShares = clusterShares[selection.plate] || [];
+        //var wellShares = clusterShares[selection.plate] || [];
+        var wellShares = this.model.wellScores()[selection.plate] || [];
 
         // Well outlines.
-        ctx.strokeStyle(cfg.baseMuted);
+        ctx.strokeStyle(cfg.baseDim);
         for(var c = 0; c < info.columnCount; c++) {
             var x = c * cfg.wellDiameter;
 
@@ -1063,8 +1109,9 @@ class TemplatePlate extends AbstractPlate {
                     ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
                     ctx.fillRect(x + .25, y + .25, cfg.wellDiameter - .5, cfg.wellDiameter - .5);
                 } else {
-                    ctx.strokeLine([x + .25, y + .25], [x + cfg.wellDiameter - .25, y + cfg.wellDiameter - .25]);
-                    ctx.strokeLine([x + .25, y + cfg.wellDiameter - .25], [x + cfg.wellDiameter - .25, y + .25]);
+                    ctx.strokeRect(x + 1, y + 1, cfg.wellDiameter - 2, cfg.wellDiameter - 2);
+                    //ctx.strokeLine([x + .25, y + .25], [x + cfg.wellDiameter - .25, y + cfg.wellDiameter - .25]);
+                    //ctx.strokeLine([x + .25, y + cfg.wellDiameter - .25], [x + cfg.wellDiameter - .25, y + .25]);
                 }
             }
         }
@@ -1118,11 +1165,11 @@ class FlowerPlate extends AbstractPlate {
         var totalColumnShares = totalWellShares[column] || [];
         var cellCount = totalColumnShares[row];
 
-        var maxObjectCount = wellClusterShares.maxObjectCount;
+        var maxObjectCount = wellClusterShares.maxPlateObjectCount[selection.plate];    //wellClusterShares.maxObjectCount;
         var normObjectCellCount = Math.sqrt(maxObjectCount);
 
         // Draw flower slice
-        var populations = this.state.populationSpace.populations.elements;
+        var populations = this.state.populationSpace.populations.elements.filter(p => p.exemplars.length > 0);
         populations.forEach((p, pI) => {
             var clusterShares = this.state.wellClusterShares.value.wellIndex[p.identifier] || [];
             var wellShares = clusterShares[selection.plate] || [];
@@ -1199,8 +1246,10 @@ class WellDetailView extends PlacedSnippet {
     setTopLeft(topLeft: number[]) {
         super.setTopLeft(topLeft);
 
-        if(this.imageTypeOption) this.imageTypeOption.setTopLeft(this.bottomLeft);
-        if(this.guide) this.guide.setTopLeft(Vector.add(this.bottomRight, [-200, 25]));
+        if(this.imageTypeOption)
+            this.imageTypeOption.setTopLeft(Vector.add(this.topLeft, [0, .75 * this.dimensions[1] + 10]));  //this.bottomLeft);
+        if(this.guide)
+            this.guide.setTopLeft(Vector.add(this.bottomRight, [-200, 25]));
     }
 
     paint(ctx: ViewContext) {
@@ -1231,16 +1280,16 @@ class WellDetailView extends PlacedSnippet {
                 var y = objects.columnVector("y");
                 var xRad = wellScale * cfg.objectViewImageRadius;
                 var yRad = wellScale * cfg.objectViewImageRadius;
-                objects.rows.forEach((r, i) => {
-                    if(Number(r) === state.focused().object) {
-                        ctx.strokeStyle(cfg.backgroundColor);
-                        ctx.lineWidth(4);
-                        ctx.strokeRect(wellScale * x[i] - xRad, wellScale * y[i] - yRad, 2 * xRad, 2 * yRad);
-                        ctx.strokeStyle(cfg.baseSelected);
-                        ctx.lineWidth(2);
-                        ctx.strokeRect(wellScale * x[i] - xRad, wellScale * y[i] - yRad, 2 * xRad, 2 * yRad);
-                    }
-                });
+                var rI = state.focused().object === null ? -1 : objects.rowIndex[state.focused().object];
+                var rX = rI >= 0 ? x[rI] : .5 * this.dimensions[0];
+                var rY = rI >= 0 ? y[rI] : .5 * this.dimensions[1];
+
+                ctx.strokeStyle(rI >= 0 ? cfg.backgroundColor : Color.NONE);
+                ctx.lineWidth(4);
+                ctx.strokeRect(wellScale * rX - xRad, wellScale * rY - yRad, 2 * xRad, 2 * yRad);
+                ctx.strokeStyle(rI >= 0 ? cfg.baseSelected : Color.NONE);
+                ctx.lineWidth(2);
+                ctx.strokeRect(wellScale * rX - xRad, wellScale * rY - yRad, 2 * xRad, 2 * yRad);
 
                 ctx.transitioning = true;
             }
@@ -1397,14 +1446,14 @@ class PlateIndex extends PlacedSnippet {
         super("pi", [0,0]);
 
         var cfg = state.configuration;
-        //var datInfo = state.dataSetInfo.value;
+        var datInfo = state.dataSetInfo.value;
 
-        //var heatMaps = _.range(0, datInfo.plateCount).map(pI => );
-        /*var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
+        var heatMaps = _.range(0, datInfo.plateCount).map(pI => new PlateMiniHeatmap(pI, state));
+        var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
         var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
-            _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));*/
+            _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
 
-        var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
+        //var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
 
         this.heatmapColumns = new List("pics",
             colMaps.map((c, cI) => new List("pic_" + cI, c, [0,0], [0,0], 'vertical', cfg.miniHeatSpace)),
@@ -1479,6 +1528,12 @@ class PlateMiniHeatmap extends PlacedSnippet {
 
         context.save();
         context.translate(this.topLeft);
+
+        // Outline, in case of no share data.
+        context.strokeStyle(cfg.baseDim);
+        context.strokeRect(.5, .5, this.dimensions[0] - .5, this.dimensions[1] - .5);
+
+        // Heat map image.
         context.drawImage(this.shareImg);
 
         context.transitioning = false;
@@ -1509,15 +1564,16 @@ class PlateMiniHeatmap extends PlacedSnippet {
     }
 
     static plateShareImage(model: EnrichedState, clusterObject: any, plate: number) {
-        var tag = "cimg_" + clusterObject + "_" + plate;
+        var tag = "cimg_" + plate + "_" + model.populationSpace.activationString(); //"cimg_" + clusterObject + "_" + plate;
         var wellClusterShares = model.wellClusterShares.value;
         var plateShareImage = wellClusterShares[tag];
 
         if(!plateShareImage) {
             var cfg = model.configuration;
             var datInfo = model.dataSetInfo.value;
-            var clusterShares = wellClusterShares.wellIndex[clusterObject] || [];
-            var plateShares = clusterShares[plate] || [];
+            //var clusterShares = wellClusterShares.wellIndex[clusterObject] || [];
+            //var plateShares = clusterShares[plate] || [];
+            var plateShares = model.wellScores()[plate] || [];
 
             var imgWidth = datInfo.columnCount * cfg.miniHeatWellDiameter;
             var imgHeight = datInfo.rowCount * cfg.miniHeatWellDiameter;

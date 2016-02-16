@@ -22,10 +22,13 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.highlightTrans = Color.grey(50, 0.75);
             // Panel configuration.
             this.panelSpace = 20;
+            this.subPanelSpace = 10;
             this.panelHeaderFont = new Font(16);
             this.panelHeaderSpace = this.panelHeaderFont.size + 15;
-            this.panelHeaderColor = this.baseMuted;
-            this.panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
+            this.panelHeaderColor = this.baseDim;
+            this.panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top', .25 * Math.PI);
+            this.panelHeaderOpenLabel = new LabelStyle(this.panelHeaderFont, this.base, 'left', 'top');
+            this.subPanelHeaderLabel = new LabelStyle(new Font(14), this.base, 'left', 'top');
             // Guide labels.
             this.guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
             this.bigGuideStyle = new LabelStyle(new Font(32, 180), Color.CRIMSON, 'left', 'top');
@@ -68,6 +71,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
             this.clusterAdditionLabel = new Font(34); //new LabelStyle(new Font(30), this.baseSelected);
             this.exemplarSpace = 1;
+            this.exemplarColumnSpace = 4 * this.exemplarSpace;
             // Plate view.
             this.wellRadius = 7;
             this.wellDiameter = 2 * this.wellRadius;
@@ -91,8 +95,8 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.objectViewImageRadius = 40;
         }
         // Plate cluster shares.
-        BaseConfiguration.voidColor = new Color(222, 220, 220); //Color.NONE;  //Color.GREEN;
-        BaseConfiguration.shareColorMap = function (normVal) { return (normVal >= 0 ? heatLookup[Math.ceil(255 * normVal)] : BaseConfiguration.voidColor); };
+        BaseConfiguration.voidColor = Color.NONE; //new Color(222, 220, 220);   //Color.NONE;  //Color.GREEN;
+        BaseConfiguration.shareColorMap = function (normVal) { return (normVal >= 0 ? heatLookup[Math.ceil(255 * (1 - normVal))] : BaseConfiguration.voidColor); };
         return BaseConfiguration;
     })();
     exports.BaseConfiguration = BaseConfiguration;

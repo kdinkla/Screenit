@@ -32,10 +32,13 @@ export class BaseConfiguration {
 
     // Panel configuration.
     panelSpace = 20;
+    subPanelSpace = 10;
     panelHeaderFont = new Font(16);
     panelHeaderSpace = this.panelHeaderFont.size + 15;
-    panelHeaderColor = this.baseMuted;
-    panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
+    panelHeaderColor = this.baseDim;
+    panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top', .25 * Math.PI);
+    panelHeaderOpenLabel = new LabelStyle(this.panelHeaderFont, this.base, 'left', 'top');
+    subPanelHeaderLabel = new LabelStyle(new Font(14), this.base, 'left', 'top');
 
     // Guide labels.
     guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
@@ -84,6 +87,7 @@ export class BaseConfiguration {
     clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
     clusterAdditionLabel = new Font(34);    //new LabelStyle(new Font(30), this.baseSelected);
     exemplarSpace = 1;
+    exemplarColumnSpace = 4 * this.exemplarSpace;
 
     // Plate view.
     wellRadius = 7;
@@ -99,9 +103,9 @@ export class BaseConfiguration {
     plateIndexMargin = 5;
 
     // Plate cluster shares.
-    static voidColor = new Color(222, 220, 220);   //Color.NONE;  //Color.GREEN;
-    static shareColorMap = (normVal: number) =>
-                                (normVal >= 0 ? heatLookup[Math.ceil(255 * normVal)] : BaseConfiguration.voidColor);
+    static voidColor = Color.NONE;  //new Color(222, 220, 220);   //Color.NONE;  //Color.GREEN;
+    static shareColorMap = (normVal: number) => (normVal >= 0 ? heatLookup[Math.ceil(255 * (1 - normVal))] :
+                                                BaseConfiguration.voidColor);
 
     //(normVal: number) => style.Color.grey(0, normVal > 0 ? Math.sqrt(normVal) : 0); //style.Color.grey(Math.ceil(255 * (1 - normVal)));
 

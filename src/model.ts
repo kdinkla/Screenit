@@ -36,7 +36,6 @@ export class InteractionState implements AbstractModel {
                 public hoveredCoordinates = new SelectionCoordinates(),
                 public selectedCoordinates = new SelectionCoordinates(),
                 public openViews: Chain<string> = new Chain(['plates', 'exemplars']),
-                public populationScoreVector: StringMap<number> = {},
                 public configuration: BaseConfiguration = new BaseConfiguration()) {
     }
 
@@ -69,7 +68,6 @@ export class EnrichedState extends InteractionState {
             state.hoveredCoordinates,
             state.selectedCoordinates,
             state.openViews,
-            state.populationScoreVector,
             state.configuration);
 
         this.allExemplars = Chain.union<number>(this.populationSpace.populations.elements.map(p => p.exemplars));
@@ -125,9 +123,6 @@ export class EnrichedState extends InteractionState {
             objectValuesDict,
             new NumberFrame(), vs => new NumberFrame(vs)
         );
-
-        console.log("Object feature values:");
-        console.log(this.objectFeatureValues.value);
     }
 
     cloneInteractionState() {
@@ -136,7 +131,6 @@ export class EnrichedState extends InteractionState {
             collection.snapshot(this.hoveredCoordinates),
             collection.snapshot(this.selectedCoordinates),
             collection.snapshot(this.openViews),
-            collection.snapshot(this.populationScoreVector),
             collection.snapshot(this.configuration)
         );
     }
@@ -307,41 +301,80 @@ export class EnrichedState extends InteractionState {
         return _.range(plateCount);
     }
 
+    // Well scores, by population activation functions.
+    private wellScs: number[][][] = null;
+    wellScores(): number[][][] {
+        if(!this.wellScs) {
+            var shares = this.wellClusterShares.value;
+
+            var populations = this.populationSpace.populations.elements.filter(p => p.identifier in shares.zScores);
+            if(populations.length > 0) {
+                this.wellScs = shares.zScores[populations[0].identifier].map(plt => plt.map(col => col.map(v => 0)));
+
+                populations.forEach(population => {
+                    var pop = population.identifier;
+                    var minZ = shares.zScoresMin[pop];
+                    var maxZ = shares.zScoresMax[pop];
+
+                    shares.zScores[pop].forEach((plt, pltI) => plt.forEach((col, colI) => col.forEach((val, rowI) => {
+                        var normZ = val <= 0 ? val / Math.abs(minZ) : val / maxZ;
+                        this.wellScs[pltI][colI][rowI] += population.activate(normZ);
+                    })));
+                });
+
+                // Normalize all scores.
+                var flatScores = _.flattenDeep<number>(this.wellScs);
+                var minScore = _.min(flatScores);
+                var maxScore = _.max(flatScores);
+
+                var delta = maxScore - minScore;
+                this.wellScs = this.wellScs.map(plt => plt.map(col => col.map(val => (val - minScore) / delta)));
+            }
+        }
+
+        return this.wellScs || [];
+    }
+
     // Column partition ordering of plates by score (TODO: by population/count vector.)
     platePartition() {
         // Compute score from total cell count, for now.
         var datasetInfo = this.dataSetInfo.value;
         var wellShares = this.wellClusterShares.value;
-        var objectCount = wellShares.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
+        //var objectCount = wellShares.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
 
         // Plate score by id.
         var plateRange = this.plates();
-        var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
+        //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
         var platesOrdered = _.clone(plateRange);
 
         // Shares have been loaded.
-        /*if(objectCount) {
+        var plateScores: number[];
+        var wellScores = this.wellScores();
+        if(wellScores) {
             // If target vector is not specified: take maximum object count of each plate.
-            if(_.keys(this.populationScoreVector).length === 0) {
-                objectCount.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
-            } else {
-                var popKeys = _.keys(this.populationScoreVector);
-                var populationMatrices = _.compact(popKeys.map(k => wellShares[k]));
-                var targetVector = popKeys.map(p => this.populationScoreVector[p]);
+            //if(_.keys(this.populationScoreVector).length === 0) {
+            //    objectCount.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
+            //} else {
+            //    var popKeys = _.keys(this.populationScoreVector);
+            //    var populationMatrices = _.compact(popKeys.map(k => wellShares[k]));
+            //    var targetVector = popKeys.map(p => this.populationScoreVector[p]);
 
-                plateRange.forEach(plate => plateScores[plate] = this.plateScore(targetVector, populationMatrices));
-            }
+            //    plateRange.forEach(plate => plateScores[plate] = this.plateScore(targetVector, populationMatrices));
+            //}
 
-            // Order plate range by score.
-            platesOrdered = platesOrdered.sort((p1, p2) => plateScores[p1] - plateScores[p2]);
-        }*/
+            plateScores = plateRange.map(plate => _.max(_.flatten(wellScores[plate])));
+        } else {
+            plateScores = plateRange.map(i => i);
+        }
+
+        // Order plate range by score.
+        platesOrdered = platesOrdered.sort((p1, p2) => plateScores[p1] - plateScores[p2]);
 
         var datInfo = this.dataSetInfo.value;
         var cfg = this.configuration;
         var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
         var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
-                            _.compact(_.range(0, colCapacity)
-                                .map(rI => platesOrdered[cI * colCapacity + rI])).sort((p1, p2) => p1 - p2));
+            _.compact(_.range(0, colCapacity).map(rI => platesOrdered[cI * colCapacity + rI])).sort((p1, p2) => p1 - p2));
 
         return colMaps;
     }
@@ -410,6 +443,14 @@ export class PopulationSpace {
     isExemplar(object: number) {
         return this.populations.elements.some(p => p.exemplars.has(object));
     }
+
+    // Population activation function as a string.
+    activationString() {
+        return this.populations.elements.map(p =>
+            p.identifier + ":[" +
+                p.activation.map(cs => cs.join(",")).join(";") +
+            "]").join(",");
+    }
 }
 
 // Population.
@@ -423,19 +464,43 @@ export class Population {
     constructor(public identifier: number = null,
                 public name: string = null,
                 public exemplars = new Chain<number>(),
-                public color = Color.NONE) {
+                public color = Color.NONE,
+                public activation: number[][] = [[-1, 0], [0, 0], [1, 1]]) {
         if(identifier === null) this.identifier = Population.POPULATION_ID_COUNTER++;
         if(name === null) this.name = this.identifier.toString();
 
         this.colorTrans = color.alpha(0.333);
     }
 
-    /*toNumber() {
-        return this.identifier;
-    }*/
-
     toString() {
         return this.identifier.toString();
+    }
+
+    // Abundance activation function, for input domain [-1, 1].
+    activate(abundance: number) {
+        var low = this.activation[0];
+        var mid = this.activation[1];
+        var high = this.activation[2];
+
+        var result: number;
+
+        if(abundance <= low[0]) {
+            result = low[1];
+        } else if(abundance <= mid[0]) {
+            var segX = abundance - low[0];
+            var periodX = (segX / (mid[0] - low[0])) * Math.PI;
+            var spanY = mid[1] - low[1];
+            result = low[1] + .5 * spanY * (1 - Math.cos(periodX));
+        } else if(abundance <= high[0]) {
+            var segX = abundance - mid[0];
+            var periodX = (segX / (high[0] - mid[0])) * Math.PI;
+            var spanY = high[1] - mid[1];
+            result = mid[1] + .5 * spanY * (1 - Math.cos(periodX));
+        } else {
+            result = high[1];
+        }
+
+        return result;
     }
 }
 
@@ -487,6 +552,12 @@ export class DataSetInfo {
 export class WellClusterShares extends NumberFrame {
     wellIndex: number[][][][];  // Index by cluster name (object nr), plate nr, col nr, row nr.
     maxObjectCount: number;     // Maximum number of objects for all wells.
+    maxPlateObjectCount: number[];  // Maximum number of objects per plate.
+
+    shareStatistics: { mean: number; standardDeviation: number }[];   // Share mean and standard deviation per population.
+    zScores: number[][][][];    // z-scores of all wells, indexed by population, plate, column, and row.
+    zScoresMin: number[];       // z-score minimum across all wells, indexed by population.
+    zScoresMax: number[];       // z-score maximum across all wells, indexed by population.
 
     constructor(dictionary: any = {}) {
         super(dictionary);
@@ -503,6 +574,23 @@ export class WellClusterShares extends NumberFrame {
                 this.inject(val, this.wellIndex, _.flatten<any>([[c], localI]));
             });
         });
+
+        this.maxPlateObjectCount = (this.wellIndex[Population.POPULATION_TOTAL_NAME] || [])
+                                    .map(plt => _.max(<number[]>_.flattenDeep<number>(plt)));
+
+        // Missing wells have zero of everything.
+        //this.wellIndex = this.wellIndex.map(p => p.map(plt => plt.map(col => Vector.invalidToZero(col))));
+
+        // Share statistics.
+        this.shareStatistics = this.wellIndex.map(pShares => math.statistics(
+            Vector.invalidToZero(<number[]>_.flattenDeep<number>(pShares))));
+
+        // z-scores of all wells, indexed by population, plate, column, and row.
+        this.zScores = this.wellIndex.map((pS, pI) => pS.map(plS => plS.map(cS =>
+                                        cS.map(s => (s - this.shareStatistics[pI].mean) /
+                                                    this.shareStatistics[pI].standardDeviation))));
+        this.zScoresMin = this.zScores.map(p => _.min(<number[]>_.flattenDeep<number>(p)));
+        this.zScoresMax = this.zScores.map(p => _.max(<number[]>_.flattenDeep<number>(p)));
     }
 
     private inject(value: number, subIndex: any, indices: any[]) {

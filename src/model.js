@@ -15,18 +15,16 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var BaseConfiguration = config.BaseConfiguration;
     exports.viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
     var InteractionState = (function () {
-        function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, openViews, populationScoreVector, configuration) {
+        function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, openViews, configuration) {
             if (populationSpace === void 0) { populationSpace = new PopulationSpace(); }
             if (hoveredCoordinates === void 0) { hoveredCoordinates = new SelectionCoordinates(); }
             if (selectedCoordinates === void 0) { selectedCoordinates = new SelectionCoordinates(); }
             if (openViews === void 0) { openViews = new Chain(['plates', 'exemplars']); }
-            if (populationScoreVector === void 0) { populationScoreVector = {}; }
             if (configuration === void 0) { configuration = new BaseConfiguration(); }
             this.populationSpace = populationSpace;
             this.hoveredCoordinates = hoveredCoordinates;
             this.selectedCoordinates = selectedCoordinates;
             this.openViews = openViews;
-            this.populationScoreVector = populationScoreVector;
             this.configuration = configuration;
         }
         InteractionState.prototype.removeExemplar = function (object) {
@@ -46,7 +44,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var EnrichedState = (function (_super) {
         __extends(EnrichedState, _super);
         function EnrichedState(state) {
-            _super.call(this, state.populationSpace, state.hoveredCoordinates, state.selectedCoordinates, state.openViews, state.populationScoreVector, state.configuration);
+            _super.call(this, state.populationSpace, state.hoveredCoordinates, state.selectedCoordinates, state.openViews, state.configuration);
+            // Well scores, by population activation functions.
+            this.wellScs = null;
             this.allExemplars = Chain.union(this.populationSpace.populations.elements.map(function (p) { return p.exemplars; }));
             var focusedWell = this.focused();
             var addWellInfo = function (dict) {
@@ -68,11 +68,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.wellClusterShares = new ProxyValue("wellClusterShares", populationDict, new WellClusterShares(), function (s) { return new WellClusterShares(s); });
             this.featureHistograms = new ProxyValue("featureHistograms", populationDict, new FeatureHistograms(), function (hs) { return new FeatureHistograms(hs); });
             this.objectFeatureValues = new ProxyValue("objectFeatureValues", objectValuesDict, new NumberFrame(), function (vs) { return new NumberFrame(vs); });
-            console.log("Object feature values:");
-            console.log(this.objectFeatureValues.value);
         }
         EnrichedState.prototype.cloneInteractionState = function () {
-            return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.populationScoreVector), collection.snapshot(this.configuration));
+            return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.configuration));
         };
         EnrichedState.prototype.closestObject = function (features, coordinates) {
             var bestIndex = -1;
@@ -208,32 +206,62 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var plateCount = this.dataSetInfo.converged ? this.dataSetInfo.value.plateCount : 0;
             return _.range(plateCount);
         };
+        EnrichedState.prototype.wellScores = function () {
+            var _this = this;
+            if (!this.wellScs) {
+                var shares = this.wellClusterShares.value;
+                var populations = this.populationSpace.populations.elements.filter(function (p) { return p.identifier in shares.zScores; });
+                if (populations.length > 0) {
+                    this.wellScs = shares.zScores[populations[0].identifier].map(function (plt) { return plt.map(function (col) { return col.map(function (v) { return 0; }); }); });
+                    populations.forEach(function (population) {
+                        var pop = population.identifier;
+                        var minZ = shares.zScoresMin[pop];
+                        var maxZ = shares.zScoresMax[pop];
+                        shares.zScores[pop].forEach(function (plt, pltI) { return plt.forEach(function (col, colI) { return col.forEach(function (val, rowI) {
+                            var normZ = val <= 0 ? val / Math.abs(minZ) : val / maxZ;
+                            _this.wellScs[pltI][colI][rowI] += population.activate(normZ);
+                        }); }); });
+                    });
+                    // Normalize all scores.
+                    var flatScores = _.flattenDeep(this.wellScs);
+                    var minScore = _.min(flatScores);
+                    var maxScore = _.max(flatScores);
+                    var delta = maxScore - minScore;
+                    this.wellScs = this.wellScs.map(function (plt) { return plt.map(function (col) { return col.map(function (val) { return (val - minScore) / delta; }); }); });
+                }
+            }
+            return this.wellScs || [];
+        };
         // Column partition ordering of plates by score (TODO: by population/count vector.)
         EnrichedState.prototype.platePartition = function () {
             // Compute score from total cell count, for now.
             var datasetInfo = this.dataSetInfo.value;
             var wellShares = this.wellClusterShares.value;
-            var objectCount = wellShares.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
+            //var objectCount = wellShares.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
             // Plate score by id.
             var plateRange = this.plates();
-            var plateScores = plateRange.map(function (i) { return i; }); // Stick to in-order partition in case of no well shares.
+            //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
             var platesOrdered = _.clone(plateRange);
             // Shares have been loaded.
-            /*if(objectCount) {
+            var plateScores;
+            var wellScores = this.wellScores();
+            if (wellScores) {
                 // If target vector is not specified: take maximum object count of each plate.
-                if(_.keys(this.populationScoreVector).length === 0) {
-                    objectCount.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
-                } else {
-                    var popKeys = _.keys(this.populationScoreVector);
-                    var populationMatrices = _.compact(popKeys.map(k => wellShares[k]));
-                    var targetVector = popKeys.map(p => this.populationScoreVector[p]);
-    
-                    plateRange.forEach(plate => plateScores[plate] = this.plateScore(targetVector, populationMatrices));
-                }
-    
-                // Order plate range by score.
-                platesOrdered = platesOrdered.sort((p1, p2) => plateScores[p1] - plateScores[p2]);
-            }*/
+                //if(_.keys(this.populationScoreVector).length === 0) {
+                //    objectCount.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
+                //} else {
+                //    var popKeys = _.keys(this.populationScoreVector);
+                //    var populationMatrices = _.compact(popKeys.map(k => wellShares[k]));
+                //    var targetVector = popKeys.map(p => this.populationScoreVector[p]);
+                //    plateRange.forEach(plate => plateScores[plate] = this.plateScore(targetVector, populationMatrices));
+                //}
+                plateScores = plateRange.map(function (plate) { return _.max(_.flatten(wellScores[plate])); });
+            }
+            else {
+                plateScores = plateRange.map(function (i) { return i; });
+            }
+            // Order plate range by score.
+            platesOrdered = platesOrdered.sort(function (p1, p2) { return plateScores[p1] - plateScores[p2]; });
             var datInfo = this.dataSetInfo.value;
             var cfg = this.configuration;
             var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
@@ -285,31 +313,60 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         PopulationSpace.prototype.isExemplar = function (object) {
             return this.populations.elements.some(function (p) { return p.exemplars.has(object); });
         };
+        // Population activation function as a string.
+        PopulationSpace.prototype.activationString = function () {
+            return this.populations.elements.map(function (p) { return p.identifier + ":[" + p.activation.map(function (cs) { return cs.join(","); }).join(";") + "]"; }).join(",");
+        };
         return PopulationSpace;
     })();
     exports.PopulationSpace = PopulationSpace;
     // Population.
     var Population = (function () {
-        function Population(identifier, name, exemplars, color) {
+        function Population(identifier, name, exemplars, color, activation) {
             if (identifier === void 0) { identifier = null; }
             if (name === void 0) { name = null; }
             if (exemplars === void 0) { exemplars = new Chain(); }
             if (color === void 0) { color = Color.NONE; }
+            if (activation === void 0) { activation = [[-1, 0], [0, 0], [1, 1]]; }
             this.identifier = identifier;
             this.name = name;
             this.exemplars = exemplars;
             this.color = color;
+            this.activation = activation;
             if (identifier === null)
                 this.identifier = Population.POPULATION_ID_COUNTER++;
             if (name === null)
                 this.name = this.identifier.toString();
             this.colorTrans = color.alpha(0.333);
         }
-        /*toNumber() {
-            return this.identifier;
-        }*/
         Population.prototype.toString = function () {
             return this.identifier.toString();
+        };
+        // Abundance activation function, for input domain [-1, 1].
+        Population.prototype.activate = function (abundance) {
+            var low = this.activation[0];
+            var mid = this.activation[1];
+            var high = this.activation[2];
+            var result;
+            if (abundance <= low[0]) {
+                result = low[1];
+            }
+            else if (abundance <= mid[0]) {
+                var segX = abundance - low[0];
+                var periodX = (segX / (mid[0] - low[0])) * Math.PI;
+                var spanY = mid[1] - low[1];
+                result = low[1] + .5 * spanY * (1 - Math.cos(periodX));
+            }
+            else if (abundance <= high[0]) {
+                var segX = abundance - mid[0];
+                var periodX = (segX / (high[0] - mid[0])) * Math.PI;
+                var spanY = high[1] - mid[1];
+                result = mid[1] + .5 * spanY * (1 - Math.cos(periodX));
+            }
+            else {
+                result = high[1];
+            }
+            return result;
         };
         Population.POPULATION_TOTAL_NAME = 'objects';
         Population.POPULATION_ID_COUNTER = 1;
@@ -377,6 +434,15 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     _this.inject(val, _this.wellIndex, _.flatten([[c], localI]));
                 });
             });
+            this.maxPlateObjectCount = (this.wellIndex[Population.POPULATION_TOTAL_NAME] || []).map(function (plt) { return _.max(_.flattenDeep(plt)); });
+            // Missing wells have zero of everything.
+            //this.wellIndex = this.wellIndex.map(p => p.map(plt => plt.map(col => Vector.invalidToZero(col))));
+            // Share statistics.
+            this.shareStatistics = this.wellIndex.map(function (pShares) { return math.statistics(Vector.invalidToZero(_.flattenDeep(pShares))); });
+            // z-scores of all wells, indexed by population, plate, column, and row.
+            this.zScores = this.wellIndex.map(function (pS, pI) { return pS.map(function (plS) { return plS.map(function (cS) { return cS.map(function (s) { return (s - _this.shareStatistics[pI].mean) / _this.shareStatistics[pI].standardDeviation; }); }); }); });
+            this.zScoresMin = this.zScores.map(function (p) { return _.min(_.flattenDeep(p)); });
+            this.zScoresMax = this.zScores.map(function (p) { return _.max(_.flattenDeep(p)); });
         }
         WellClusterShares.prototype.inject = function (value, subIndex, indices) {
             var nextIndex = _.head(indices);
