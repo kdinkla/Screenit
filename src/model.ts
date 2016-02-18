@@ -33,8 +33,8 @@ export var viewCycle = ['datasets', 'plates', 'plate', 'well', 'features', 'splo
 
 export class InteractionState implements AbstractModel {
     constructor(public populationSpace: PopulationSpace = null,
-                public hoveredCoordinates = null,
-                public selectedCoordinates = null,
+                public hoveredCoordinates: SelectionCoordinates = null,
+                public selectedCoordinates: SelectionCoordinates = null,
                 public openViews: Chain<string> = null,
                 public configuration: BaseConfiguration = null) {
         if(populationSpace == null) this.switchToDataSet('CellMorph'); // Default to Cell Morph data set.
@@ -82,7 +82,7 @@ export class EnrichedState extends InteractionState {
             state.openViews,
             state.configuration);
 
-        this.allExemplars = Chain.union<number>(this.populationSpace.populations.elements.map(p => p.exemplars));
+        this.allExemplars = this.populationSpace.allExemplars();
 
         var dataSet = this.selectedCoordinates.dataSet;
         var populationDict = this.populationSpace.toDict();
@@ -92,17 +92,20 @@ export class EnrichedState extends InteractionState {
         histogramDict['bins'] = state.configuration.splomInnerSize;
 
         var focusedWell = this.focused();
-        var addWellInfo = (dict) => {
+        var addObjectInfo = (dict) => {
             dict['dataSet'] = dataSet;
             dict['column'] = focusedWell.well === null ? -1 : focusedWell.well.column;
             dict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
             dict['plate'] = focusedWell.plate === null ? - 1 : focusedWell.plate;
+            dict['probes'] = {};
+            state.selectedCoordinates.probeColumns.forEach((c, cI) =>
+                dict['probes'][c] = state.selectedCoordinates.probeCoordinates[cI]);
         };
 
         var objectInfoDict = this.populationSpace.toDict();
-        addWellInfo(objectInfoDict);
+        addObjectInfo(objectInfoDict);
         var objectValuesDict = this.populationSpace.toDict(false);
-        addWellInfo(objectValuesDict);
+        addObjectInfo(objectValuesDict);
 
         this.dataSets = new ProxyValue(
             "dataSetList",
@@ -156,7 +159,7 @@ export class EnrichedState extends InteractionState {
         );
     }
 
-    closestObject(features: string[], coordinates: number[]): number {
+    /*closestObject(features: string[], coordinates: number[]): number {
         var bestIndex = -1;
 
         var tbl = this.objectInfo.value;
@@ -177,7 +180,7 @@ export class EnrichedState extends InteractionState {
         }
 
         return bestIndex >= 0 ? Number(tbl.rows[bestIndex]) : null;
-    }
+    }*/
 
     closestWellObject(coordinates: number[]): number {
         var bestIndex = -1;
@@ -217,6 +220,34 @@ export class EnrichedState extends InteractionState {
 
     // Focused coordinates.
     focused() {
+        // Focus probed object if no other object is selected, if available.
+        if(this.selectedCoordinates.object === null &&
+            this.selectedCoordinates.probeColumns.length > 0 &&
+            this.objectInfo &&
+            this.objectInfo.converged) {
+            var objInfo = this.objectInfo.value;
+
+            var probeCandidates = objInfo.rows.filter(obj => {
+                var objNr = Number(obj);
+                return !(objInfo.cell("plate", obj) === this.selectedCoordinates.plate &&
+                         objInfo.cell("column", obj) === this.selectedCoordinates.well.column &&
+                        objInfo.cell("row", obj) === this.selectedCoordinates.well.row) &&
+                        !this.allExemplars.has(Number(objNr));
+            });
+
+            // Found a probe candidate.
+            if(probeCandidates.length > 0) {
+                this.selectedCoordinates.object = Number(probeCandidates[0]);
+
+                // Conform rest of selection (plate, etc.) to newly selected object.
+                this.conformSelectedCoordinates(this);
+            }
+
+            // Clear probe.
+            //this.selectedCoordinates.probeColumns = [];
+            //this.selectedCoordinates.probeCoordinates = [];
+        }
+
         return this.selectedCoordinates;
     }
 
@@ -231,7 +262,7 @@ export class EnrichedState extends InteractionState {
     }
 
     // Complete, or correct, coordinates, from object level up to plate level.
-    conformHoveredCoordinates(targetState: InteractionState) {
+    /*conformHoveredCoordinates(targetState: InteractionState) {
         var coordinates = targetState.hoveredCoordinates;
         if(coordinates !== null) {
             var wellInfo = this.objectWellInfo(coordinates.object);
@@ -241,7 +272,7 @@ export class EnrichedState extends InteractionState {
                 coordinates.plate = location.plate;
             }
         }
-    }
+    }*/
 
     conformSelectedCoordinates(targetState: InteractionState) {
         var coordinates = targetState.selectedCoordinates;
@@ -472,6 +503,11 @@ export class PopulationSpace {
                 p.activation.map(cs => cs.join(",")).join(";") +
             "]").join(",");
     }
+
+    // Return all exemplars of populations.
+    allExemplars() {
+        return Chain.union<number>(this.populations.elements.map(p => p.exemplars));
+    }
 }
 
 // Population.
@@ -531,7 +567,9 @@ export class SelectionCoordinates {
                 public population: number = null,                           // Population id.
                 public object: number = null,                               // Object (e.g. cell) id.
                 public well: WellCoordinates = new WellCoordinates(0, 0),   // Well coordinates (column, row).
-                public plate: number = 0) {                                 // Plate id.
+                public plate: number = 0,                                   // Plate id.
+                public probeColumns: string[] = [],
+                public probeCoordinates: number[] = []) {
     }
 
     // Correct for missing values with given coordinates.
@@ -547,6 +585,31 @@ export class SelectionCoordinates {
     // Selected population, or total population fallback.
     populationOrTotal(): any {
         return this.population || Population.POPULATION_TOTAL_NAME;
+    }
+
+    switchProbe(features: string[], coordinates: number[]) {
+        this.probeColumns = features;
+        this.probeCoordinates = coordinates;
+        this.object = null;
+    }
+
+    switchObject(object: number) {
+        this.object = object;
+        this.probeColumns = [];
+        this.probeCoordinates = [];
+    }
+
+    switchPlate(plate: number) {
+        this.plate = plate;
+        this.object = null;
+        this.probeColumns = [];
+        this.probeCoordinates = [];
+    }
+
+    switchWell(well: WellCoordinates) {
+        this.well = well;
+        this.probeColumns = [];
+        this.probeCoordinates = [];
     }
 }
 
@@ -666,7 +729,7 @@ export class FeatureHistograms {
 
 // Wells by column and row coordinates.
 export class WellCoordinates {
-    constructor(public column: number, public row: number) {}
+    constructor(public column: number = null, public row: number = null) {}
 
     // Generate the coordinates of all wells on a plate.
     static allWells(columnCount: number, rowCount: number) {

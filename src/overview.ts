@@ -290,7 +290,7 @@ class FeatureHistogram extends PlacedSnippet {
         var cachedImage = histograms[cacheTag];
         if(!cachedImage) {
             cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], plainContext => {
-                _.keys(frames).map((fK, fI) => {
+                _.keys(frames).map(fK => {
                     var frame = frames[fK];
                     var normFrequencies = frame.matrix[frame.columnIndex[this.feature]];
                     var fontColor = fK === '-1' ?
@@ -325,7 +325,19 @@ class FeatureHistogram extends PlacedSnippet {
         context.save();
         context.translate(this.topLeft);
         context.drawImage(cachedImage);
+
+        // Normalized pickable area.
+        context.picking = true;
+        context.scale(this.dimensions[0], this.dimensions[1]);
+        context.fillStyle(Color.NONE);
+        context.fillRect(0, 0, 1, 1);
+        context.picking = false;
+
         context.restore();
+    }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        interaction.selectedCoordinates.switchProbe([this.feature], [coordinates[0]]);
     }
 }
 
@@ -590,21 +602,8 @@ class ObjectFeaturePlot extends BaseSnippet implements Snippet {
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        var invCs = [coordinates[0], 1 - coordinates[1]];
-        var object = enriched.closestObject([this.feature1, this.feature2], invCs);
-
-        // Toggle given exemplar for the focused population.
-        // If no population is focused, create a new population for the exemplar, and focus the population.
-        var popSpace = interaction.populationSpace;
-        var population = popSpace.populations.byId(interaction.hoveredCoordinates.population);
-
-        // Create and focus a new population if one is lacking.
-        if(!population) {
-            population = popSpace.createPopulation();
-            interaction.hoveredCoordinates.population = population.identifier;
-        }
-
-        population.exemplars = population.exemplars.toggle(object);
+        var invCs = [coordinates[0], 1 - coordinates[1]];   // Inverted y-axis.
+        interaction.selectedCoordinates.switchProbe([this.feature1, this.feature2], invCs);
     }
 }
 
@@ -1085,8 +1084,9 @@ class AbstractPlate extends PlacedSnippet {
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         var plate = this.state.focused().plate;
         if(plate !== null) {
-            interaction.selectedCoordinates.plate = plate;
-            interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
+            //interaction.selectedCoordinates.plate = plate;
+            interaction.selectedCoordinates.switchWell(PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched));
+            //interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
             interaction.pushView('well');
         }
     }
@@ -1337,7 +1337,8 @@ class WellDetailView extends PlacedSnippet {
                enriched: EnrichedState, interaction: InteractionState) {
         var object = enriched.closestWellObject(coordinates);
 
-        interaction.selectedCoordinates.object = object;
+        interaction.selectedCoordinates.switchObject(object);
+        //interaction.selectedCoordinates.object = object;
         enriched.conformSelectedCoordinates(interaction);
 
         // Toggle given exemplar for the focused population.
@@ -1453,7 +1454,8 @@ class ObjectDetailView extends PlacedSnippet {
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         //interaction.removeExemplar(this.object);
-        interaction.selectedCoordinates.object = this.object;
+        //interaction.selectedCoordinates.object = this.object;
+        interaction.selectedCoordinates.switchObject(this.object);
         enriched.conformSelectedCoordinates(interaction);
 
         // Remove exemplar status of object (on second click).
@@ -1628,7 +1630,8 @@ class PlateMiniHeatmap extends PlacedSnippet {
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        interaction.selectedCoordinates.plate = this.plateNumber;
+        interaction.selectedCoordinates.switchPlate(this.plateNumber);
+        //interaction.selectedCoordinates.plate = this.plateNumber;
         //interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
 
         interaction.pushView('plate');

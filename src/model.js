@@ -57,7 +57,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             _super.call(this, state.populationSpace, state.hoveredCoordinates, state.selectedCoordinates, state.openViews, state.configuration);
             // Well scores, by population activation functions.
             this.wellScs = null;
-            this.allExemplars = Chain.union(this.populationSpace.populations.elements.map(function (p) { return p.exemplars; }));
+            this.allExemplars = this.populationSpace.allExemplars();
             var dataSet = this.selectedCoordinates.dataSet;
             var populationDict = this.populationSpace.toDict();
             populationDict['dataSet'] = dataSet;
@@ -65,16 +65,18 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             histogramDict['dataSet'] = dataSet;
             histogramDict['bins'] = state.configuration.splomInnerSize;
             var focusedWell = this.focused();
-            var addWellInfo = function (dict) {
+            var addObjectInfo = function (dict) {
                 dict['dataSet'] = dataSet;
                 dict['column'] = focusedWell.well === null ? -1 : focusedWell.well.column;
                 dict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
                 dict['plate'] = focusedWell.plate === null ? -1 : focusedWell.plate;
+                dict['probes'] = {};
+                state.selectedCoordinates.probeColumns.forEach(function (c, cI) { return dict['probes'][c] = state.selectedCoordinates.probeCoordinates[cI]; });
             };
             var objectInfoDict = this.populationSpace.toDict();
-            addWellInfo(objectInfoDict);
+            addObjectInfo(objectInfoDict);
             var objectValuesDict = this.populationSpace.toDict(false);
-            addWellInfo(objectValuesDict);
+            addObjectInfo(objectValuesDict);
             this.dataSets = new ProxyValue("dataSetList", {}, []);
             this.dataSetInfo = new ProxyValue("dataSetInfo", { dataSet: dataSet }, new DataSetInfo(), function (ds) { return new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels); });
             this.features = new ProxyValue("features", { dataSet: dataSet }, []);
@@ -87,16 +89,18 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         EnrichedState.prototype.cloneInteractionState = function () {
             return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.configuration));
         };
-        EnrichedState.prototype.closestObject = function (features, coordinates) {
+        /*closestObject(features: string[], coordinates: number[]): number {
             var bestIndex = -1;
+    
             var tbl = this.objectInfo.value;
-            if (features[0] in tbl.columnIndex && features[1] in tbl.columnIndex && coordinates) {
+            if(features[0] in tbl.columnIndex && features[1] in tbl.columnIndex && coordinates) {
                 var xColI = tbl.columnIndex[features[0]];
                 var yColI = tbl.columnIndex[features[1]];
                 var x = tbl.normalizedMatrix[xColI];
                 var y = tbl.normalizedMatrix[yColI];
+    
                 var minDist = Number.MAX_VALUE;
-                for (var i = 0; i < tbl.rows.length; i++) {
+                for(var i = 0; i < tbl.rows.length; i++) {
                     var csDist = Vector.distance(coordinates, [x[i], y[i]]);
                     if (csDist < minDist) {
                         minDist = csDist;
@@ -104,8 +108,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     }
                 }
             }
+    
             return bestIndex >= 0 ? Number(tbl.rows[bestIndex]) : null;
-        };
+        }*/
         EnrichedState.prototype.closestWellObject = function (coordinates) {
             var bestIndex = -1;
             var tbl = this.objectInfo.value;
@@ -137,6 +142,21 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Focused coordinates.
         EnrichedState.prototype.focused = function () {
+            var _this = this;
+            // Focus probed object if no other object is selected, if available.
+            if (this.selectedCoordinates.object === null && this.selectedCoordinates.probeColumns.length > 0 && this.objectInfo && this.objectInfo.converged) {
+                var objInfo = this.objectInfo.value;
+                var probeCandidates = objInfo.rows.filter(function (obj) {
+                    var objNr = Number(obj);
+                    return !(objInfo.cell("plate", obj) === _this.selectedCoordinates.plate && objInfo.cell("column", obj) === _this.selectedCoordinates.well.column && objInfo.cell("row", obj) === _this.selectedCoordinates.well.row) && !_this.allExemplars.has(Number(objNr));
+                });
+                // Found a probe candidate.
+                if (probeCandidates.length > 0) {
+                    this.selectedCoordinates.object = Number(probeCandidates[0]);
+                    // Conform rest of selection (plate, etc.) to newly selected object.
+                    this.conformSelectedCoordinates(this);
+                }
+            }
             return this.selectedCoordinates;
         };
         // Population color, includes focused population highlight.
@@ -148,9 +168,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return this.focused().population === population.identifier ? this.configuration.highlight : population.colorTrans;
         };
         // Complete, or correct, coordinates, from object level up to plate level.
-        EnrichedState.prototype.conformHoveredCoordinates = function (targetState) {
+        /*conformHoveredCoordinates(targetState: InteractionState) {
             var coordinates = targetState.hoveredCoordinates;
-            if (coordinates !== null) {
+            if(coordinates !== null) {
                 var wellInfo = this.objectWellInfo(coordinates.object);
                 if (wellInfo) {
                     var location = wellInfo.location;
@@ -158,7 +178,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     coordinates.plate = location.plate;
                 }
             }
-        };
+        }*/
         EnrichedState.prototype.conformSelectedCoordinates = function (targetState) {
             var coordinates = targetState.selectedCoordinates;
             if (coordinates !== null) {
@@ -332,6 +352,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         PopulationSpace.prototype.activationString = function () {
             return this.populations.elements.map(function (p) { return p.identifier + ":[" + p.activation.map(function (cs) { return cs.join(","); }).join(";") + "]"; }).join(",");
         };
+        // Return all exemplars of populations.
+        PopulationSpace.prototype.allExemplars = function () {
+            return Chain.union(this.populations.elements.map(function (p) { return p.exemplars; }));
+        };
         return PopulationSpace;
     })();
     exports.PopulationSpace = PopulationSpace;
@@ -393,17 +417,22 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         function SelectionCoordinates(dataSet, population, // Population id.
             object, // Object (e.g. cell) id.
             well, // Well coordinates (column, row).
-            plate) {
+            plate, // Plate id.
+            probeColumns, probeCoordinates) {
             if (dataSet === void 0) { dataSet = null; }
             if (population === void 0) { population = null; }
             if (object === void 0) { object = null; }
             if (well === void 0) { well = new WellCoordinates(0, 0); }
             if (plate === void 0) { plate = 0; }
+            if (probeColumns === void 0) { probeColumns = []; }
+            if (probeCoordinates === void 0) { probeCoordinates = []; }
             this.dataSet = dataSet;
             this.population = population;
             this.object = object;
             this.well = well;
             this.plate = plate;
+            this.probeColumns = probeColumns;
+            this.probeCoordinates = probeCoordinates;
         }
         // Correct for missing values with given coordinates.
         SelectionCoordinates.prototype.otherwise = function (that) {
@@ -412,6 +441,27 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         // Selected population, or total population fallback.
         SelectionCoordinates.prototype.populationOrTotal = function () {
             return this.population || Population.POPULATION_TOTAL_NAME;
+        };
+        SelectionCoordinates.prototype.switchProbe = function (features, coordinates) {
+            this.probeColumns = features;
+            this.probeCoordinates = coordinates;
+            this.object = null;
+        };
+        SelectionCoordinates.prototype.switchObject = function (object) {
+            this.object = object;
+            this.probeColumns = [];
+            this.probeCoordinates = [];
+        };
+        SelectionCoordinates.prototype.switchPlate = function (plate) {
+            this.plate = plate;
+            this.object = null;
+            this.probeColumns = [];
+            this.probeCoordinates = [];
+        };
+        SelectionCoordinates.prototype.switchWell = function (well) {
+            this.well = well;
+            this.probeColumns = [];
+            this.probeCoordinates = [];
         };
         return SelectionCoordinates;
     })();
@@ -512,6 +562,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     // Wells by column and row coordinates.
     var WellCoordinates = (function () {
         function WellCoordinates(column, row) {
+            if (column === void 0) { column = null; }
+            if (row === void 0) { row = null; }
             this.column = column;
             this.row = row;
         }

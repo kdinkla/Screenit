@@ -28,6 +28,12 @@ def featureSet(features):
 def objectSet(objects):
     return frozenset(json.loads(objects))
 
+# One to one mapping.
+def objectDict(objDict):
+    dict = json.loads(objDict)
+    tpls = [(id, object) for id, object in dict.iteritems()]
+    return frozenset(tpls)
+
 # Exemplar dictionary input conversion.
 def exemplarDict(exemplars):
     dict = json.loads(exemplars)
@@ -180,23 +186,27 @@ def clustersAsPartition(dataSet, features, exemplars):
 def clustersAsMap(dataSet, features, exemplars):
     return {grp: table.index.values for grp, table in clustersAsPartition(dataSet, features, exemplars)}
 
+def closestObject(dataSet, probes):
+    result = []
+
+    if len(probes) > 0:
+        diffs = [np.square(scaledArray(dataSet, col) - coordinate) for col, coordinate in probes]
+        distances = np.sqrt(np.sum(diffs, axis=0))
+        result = [np.argmin(distances)]
+
+    return result
+
 @lru_cache(maxsize=5)
-def allObjects(dataSet, column, row, plate, exemplars, colSelectA, colCoordinateA, colSelectB, colCoordinateB):
+def allObjects(dataSet, column, row, plate, exemplars, probes):
     allExemplars = list(itertools.chain.from_iterable(cls[1] for cls in exemplars))
     wellObjectMap = wellToObjects(dataSet)
     wellObjects = wellObjectMap[(plate, row, column)] if column >= 0 and (plate, row, column) in wellObjectMap else []
-    return list(set(allExemplars + wellObjects))
+    probeObject = closestObject(dataSet, probes)
+    return list(set(allExemplars + wellObjects + probeObject))
 
 @lru_cache(maxsize=5)
-def allObjects(dataSet, column, row, plate, exemplars):
-    allExemplars = list(itertools.chain.from_iterable(cls[1] for cls in exemplars))
-    wellObjectMap = wellToObjects(dataSet)
-    wellObjects = wellObjectMap[(plate, row, column)] if column >= 0 and (plate, row, column) in wellObjectMap else []
-    return list(set(allExemplars + wellObjects))
-
-@lru_cache(maxsize=5)
-def objectInfo(dataSet, featureSet, column, row, plate, exemplars):
-    objects = allObjects(dataSet, column, row, plate, exemplars)
+def objectInfo(dataSet, featureSet, column, row, plate, exemplars, probes):
+    objects = allObjects(dataSet, column, row, plate, exemplars, probes)
 
     clusters = clustersAsTable(dataSet, featureSet, exemplars).loc[objects]
     wellInfo = wellIndex(dataSet).loc[objects]
@@ -324,8 +334,8 @@ def forObjectFeatureValues(args):
     objects = workerShare
     return col, np.take(scaledArray(dataSet, col), objects)
 
-def objectFeatureValues(dataSet, column, row, plate, exemplars):
-    objects = allObjects(dataSet, column, row, plate, exemplars)
+def objectFeatureValues(dataSet, column, row, plate, exemplars, probes):
+    objects = allObjects(dataSet, column, row, plate, exemplars, probes)
     cols = data.imageFeatures(dataSet)
 
     pool = Pool(initializer=setupWorkerShare, initargs=[objects])

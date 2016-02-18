@@ -201,7 +201,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cachedImage = histograms[cacheTag];
             if (!cachedImage) {
                 cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], function (plainContext) {
-                    _.keys(frames).map(function (fK, fI) {
+                    _.keys(frames).map(function (fK) {
                         var frame = frames[fK];
                         var normFrequencies = frame.matrix[frame.columnIndex[_this.feature]];
                         var fontColor = fK === '-1' ? cfg.baseDim : _this.state.populationColorTranslucent(_this.state.populationSpace.populations.byId(fK));
@@ -224,7 +224,16 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.save();
             context.translate(this.topLeft);
             context.drawImage(cachedImage);
+            // Normalized pickable area.
+            context.picking = true;
+            context.scale(this.dimensions[0], this.dimensions[1]);
+            context.fillStyle(Color.NONE);
+            context.fillRect(0, 0, 1, 1);
+            context.picking = false;
             context.restore();
+        };
+        FeatureHistogram.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
+            interaction.selectedCoordinates.switchProbe([this.feature], [coordinates[0]]);
         };
         return FeatureHistogram;
     })(PlacedSnippet);
@@ -442,18 +451,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.fillEllipse(x, y, rI, rI);
         };
         ObjectFeaturePlot.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
-            var invCs = [coordinates[0], 1 - coordinates[1]];
-            var object = enriched.closestObject([this.feature1, this.feature2], invCs);
-            // Toggle given exemplar for the focused population.
-            // If no population is focused, create a new population for the exemplar, and focus the population.
-            var popSpace = interaction.populationSpace;
-            var population = popSpace.populations.byId(interaction.hoveredCoordinates.population);
-            // Create and focus a new population if one is lacking.
-            if (!population) {
-                population = popSpace.createPopulation();
-                interaction.hoveredCoordinates.population = population.identifier;
-            }
-            population.exemplars = population.exemplars.toggle(object);
+            var invCs = [coordinates[0], 1 - coordinates[1]]; // Inverted y-axis.
+            interaction.selectedCoordinates.switchProbe([this.feature1, this.feature2], invCs);
         };
         return ObjectFeaturePlot;
     })(BaseSnippet);
@@ -829,8 +828,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         AbstractPlate.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             var plate = this.state.focused().plate;
             if (plate !== null) {
-                interaction.selectedCoordinates.plate = plate;
-                interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
+                //interaction.selectedCoordinates.plate = plate;
+                interaction.selectedCoordinates.switchWell(PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched));
+                //interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
                 interaction.pushView('well');
             }
         };
@@ -1023,7 +1023,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         WellDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             var object = enriched.closestWellObject(coordinates);
-            interaction.selectedCoordinates.object = object;
+            interaction.selectedCoordinates.switchObject(object);
+            //interaction.selectedCoordinates.object = object;
             enriched.conformSelectedCoordinates(interaction);
             // Toggle given exemplar for the focused population.
             // If no population is focused, create a new population for the exemplar, and focus the population.
@@ -1121,7 +1122,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         ObjectDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             //interaction.removeExemplar(this.object);
-            interaction.selectedCoordinates.object = this.object;
+            //interaction.selectedCoordinates.object = this.object;
+            interaction.selectedCoordinates.switchObject(this.object);
             enriched.conformSelectedCoordinates(interaction);
             // Remove exemplar status of object (on second click).
             if (this.focused)
@@ -1250,7 +1252,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return plateShareImage;
         };
         PlateMiniHeatmap.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
-            interaction.selectedCoordinates.plate = this.plateNumber;
+            interaction.selectedCoordinates.switchPlate(this.plateNumber);
+            //interaction.selectedCoordinates.plate = this.plateNumber;
             //interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
             interaction.pushView('plate');
         };
