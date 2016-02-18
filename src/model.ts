@@ -29,14 +29,25 @@ import controller = require('./core/graphics/controller');
 import config = require('./configuration');
 import BaseConfiguration = config.BaseConfiguration;
 
-export var viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
+export var viewCycle = ['datasets', 'plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
 
 export class InteractionState implements AbstractModel {
-    constructor(public populationSpace: PopulationSpace = new PopulationSpace(),
-                public hoveredCoordinates = new SelectionCoordinates(),
-                public selectedCoordinates = new SelectionCoordinates(),
-                public openViews: Chain<string> = new Chain(['plates', 'exemplars']),
-                public configuration: BaseConfiguration = new BaseConfiguration()) {
+    constructor(public populationSpace: PopulationSpace = null,
+                public hoveredCoordinates = null,
+                public selectedCoordinates = null,
+                public openViews: Chain<string> = null,
+                public configuration: BaseConfiguration = null) {
+        if(populationSpace == null) this.switchToDataSet('CellMorph'); // Default to Cell Morph data set.
+    }
+
+    switchToDataSet(dataSet: string) {
+        this.populationSpace = new PopulationSpace();
+        this.hoveredCoordinates = new SelectionCoordinates();
+        this.selectedCoordinates = new SelectionCoordinates();
+        this.openViews = new Chain(['plates', 'exemplars']);
+        this.configuration = new BaseConfiguration();
+        this.selectedCoordinates.dataSet = dataSet;
+
     }
 
     removeExemplar(object: number) {
@@ -55,6 +66,7 @@ export class InteractionState implements AbstractModel {
 export class EnrichedState extends InteractionState {
     allExemplars: Chain<number>;                        // All exemplars in population space.
 
+    dataSets: ProxyValue<string[]>;                     // Available data sets.
     dataSetInfo: ProxyValue<DataSetInfo>;               // Data set specifications.
     features: ProxyValue<string[]>;                     // Available parameters.
     objectInfo: ProxyValue<NumberFrame>;                // All features for prime sample.
@@ -71,31 +83,40 @@ export class EnrichedState extends InteractionState {
             state.configuration);
 
         this.allExemplars = Chain.union<number>(this.populationSpace.populations.elements.map(p => p.exemplars));
+
+        var dataSet = this.selectedCoordinates.dataSet;
+        var populationDict = this.populationSpace.toDict();
+        populationDict['dataSet'] = dataSet;
+        var histogramDict = this.populationSpace.toDict();
+        histogramDict['dataSet'] = dataSet;
+        histogramDict['bins'] = state.configuration.splomInnerSize;
+
         var focusedWell = this.focused();
         var addWellInfo = (dict) => {
+            dict['dataSet'] = dataSet;
             dict['column'] = focusedWell.well === null ? -1 : focusedWell.well.column;
             dict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
             dict['plate'] = focusedWell.plate === null ? - 1 : focusedWell.plate;
         };
 
-        var populationDict = this.populationSpace.toDict();
-        var histogramDict = this.populationSpace.toDict();
-        histogramDict['bins'] = state.configuration.splomInnerSize;
-
         var objectInfoDict = this.populationSpace.toDict();
         addWellInfo(objectInfoDict);
-
         var objectValuesDict = this.populationSpace.toDict(false);
         addWellInfo(objectValuesDict);
 
+        this.dataSets = new ProxyValue(
+            "dataSetList",
+            {},
+            []
+        );
         this.dataSetInfo = new ProxyValue(
             "dataSetInfo",
-            {},
+            {dataSet: dataSet},
             new DataSetInfo(), ds => new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels)
         );
         this.features = new ProxyValue(
             "features",
-            {},
+            {dataSet: dataSet},
             []
         );
         this.objectInfo = new ProxyValue(
@@ -196,7 +217,7 @@ export class EnrichedState extends InteractionState {
 
     // Focused coordinates.
     focused() {
-        return this.selectedCoordinates;    //this.hoveredCoordinates.otherwise(this.selectedCoordinates);
+        return this.selectedCoordinates;
     }
 
     // Population color, includes focused population highlight.
@@ -506,7 +527,8 @@ export class Population {
 
 // Field selection coordinates.
 export class SelectionCoordinates {
-    constructor(public population: number = null,                           // Population id.
+    constructor(public dataSet: string = null,
+                public population: number = null,                           // Population id.
                 public object: number = null,                               // Object (e.g. cell) id.
                 public well: WellCoordinates = new WellCoordinates(0, 0),   // Well coordinates (column, row).
                 public plate: number = 0) {                                 // Plate id.
@@ -515,6 +537,7 @@ export class SelectionCoordinates {
     // Correct for missing values with given coordinates.
     otherwise(that: SelectionCoordinates) {
         return new SelectionCoordinates(
+            this.dataSet === null ? that.dataSet : this.dataSet,
             this.population === null ? that.population : this.population,
             this.object === null ? that.object : this.object,
             this.well === null ? that.well : this.well,

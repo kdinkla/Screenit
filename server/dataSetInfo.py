@@ -1,9 +1,8 @@
 import tangelo
 tangelo.paths(".")
+import compute
 
-import sys
-sys.path.append('../dataset')
-import config
-
-def run():
+@tangelo.types(dataSet=compute.dataSet)
+def run(dataSet):
+    config = compute.configuration(dataSet)
     return {'plateLabels': config.plates, 'columnLabels': config.columns, 'rowLabels': config.rows}

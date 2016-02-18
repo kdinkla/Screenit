@@ -13,20 +13,30 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var NumberFrame = dataframe.NumberFrame;
     var ProxyValue = data.ProxyValue;
     var BaseConfiguration = config.BaseConfiguration;
-    exports.viewCycle = ['plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
+    exports.viewCycle = ['datasets', 'plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
     var InteractionState = (function () {
         function InteractionState(populationSpace, hoveredCoordinates, selectedCoordinates, openViews, configuration) {
-            if (populationSpace === void 0) { populationSpace = new PopulationSpace(); }
-            if (hoveredCoordinates === void 0) { hoveredCoordinates = new SelectionCoordinates(); }
-            if (selectedCoordinates === void 0) { selectedCoordinates = new SelectionCoordinates(); }
-            if (openViews === void 0) { openViews = new Chain(['plates', 'exemplars']); }
-            if (configuration === void 0) { configuration = new BaseConfiguration(); }
+            if (populationSpace === void 0) { populationSpace = null; }
+            if (hoveredCoordinates === void 0) { hoveredCoordinates = null; }
+            if (selectedCoordinates === void 0) { selectedCoordinates = null; }
+            if (openViews === void 0) { openViews = null; }
+            if (configuration === void 0) { configuration = null; }
             this.populationSpace = populationSpace;
             this.hoveredCoordinates = hoveredCoordinates;
             this.selectedCoordinates = selectedCoordinates;
             this.openViews = openViews;
             this.configuration = configuration;
+            if (populationSpace == null)
+                this.switchToDataSet('CellMorph'); // Default to Cell Morph data set.
         }
+        InteractionState.prototype.switchToDataSet = function (dataSet) {
+            this.populationSpace = new PopulationSpace();
+            this.hoveredCoordinates = new SelectionCoordinates();
+            this.selectedCoordinates = new SelectionCoordinates();
+            this.openViews = new Chain(['plates', 'exemplars']);
+            this.configuration = new BaseConfiguration();
+            this.selectedCoordinates.dataSet = dataSet;
+        };
         InteractionState.prototype.removeExemplar = function (object) {
             // Remove given exemplar from any population (should be a single population).
             this.populationSpace.populations.forEach(function (p) { return p.exemplars = p.exemplars.pull(object); });
@@ -48,21 +58,26 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             // Well scores, by population activation functions.
             this.wellScs = null;
             this.allExemplars = Chain.union(this.populationSpace.populations.elements.map(function (p) { return p.exemplars; }));
+            var dataSet = this.selectedCoordinates.dataSet;
+            var populationDict = this.populationSpace.toDict();
+            populationDict['dataSet'] = dataSet;
+            var histogramDict = this.populationSpace.toDict();
+            histogramDict['dataSet'] = dataSet;
+            histogramDict['bins'] = state.configuration.splomInnerSize;
             var focusedWell = this.focused();
             var addWellInfo = function (dict) {
+                dict['dataSet'] = dataSet;
                 dict['column'] = focusedWell.well === null ? -1 : focusedWell.well.column;
                 dict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
                 dict['plate'] = focusedWell.plate === null ? -1 : focusedWell.plate;
             };
-            var populationDict = this.populationSpace.toDict();
-            var histogramDict = this.populationSpace.toDict();
-            histogramDict['bins'] = state.configuration.splomInnerSize;
             var objectInfoDict = this.populationSpace.toDict();
             addWellInfo(objectInfoDict);
             var objectValuesDict = this.populationSpace.toDict(false);
             addWellInfo(objectValuesDict);
-            this.dataSetInfo = new ProxyValue("dataSetInfo", {}, new DataSetInfo(), function (ds) { return new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels); });
-            this.features = new ProxyValue("features", {}, []);
+            this.dataSets = new ProxyValue("dataSetList", {}, []);
+            this.dataSetInfo = new ProxyValue("dataSetInfo", { dataSet: dataSet }, new DataSetInfo(), function (ds) { return new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels); });
+            this.features = new ProxyValue("features", { dataSet: dataSet }, []);
             this.objectInfo = new ProxyValue("objectInfo", objectInfoDict, new NumberFrame(), function (o) { return new NumberFrame(o); });
             this.objectHistograms = new ProxyValue("objectHistograms2D", histogramDict, new HistogramMatrix(), function (m) { return new HistogramMatrix(m); });
             this.wellClusterShares = new ProxyValue("wellClusterShares", populationDict, new WellClusterShares(), function (s) { return new WellClusterShares(s); });
@@ -122,7 +137,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Focused coordinates.
         EnrichedState.prototype.focused = function () {
-            return this.selectedCoordinates; //this.hoveredCoordinates.otherwise(this.selectedCoordinates);
+            return this.selectedCoordinates;
         };
         // Population color, includes focused population highlight.
         EnrichedState.prototype.populationColor = function (population) {
@@ -375,14 +390,16 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     exports.Population = Population;
     // Field selection coordinates.
     var SelectionCoordinates = (function () {
-        function SelectionCoordinates(population, // Population id.
+        function SelectionCoordinates(dataSet, population, // Population id.
             object, // Object (e.g. cell) id.
             well, // Well coordinates (column, row).
             plate) {
+            if (dataSet === void 0) { dataSet = null; }
             if (population === void 0) { population = null; }
             if (object === void 0) { object = null; }
             if (well === void 0) { well = new WellCoordinates(0, 0); }
             if (plate === void 0) { plate = 0; }
+            this.dataSet = dataSet;
             this.population = population;
             this.object = object;
             this.well = well;
@@ -390,7 +407,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         }
         // Correct for missing values with given coordinates.
         SelectionCoordinates.prototype.otherwise = function (that) {
-            return new SelectionCoordinates(this.population === null ? that.population : this.population, this.object === null ? that.object : this.object, this.well === null ? that.well : this.well, this.plate === null ? that.plate : this.plate);
+            return new SelectionCoordinates(this.dataSet === null ? that.dataSet : this.dataSet, this.population === null ? that.population : this.population, this.object === null ? that.object : this.object, this.well === null ? that.well : this.well, this.plate === null ? that.plate : this.plate);
         };
         // Selected population, or total population fallback.
         SelectionCoordinates.prototype.populationOrTotal = function () {

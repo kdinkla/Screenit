@@ -52,6 +52,7 @@ var viewConstructors: () => StringMap<any> = () => {
         'features':   FeatureHistogramTable,
         'splom':      Splom,
         'exemplars':  ExemplarTable,
+        'datasets':   DataSetList,
         'plates':     PlateIndex,
         'plate':      JointWellPlates,
         'well':       WellDetailView
@@ -59,7 +60,6 @@ var viewConstructors: () => StringMap<any> = () => {
 };
 
 export class OverView extends View<EnrichedState> {
-    //background: ActiveBackground;
     panelColumns: List<PlacedSnippet>;
 
     constructor() {
@@ -68,29 +68,12 @@ export class OverView extends View<EnrichedState> {
 
     updateScene(state: EnrichedState) {
         var cfg = state.configuration;
-
-        //this.background = new ActiveBackground(cfg.backgroundColor);
-
-        var rootTopLeft = [cfg.windowMargin, cfg.windowMargin];
-
-        // All panel constructors.
-        var constructors = viewConstructors();
+        var constructors = viewConstructors();  // All panel constructors.
 
         // Active panels.
-        var panels = //state.openViews.elements.map(ov => new ColumnPanel(ov, new constructors[ov](state), state, true));
-                     model.viewCycle.map(ov => new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)));
-
-        // All panel options.
-        //var closedPanels = _.difference(model.viewCycle, state.openViews.elements)
-        //                    .map(ov => new ColumnPanel(ov, new constructors[ov](state), state, false));
-        //var closedList = new List("pnlClsCols", closedPanels, [0,0], [0,0], 'vertical', cfg.panelSpace, 'right');
-
-        this.panelColumns = new List("pnlCols",
-            _.union<PlacedSnippet>(/*[closedList],*/ panels),
-            rootTopLeft, [0,0],
-            'horizontal',
-            cfg.panelSpace,
-            'left');
+        var openPanels = model.viewCycle.map(ov =>
+            new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)));
+        this.panelColumns = new List("pnlCols", openPanels, [0,0], [0,0], 'horizontal', cfg.panelSpace, 'left');
 
         //console.log("Model:");
         //console.log(mod);
@@ -100,7 +83,7 @@ export class OverView extends View<EnrichedState> {
         var cfg = iMod.configuration;
         var dim = this.dimensions();
 
-        c.context.clearRect(0, 0, dim[0], dim[1]);
+        //c.context.clearRect(0, 0, dim[0], dim[1]);
 
         // Center panels.
         var topLeft = Vector.mul(Vector.subtract(this.dimensions(), this.panelColumns.dimensions), .5);
@@ -109,13 +92,12 @@ export class OverView extends View<EnrichedState> {
         this.panelColumns.setTopLeft([
             Math.min(.5 * (this.dimensions()[0] - this.panelColumns.dimensions[0]),
                     this.dimensions()[0] - this.panelColumns.dimensions[0] - cfg.windowMargin),
-            topLeft[1]
+            cfg.panelSpace    //Math.min()//topLeft[1]
         ]);
         c.snippet(this.panelColumns);
 
-
         // Show data loading text.
-        var isLoading = _.keys(iMod).filter(prp => iMod[prp] && 'converged' in iMod[prp]).some(prp => !iMod[prp].converged);
+        var isLoading = _.keys(iMod).filter(prp => iMod[prp] && _.isBoolean(iMod[prp]['converged'])).some(prp => !iMod[prp].converged);
         var secondsMod = Math.round(Date.now() / 1000) % 3;
         c.save();
 
@@ -137,9 +119,9 @@ export class OverView extends View<EnrichedState> {
 
 class ColumnPanel extends List<PlacedSnippet> {
     constructor(identifier: string,
-                public core: PlacedSnippet,
-                public state: EnrichedState,
-                public opened = false) {
+                core: PlacedSnippet,
+                state: EnrichedState,
+                opened = false) {
         super("cp_" + identifier,
             _.union([new ColumnLabel(identifier, core.toString(), opened, state)], opened ? [core] : []), //[new Label("hdr_" + identifier, core.toString(), [0,0], state.configuration.panelHeaderLabel), core],
             [0,0],
@@ -151,15 +133,62 @@ class ColumnPanel extends List<PlacedSnippet> {
 }
 
 class ColumnLabel extends Label {
-    constructor(public viewIdentifier: string, text: string, opened: boolean, state: EnrichedState) {
+    constructor(public viewIdentifier: string, text: string, public opened: boolean, state: EnrichedState) {
         super("clLbl_" + viewIdentifier, text, [0,0],
                 opened ? state.configuration.panelHeaderOpenLabel : state.configuration.panelHeaderLabel, true);
 
-        if(!opened) this.setDimensions([.25 * this.dimensions[0] + 2 * this.dimensions[1], this.dimensions[1]]);
+       if(!opened) {
+           this.setDimensions([this.dimensions[1], this.dimensions[0]]);
+       }
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
         interaction.pushView(this.viewIdentifier);
+    }
+
+    paint(context: ViewContext) {
+        context.picking = this.pickable;
+        context.fillStyle(this.style.color);
+        context.font(this.style.font.toString());
+
+        context.save();
+        context.translate(this.opened ? this.topLeft : Vector.add(this.topLeft, [0, this.dimensions[1]]));
+        context.rotate(this.opened ? 0 : -.5 * Math.PI);
+        var dY = 0;
+        this.lines.forEach(l => {
+            dY += this.style.font.size;
+            context.fillText(l, 0, dY);
+        });
+        context.restore();
+    }
+}
+
+class DataSetList extends List<PlacedSnippet> {
+    constructor(public state: EnrichedState) {
+        super("dataSetList",
+            state.dataSets.value
+                 .filter(ds => ds !== state.selectedCoordinates.dataSet)
+                 .map(ds => new DataSetLabel(ds, state)),
+            [0,0],
+            [0,0],
+            'vertical',
+            state.configuration.featureCellSpace[0]
+        );
+    }
+
+    toString() {
+        return "Screen " + this.state.selectedCoordinates.dataSet;
+    }
+}
+
+class DataSetLabel extends Label {
+    constructor(public dataSet: string, state: EnrichedState) {
+        super("clLbl_" + dataSet, dataSet, [0,0], state.configuration.panelHeaderLabel, true);
+    }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        interaction.selectedCoordinates.dataSet = this.dataSet;
+        interaction.pushView('plates');
     }
 }
 

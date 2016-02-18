@@ -12,8 +12,6 @@ import EnrichedState = mod.EnrichedState;
 import data = require('./core/dataprovider');
 import ProxyService = data.ProxyService;
 
-import mutations = require('./mutations');
-
 import view = require('./overview');
 import OverView = view.OverView;
 
@@ -30,14 +28,12 @@ var proxyService = new ProxyService<EnrichedState>("server", enrichedStates);
 
 overView.event.onValue(event => {
     var oldState = overView.model;
-    var newState = overView.model.cloneInteractionState();
+    var newState = overView.model ? overView.model.cloneInteractionState() : new EnrichedState(interactionState);
 
     // Alter model copy with mutations that are defined at snippet.
     event.onMouse(me => {
-            if (me.topHit && event.type in me.topHit.snippet) me.topHit.snippet[event.type](event, me.topHit.local, oldState, newState)
-            /*me.hits.forEach(hit => {
-             if(event.type in hit.snippet) hit.snippet[event.type](event, hit.local, oldState, newState);
-             })*/
+            if (me.topHit && event.type in me.topHit.snippet)
+                me.topHit.snippet[event.type](event, me.topHit.local, oldState, newState)
         }
     );
 

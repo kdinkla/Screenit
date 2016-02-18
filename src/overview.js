@@ -23,6 +23,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             'features': FeatureHistogramTable,
             'splom': Splom,
             'exemplars': ExemplarTable,
+            'datasets': DataSetList,
             'plates': PlateIndex,
             'plate': JointWellPlates,
             'well': WellDetailView
@@ -35,34 +36,27 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         }
         OverView.prototype.updateScene = function (state) {
             var cfg = state.configuration;
-            //this.background = new ActiveBackground(cfg.backgroundColor);
-            var rootTopLeft = [cfg.windowMargin, cfg.windowMargin];
-            // All panel constructors.
-            var constructors = viewConstructors();
+            var constructors = viewConstructors(); // All panel constructors.
             // Active panels.
-            var panels = model.viewCycle.map(function (ov) { return new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)); });
-            // All panel options.
-            //var closedPanels = _.difference(model.viewCycle, state.openViews.elements)
-            //                    .map(ov => new ColumnPanel(ov, new constructors[ov](state), state, false));
-            //var closedList = new List("pnlClsCols", closedPanels, [0,0], [0,0], 'vertical', cfg.panelSpace, 'right');
-            this.panelColumns = new List("pnlCols", _.union(panels), rootTopLeft, [0, 0], 'horizontal', cfg.panelSpace, 'left');
+            var openPanels = model.viewCycle.map(function (ov) { return new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)); });
+            this.panelColumns = new List("pnlCols", openPanels, [0, 0], [0, 0], 'horizontal', cfg.panelSpace, 'left');
             //console.log("Model:");
             //console.log(mod);
         };
         OverView.prototype.paint = function (c, iMod) {
             var cfg = iMod.configuration;
             var dim = this.dimensions();
-            c.context.clearRect(0, 0, dim[0], dim[1]);
+            //c.context.clearRect(0, 0, dim[0], dim[1]);
             // Center panels.
             var topLeft = Vector.mul(Vector.subtract(this.dimensions(), this.panelColumns.dimensions), .5);
             //this.panelColumns.setTopLeft(topLeft);
             this.panelColumns.setTopLeft([
                 Math.min(.5 * (this.dimensions()[0] - this.panelColumns.dimensions[0]), this.dimensions()[0] - this.panelColumns.dimensions[0] - cfg.windowMargin),
-                topLeft[1]
+                cfg.panelSpace
             ]);
             c.snippet(this.panelColumns);
             // Show data loading text.
-            var isLoading = _.keys(iMod).filter(function (prp) { return iMod[prp] && 'converged' in iMod[prp]; }).some(function (prp) { return !iMod[prp].converged; });
+            var isLoading = _.keys(iMod).filter(function (prp) { return iMod[prp] && _.isBoolean(iMod[prp]['converged']); }).some(function (prp) { return !iMod[prp].converged; });
             var secondsMod = Math.round(Date.now() / 1000) % 3;
             c.save();
             c.fillStyle(isLoading ? cfg.baseEmphasis : Color.NONE);
@@ -85,9 +79,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         function ColumnPanel(identifier, core, state, opened) {
             if (opened === void 0) { opened = false; }
             _super.call(this, "cp_" + identifier, _.union([new ColumnLabel(identifier, core.toString(), opened, state)], opened ? [core] : []), [0, 0], [0, 0], 'vertical', state.configuration.panelSpace, 'middle');
-            this.core = core;
-            this.state = state;
-            this.opened = opened;
         }
         return ColumnPanel;
     })(List);
@@ -96,13 +87,53 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         function ColumnLabel(viewIdentifier, text, opened, state) {
             _super.call(this, "clLbl_" + viewIdentifier, text, [0, 0], opened ? state.configuration.panelHeaderOpenLabel : state.configuration.panelHeaderLabel, true);
             this.viewIdentifier = viewIdentifier;
-            if (!opened)
-                this.setDimensions([.25 * this.dimensions[0] + 2 * this.dimensions[1], this.dimensions[1]]);
+            this.opened = opened;
+            if (!opened) {
+                this.setDimensions([this.dimensions[1], this.dimensions[0]]);
+            }
         }
         ColumnLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             interaction.pushView(this.viewIdentifier);
         };
+        ColumnLabel.prototype.paint = function (context) {
+            var _this = this;
+            context.picking = this.pickable;
+            context.fillStyle(this.style.color);
+            context.font(this.style.font.toString());
+            context.save();
+            context.translate(this.opened ? this.topLeft : Vector.add(this.topLeft, [0, this.dimensions[1]]));
+            context.rotate(this.opened ? 0 : -.5 * Math.PI);
+            var dY = 0;
+            this.lines.forEach(function (l) {
+                dY += _this.style.font.size;
+                context.fillText(l, 0, dY);
+            });
+            context.restore();
+        };
         return ColumnLabel;
+    })(Label);
+    var DataSetList = (function (_super) {
+        __extends(DataSetList, _super);
+        function DataSetList(state) {
+            _super.call(this, "dataSetList", state.dataSets.value.filter(function (ds) { return ds !== state.selectedCoordinates.dataSet; }).map(function (ds) { return new DataSetLabel(ds, state); }), [0, 0], [0, 0], 'vertical', state.configuration.featureCellSpace[0]);
+            this.state = state;
+        }
+        DataSetList.prototype.toString = function () {
+            return "Screen " + this.state.selectedCoordinates.dataSet;
+        };
+        return DataSetList;
+    })(List);
+    var DataSetLabel = (function (_super) {
+        __extends(DataSetLabel, _super);
+        function DataSetLabel(dataSet, state) {
+            _super.call(this, "clLbl_" + dataSet, dataSet, [0, 0], state.configuration.panelHeaderLabel, true);
+            this.dataSet = dataSet;
+        }
+        DataSetLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
+            interaction.selectedCoordinates.dataSet = this.dataSet;
+            interaction.pushView('plates');
+        };
+        return DataSetLabel;
     })(Label);
     var FeatureHistogramTable = (function (_super) {
         __extends(FeatureHistogramTable, _super);

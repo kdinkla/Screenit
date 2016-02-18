@@ -36,7 +36,7 @@ export class BaseConfiguration {
     panelHeaderFont = new Font(16);
     panelHeaderSpace = this.panelHeaderFont.size + 15;
     panelHeaderColor = this.baseDim;
-    panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top', .25 * Math.PI);
+    panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
     panelHeaderOpenLabel = new LabelStyle(this.panelHeaderFont, this.base, 'left', 'top');
     subPanelHeaderLabel = new LabelStyle(new Font(14), this.base, 'left', 'top');
 

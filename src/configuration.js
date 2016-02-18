@@ -26,7 +26,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.panelHeaderFont = new Font(16);
             this.panelHeaderSpace = this.panelHeaderFont.size + 15;
             this.panelHeaderColor = this.baseDim;
-            this.panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top', .25 * Math.PI);
+            this.panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
             this.panelHeaderOpenLabel = new LabelStyle(this.panelHeaderFont, this.base, 'left', 'top');
             this.subPanelHeaderLabel = new LabelStyle(new Font(14), this.base, 'left', 'top');
             // Guide labels.
