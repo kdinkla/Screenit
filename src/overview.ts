@@ -187,7 +187,7 @@ class DataSetLabel extends Label {
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-        interaction.selectedCoordinates.dataSet = this.dataSet;
+        interaction.switchToDataSet(this.dataSet);
         interaction.pushView('plates');
     }
 }

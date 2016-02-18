@@ -130,7 +130,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.dataSet = dataSet;
         }
         DataSetLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
-            interaction.selectedCoordinates.dataSet = this.dataSet;
+            interaction.switchToDataSet(this.dataSet);
             interaction.pushView('plates');
         };
         return DataSetLabel;
