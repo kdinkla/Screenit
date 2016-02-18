@@ -23,7 +23,7 @@ Bash:
 sudo pip install tangelo numpy pandas scipy scikit-learn
 ```
 
-Download and place the code at a location that you like, but first look at __Cache__, __Database__, and __Images__ sections for space requirements.
+Download and place the code at a location that you like, but first look at __Database__ and __Images__ sections for space requirements.
 
 Install npm and then bower. Bash:
 ```
@@ -44,12 +44,12 @@ sudo tangelo -c tangelo_config.yaml
 Browse to the server's address to try out the prototype.
 
 ## Data
-Image feature data is stored per image feature as a NumPy array dump in __dataset/columns__. Every object (in a well) has a value in such an array, where the array index of an object is consistent across all columns. Everything is therefore stored at the object level, including eventual well and plate information (sacrificing disk space for sake of computation speed).
+Image feature data is stored per image feature as a NumPy array dump in __dataset/DataSetName/columns__. Every object (in a well) has a value in such an array, where the array index of an object is consistent across all columns. Everything is therefore stored at the object level, including eventual well and plate information (sacrificing disk space for sake of computation speed).
 
 The example CellMorph data is 1.5GB and can be downloaded from Google Drive for now: https://drive.google.com/folderview?id=0B4zuo4p8QBcaaXIwTXRCaGpUdU0&usp=sharing
-The column data should be placed in __dataset/columns__. The __dataset__ directory already contains the __config.py__ file for CellMorph, which also contains explanatory comments per configuration option.
+The column data should be placed in __dataset/DataSetName/columns__. The __dataset/CellMorph__ directory already contains the __config.py__ file for CellMorph, which also contains explanatory comments per configuration option.
 
-The code for converting the CellMorph (per plate) tab-delimited files can be found in __wrangle/liteFill.py__.
+The code for converting the CellMorph (per plate) tab-delimited files can be found in __wrangle/numpyFill.py__.
 
 The system expects the following columns to be present:
 - __plate__, integer ranging from 0 to N, that encodes the containing plate of the object, out of N plates
@@ -58,13 +58,13 @@ The system expects the following columns to be present:
 - __x__, float that specifies the x-coordinate of the object in its well, in pixel space of the well images
 - __y__, float that specifies the y-coordinate of the object in its well, in pixel space of the well images
 
-All other columns in the __dataset/columns__ directory are assumed to contain image features as floating point values. The CellMorph data stores image features as 32-bit floats to reduce storage and increase performance, but more precise floats should be supported as well.
+All other columns in the __dataset/DataSetName/columns__ directory are assumed to contain image features as floating point values. The CellMorph data stores image features as 32-bit floats to reduce storage and increase performance, but more precise floats should be supported as well.
 
 ## Code organization
 __server__ contains all server-side Python code. Currently, most files serve as API delegators for the Tangelo web server:
 - __compute.py__ contains all interactive computation code
 - __numpyData.py__ that data retrieval backend, which can be replaced in the future.
 
-__wrangle/columnFill__ contains code that can be used to scrape all image feature data from the CellMorph comma-separated files (per plate) and store it as NumPy columns in the __Data__ section.
+__wrangle/numpyFill__ contains code that can be used to scrape all image feature data from the CellMorph comma-separated files (per plate) and store it as NumPy columns in the __Data__ section.
 
 __src__ contains all client-side code, which is written primarily in Typescript. __typings__ contains type definition files that interface TypeScript with common JavaScript libraries found in __bower_components__ and configured in __bower.json__.
