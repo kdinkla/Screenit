@@ -37,7 +37,7 @@ export class InteractionState implements AbstractModel {
                 public selectedCoordinates: SelectionCoordinates = null,
                 public openViews: Chain<string> = null,
                 public configuration: BaseConfiguration = null) {
-        if(populationSpace == null) this.switchToDataSet('CellMorph'); // Default to Cell Morph data set.
+        if(populationSpace == null) this.switchToDataSet('CellMorph');  // Default to Cell Morph data set.
     }
 
     switchToDataSet(dataSet: string) {
@@ -52,7 +52,7 @@ export class InteractionState implements AbstractModel {
 
     removeExemplar(object: number) {
         // Remove given exemplar from any population (should be a single population).
-        this.populationSpace.populations.forEach(p => p.exemplars = p.exemplars.pull(object));
+        this.populationSpace.removeExemplar(object);
         if(this.hoveredCoordinates.object === object) this.hoveredCoordinates.object = null;
     }
 
@@ -60,9 +60,22 @@ export class InteractionState implements AbstractModel {
         var index = viewCycle.indexOf(identifier);
         this.openViews = new Chain([viewCycle[Math.max(0, index - 1)], viewCycle[index], 'exemplars']);
     }
+
+    toJSON() {
+        return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
+    }
+
+    static fromJSON(data: {}) {
+        return new InteractionState(
+            PopulationSpace.fromJSON(data['populationSpace']),
+            SelectionCoordinates.fromJSON(data['hoveredCoordinates']),
+            SelectionCoordinates.fromJSON(data['selectedCoordinates']),
+            Chain.fromJSON<string>(data['openViews']),
+            new BaseConfiguration()
+        );
+    }
 }
 
-// The object referred to below are part of a small sample (~1000).
 export class EnrichedState extends InteractionState {
     allExemplars: Chain<number>;                        // All exemplars in population space.
 
@@ -253,12 +266,18 @@ export class EnrichedState extends InteractionState {
 
     // Population color, includes focused population highlight.
     populationColor(population: Population) {
-        return this.focused().population === population.identifier ? this.configuration.highlight : population.color;
+        var focus = this.focused();
+        return focus && focus.population === population.identifier ?
+            this.configuration.highlight :
+            population.color;
     }
 
     // Translucent population color, includes population highlight.
     populationColorTranslucent(population: Population) {
-        return this.focused().population === population.identifier ? this.configuration.highlight : population.colorTrans;
+        var focus = this.focused();
+        return focus && focus.population === population.identifier ?
+            this.configuration.highlight :
+            population.colorTrans;
     }
 
     // Complete, or correct, coordinates, from object level up to plate level.
@@ -361,6 +380,7 @@ export class EnrichedState extends InteractionState {
 
             var populations = this.populationSpace.populations.elements.filter(p => p.identifier in shares.zScores);
             if(populations.length > 0) {
+                // Initialize empty score arrays.
                 this.wellScs = shares.zScores[populations[0].identifier].map(plt => plt.map(col => col.map(v => 0)));
 
                 populations.forEach(population => {
@@ -453,12 +473,25 @@ export class EnrichedState extends InteractionState {
 export class PopulationSpace {
     constructor(public features: Chain<string> = new Chain<string>(), // Feature axes of space to model in.
                 public populations: Chain<Population> = new Chain<Population>()) {
+        // Total cell count population.
+        var totalPop = new Population(Population.POPULATION_TOTAL_NAME, "Cell Count",
+                            new Chain<number>(), Population.POPULATION_TOTAL_COLOR);
+        totalPop.activation = [[-1, 0], [0, 1], [1, 1]];
+        this.populations = this.populations.push(totalPop);
         this.conformPopulations();
     }
 
     private conformPopulations() {
-        this.populations = this.populations.filter(p => p.exemplars.length > 0);   // Remove any empty populations.
-        this.createPopulation();    // Add one empty population at end.
+        this.populations = this.populations.filter(p => p.exemplars.length > 0 ||
+                                                    p.identifier === Population.POPULATION_TOTAL_NAME);   // Remove any empty populations.
+
+        // If an exemplar has been added to total cell population, then transfer to new population.
+        var totalPopulation = this.populations.byId(Population.POPULATION_TOTAL_NAME);
+        if(totalPopulation.exemplars.length > 0) {
+            this.createPopulation().exemplars = totalPopulation.exemplars.clone();
+            totalPopulation.exemplars = new Chain<number>();
+        }
+        //this.createPopulation();    // Add one empty population at end.
     }
 
     // Add given object to given population.
@@ -468,13 +501,19 @@ export class PopulationSpace {
         this.conformPopulations();
     }
 
+    // Remove given object from any population.
+    removeExemplar(object: number) {
+        this.populations.forEach(p => p.exemplars = p.exemplars.pull(object));
+        this.conformPopulations();
+    }
+
     // Create a new population.
     createPopulation() {
         // Choose an available nominal color.
         var takenColors = this.populations.map(p => p.color);
         var availableColors = new Chain(Color.colorMapNominal8);
         var freeColors = Chain.difference(availableColors, takenColors);
-        var color = freeColors.length > 0 ? freeColors.elements[0] : Color.BLACK;
+        var color = freeColors.length > 0 ? freeColors.elements[0] : Color.WHITE;
 
         var population = new Population(null, "Tag", new Chain<number>(), color);
         this.populations = this.populations.push(population);
@@ -485,7 +524,8 @@ export class PopulationSpace {
     // Dictionary for communicating population description.
     toDict(includeFeatures = true) {
         var exemplars = {};
-        this.populations.filter(p => p.exemplars.length > 0).forEach(p => exemplars[p.identifier] = _.clone(p.exemplars.elements)); // DO NOT REMOVE!
+        this.populations.filter(p => p.exemplars.length > 0)
+            .forEach(p => exemplars[p.identifier] = _.clone(p.exemplars.elements)); // DO NOT REMOVE!
         return includeFeatures ?
             { features: this.features.elements, exemplars: exemplars } :
             { exemplars: exemplars };
@@ -508,13 +548,22 @@ export class PopulationSpace {
     allExemplars() {
         return Chain.union<number>(this.populations.elements.map(p => p.exemplars));
     }
+
+    static fromJSON(data: {}) {
+        return new PopulationSpace(
+            Chain.fromJSON<string>(data['features']),
+            new Chain<Population>(data['populations']['elements'].map(p => Population.fromJSON(p)))
+        );
+    }
 }
 
 // Population.
 export class Population {
-    public static POPULATION_TOTAL_NAME = 'objects';
+    public static POPULATION_TOTAL_NAME = 0;    // All cell population (for cell count purposes).
+    public static POPULATION_ALL_NAME = 1;      // Population code in case of no known phenotypes.
+    public static POPULATION_TOTAL_COLOR = new Color(150, 150, 150);
 
-    private static POPULATION_ID_COUNTER = 1;
+    private static POPULATION_ID_COUNTER = 2;   // 0 and 1 are reserved for above population identifiers
 
     colorTrans: Color;
 
@@ -522,11 +571,11 @@ export class Population {
                 public name: string = null,
                 public exemplars = new Chain<number>(),
                 public color = Color.NONE,
-                public activation: number[][] = [[-1, 0], [0, 0], [1, 1]]) {
+                public activation: number[][] = [[-1, 0], [0, 0], [1, 0]]) {
         if(identifier === null) this.identifier = Population.POPULATION_ID_COUNTER++;
         if(name === null) this.name = this.identifier.toString();
 
-        this.colorTrans = color.alpha(0.333);
+        this.colorTrans = color.alpha(0.5);
     }
 
     toString() {
@@ -558,6 +607,16 @@ export class Population {
         }
 
         return result;
+    }
+
+    static fromJSON(data: {}) {
+        return new Population(
+            data['identifier'],
+            data['name'],
+            Chain.fromJSON<number>(data['exemplars']),
+            Color.fromJSON(data['color']),
+            data['activation']
+        );
     }
 }
 
@@ -611,6 +670,18 @@ export class SelectionCoordinates {
         this.probeColumns = [];
         this.probeCoordinates = [];
     }
+
+    static fromJSON(data: {}) {
+        return new SelectionCoordinates(
+            data['dataSet'],
+            data['population'],
+            data['object'],
+            WellCoordinates.fromJSON(data['well']),
+            data['plate'],
+            data['probeColumns'],
+            data['probeCoordinates']
+        );
+    }
 }
 
 export class DataSetInfo {
@@ -660,6 +731,7 @@ export class WellClusterShares extends NumberFrame {
                 this.inject(val, this.wellIndex, _.flatten<any>([[c], localI]));
             });
         });
+        //delete this.wellIndex[0];
 
         this.maxPlateObjectCount = (this.wellIndex[Population.POPULATION_TOTAL_NAME] || [])
                                     .map(plt => _.max(<number[]>_.flattenDeep<number>(plt)));
@@ -672,11 +744,16 @@ export class WellClusterShares extends NumberFrame {
             Vector.invalidToZero(<number[]>_.flattenDeep<number>(pShares))));
 
         // z-scores of all wells, indexed by population, plate, column, and row.
-        this.zScores = this.wellIndex.map((pS, pI) => pS.map(plS => plS.map(cS =>
+        this.zScores = [];
+        this.wellIndex.forEach((pS, pI) => this.zScores[pI] = pS.map(plS => plS.map(cS =>
                                         cS.map(s => (s - this.shareStatistics[pI].mean) /
                                                     this.shareStatistics[pI].standardDeviation))));
-        this.zScoresMin = this.zScores.map(p => _.min(<number[]>_.flattenDeep<number>(p)));
-        this.zScoresMax = this.zScores.map(p => _.max(<number[]>_.flattenDeep<number>(p)));
+        this.zScoresMin = [];
+        this.zScoresMax = [];
+        this.zScores.forEach((p, pI) => {
+            this.zScoresMin[pI] = _.min(<number[]>_.flattenDeep<number>(p));
+            this.zScoresMax[pI] = _.max(<number[]>_.flattenDeep<number>(p));
+        });
     }
 
     private inject(value: number, subIndex: any, indices: any[]) {
@@ -697,26 +774,26 @@ export class WellClusterShares extends NumberFrame {
     }
 }
 
-export class Clusters {
-    static CLUSTER_PREAMBLE = "c_";
-
-    identifiers: number[];              // Cluster representative identifiers.
-    identifierIndex: StringMap<number>; // Cluster indices.
-    members: number[][];                // Cluster member identifiers (of small sub-sample).
-
-    constructor(public clusterMap: StringMap<number> = {}) {
-        this.identifiers = _.uniq(_.values(clusterMap).map(c => Number(c)));
-
-        // Check for no cluster case (-1 cluster).
-        if(this.identifiers.length > 0 && this.identifiers[0] > -1) {
-            this.identifierIndex = {};
-            this.identifiers.forEach((id, I) => this.identifierIndex[id] = I);
-            this.members = [];
-            this.identifiers.forEach(c => this.members[c] = []);
-            _.pairs(clusterMap).forEach((p) => this.members[p[1]].push(p[0]));
-        }
-    }
-}
+//export class Clusters {
+//    static CLUSTER_PREAMBLE = "c_";
+//
+//    identifiers: number[];              // Cluster representative identifiers.
+//    identifierIndex: StringMap<number>; // Cluster indices.
+//    members: number[][];                // Cluster member identifiers (of small sub-sample).
+//
+//    constructor(public clusterMap: StringMap<number> = {}) {
+//        this.identifiers = _.uniq(_.values(clusterMap).map(c => Number(c)));
+//
+//        // Check for no cluster case (-1 cluster).
+//        if(this.identifiers.length > 0 && this.identifiers[0] > -1) {
+//            this.identifierIndex = {};
+//            this.identifiers.forEach((id, I) => this.identifierIndex[id] = I);
+//            this.members = [];
+//            this.identifiers.forEach(c => this.members[c] = []);
+//            _.pairs(clusterMap).forEach((p) => this.members[p[1]].push(p[0]));
+//        }
+//    }
+//}
 
 export class FeatureHistograms {
     histograms: StringMap<DataFrame<number>>;
@@ -730,6 +807,10 @@ export class FeatureHistograms {
 // Wells by column and row coordinates.
 export class WellCoordinates {
     constructor(public column: number = null, public row: number = null) {}
+
+    static fromJSON(data: {}) {
+        return new WellCoordinates(data['column'], data['row']);
+    }
 
     // Generate the coordinates of all wells on a plate.
     static allWells(columnCount: number, rowCount: number) {

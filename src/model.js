@@ -39,7 +39,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         InteractionState.prototype.removeExemplar = function (object) {
             // Remove given exemplar from any population (should be a single population).
-            this.populationSpace.populations.forEach(function (p) { return p.exemplars = p.exemplars.pull(object); });
+            this.populationSpace.removeExemplar(object);
             if (this.hoveredCoordinates.object === object)
                 this.hoveredCoordinates.object = null;
         };
@@ -47,10 +47,15 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var index = exports.viewCycle.indexOf(identifier);
             this.openViews = new Chain([exports.viewCycle[Math.max(0, index - 1)], exports.viewCycle[index], 'exemplars']);
         };
+        InteractionState.prototype.toJSON = function () {
+            return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
+        };
+        InteractionState.fromJSON = function (data) {
+            return new InteractionState(PopulationSpace.fromJSON(data['populationSpace']), SelectionCoordinates.fromJSON(data['hoveredCoordinates']), SelectionCoordinates.fromJSON(data['selectedCoordinates']), Chain.fromJSON(data['openViews']), new BaseConfiguration());
+        };
         return InteractionState;
     })();
     exports.InteractionState = InteractionState;
-    // The object referred to below are part of a small sample (~1000).
     var EnrichedState = (function (_super) {
         __extends(EnrichedState, _super);
         function EnrichedState(state) {
@@ -161,11 +166,13 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Population color, includes focused population highlight.
         EnrichedState.prototype.populationColor = function (population) {
-            return this.focused().population === population.identifier ? this.configuration.highlight : population.color;
+            var focus = this.focused();
+            return focus && focus.population === population.identifier ? this.configuration.highlight : population.color;
         };
         // Translucent population color, includes population highlight.
         EnrichedState.prototype.populationColorTranslucent = function (population) {
-            return this.focused().population === population.identifier ? this.configuration.highlight : population.colorTrans;
+            var focus = this.focused();
+            return focus && focus.population === population.identifier ? this.configuration.highlight : population.colorTrans;
         };
         // Complete, or correct, coordinates, from object level up to plate level.
         /*conformHoveredCoordinates(targetState: InteractionState) {
@@ -247,6 +254,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 var shares = this.wellClusterShares.value;
                 var populations = this.populationSpace.populations.elements.filter(function (p) { return p.identifier in shares.zScores; });
                 if (populations.length > 0) {
+                    // Initialize empty score arrays.
                     this.wellScs = shares.zScores[populations[0].identifier].map(function (plt) { return plt.map(function (col) { return col.map(function (v) { return 0; }); }); });
                     populations.forEach(function (population) {
                         var pop = population.identifier;
@@ -314,16 +322,31 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (populations === void 0) { populations = new Chain(); }
             this.features = features;
             this.populations = populations;
+            // Total cell count population.
+            var totalPop = new Population(Population.POPULATION_TOTAL_NAME, "Cell Count", new Chain(), Population.POPULATION_TOTAL_COLOR);
+            totalPop.activation = [[-1, 0], [0, 1], [1, 1]];
+            this.populations = this.populations.push(totalPop);
             this.conformPopulations();
         }
         PopulationSpace.prototype.conformPopulations = function () {
-            this.populations = this.populations.filter(function (p) { return p.exemplars.length > 0; }); // Remove any empty populations.
-            this.createPopulation(); // Add one empty population at end.
+            this.populations = this.populations.filter(function (p) { return p.exemplars.length > 0 || p.identifier === Population.POPULATION_TOTAL_NAME; }); // Remove any empty populations.
+            // If an exemplar has been added to total cell population, then transfer to new population.
+            var totalPopulation = this.populations.byId(Population.POPULATION_TOTAL_NAME);
+            if (totalPopulation.exemplars.length > 0) {
+                this.createPopulation().exemplars = totalPopulation.exemplars.clone();
+                totalPopulation.exemplars = new Chain();
+            }
+            //this.createPopulation();    // Add one empty population at end.
         };
         // Add given object to given population.
         PopulationSpace.prototype.addExemplar = function (object, population) {
             var target = this.populations.byId(population);
             target.exemplars = target.exemplars.push(object);
+            this.conformPopulations();
+        };
+        // Remove given object from any population.
+        PopulationSpace.prototype.removeExemplar = function (object) {
+            this.populations.forEach(function (p) { return p.exemplars = p.exemplars.pull(object); });
             this.conformPopulations();
         };
         // Create a new population.
@@ -332,7 +355,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var takenColors = this.populations.map(function (p) { return p.color; });
             var availableColors = new Chain(Color.colorMapNominal8);
             var freeColors = Chain.difference(availableColors, takenColors);
-            var color = freeColors.length > 0 ? freeColors.elements[0] : Color.BLACK;
+            var color = freeColors.length > 0 ? freeColors.elements[0] : Color.WHITE;
             var population = new Population(null, "Tag", new Chain(), color);
             this.populations = this.populations.push(population);
             return population;
@@ -356,6 +379,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         PopulationSpace.prototype.allExemplars = function () {
             return Chain.union(this.populations.elements.map(function (p) { return p.exemplars; }));
         };
+        PopulationSpace.fromJSON = function (data) {
+            return new PopulationSpace(Chain.fromJSON(data['features']), new Chain(data['populations']['elements'].map(function (p) { return Population.fromJSON(p); })));
+        };
         return PopulationSpace;
     })();
     exports.PopulationSpace = PopulationSpace;
@@ -366,7 +392,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (name === void 0) { name = null; }
             if (exemplars === void 0) { exemplars = new Chain(); }
             if (color === void 0) { color = Color.NONE; }
-            if (activation === void 0) { activation = [[-1, 0], [0, 0], [1, 1]]; }
+            if (activation === void 0) { activation = [[-1, 0], [0, 0], [1, 0]]; }
             this.identifier = identifier;
             this.name = name;
             this.exemplars = exemplars;
@@ -376,7 +402,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.identifier = Population.POPULATION_ID_COUNTER++;
             if (name === null)
                 this.name = this.identifier.toString();
-            this.colorTrans = color.alpha(0.333);
+            this.colorTrans = color.alpha(0.5);
         }
         Population.prototype.toString = function () {
             return this.identifier.toString();
@@ -407,8 +433,13 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             }
             return result;
         };
-        Population.POPULATION_TOTAL_NAME = 'objects';
-        Population.POPULATION_ID_COUNTER = 1;
+        Population.fromJSON = function (data) {
+            return new Population(data['identifier'], data['name'], Chain.fromJSON(data['exemplars']), Color.fromJSON(data['color']), data['activation']);
+        };
+        Population.POPULATION_TOTAL_NAME = 0; // All cell population (for cell count purposes).
+        Population.POPULATION_ALL_NAME = 1; // Population code in case of no known phenotypes.
+        Population.POPULATION_TOTAL_COLOR = new Color(150, 150, 150);
+        Population.POPULATION_ID_COUNTER = 2; // 0 and 1 are reserved for above population identifiers
         return Population;
     })();
     exports.Population = Population;
@@ -463,6 +494,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.probeColumns = [];
             this.probeCoordinates = [];
         };
+        SelectionCoordinates.fromJSON = function (data) {
+            return new SelectionCoordinates(data['dataSet'], data['population'], data['object'], WellCoordinates.fromJSON(data['well']), data['plate'], data['probeColumns'], data['probeCoordinates']);
+        };
         return SelectionCoordinates;
     })();
     exports.SelectionCoordinates = SelectionCoordinates;
@@ -501,15 +535,21 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     _this.inject(val, _this.wellIndex, _.flatten([[c], localI]));
                 });
             });
+            //delete this.wellIndex[0];
             this.maxPlateObjectCount = (this.wellIndex[Population.POPULATION_TOTAL_NAME] || []).map(function (plt) { return _.max(_.flattenDeep(plt)); });
             // Missing wells have zero of everything.
             //this.wellIndex = this.wellIndex.map(p => p.map(plt => plt.map(col => Vector.invalidToZero(col))));
             // Share statistics.
             this.shareStatistics = this.wellIndex.map(function (pShares) { return math.statistics(Vector.invalidToZero(_.flattenDeep(pShares))); });
             // z-scores of all wells, indexed by population, plate, column, and row.
-            this.zScores = this.wellIndex.map(function (pS, pI) { return pS.map(function (plS) { return plS.map(function (cS) { return cS.map(function (s) { return (s - _this.shareStatistics[pI].mean) / _this.shareStatistics[pI].standardDeviation; }); }); }); });
-            this.zScoresMin = this.zScores.map(function (p) { return _.min(_.flattenDeep(p)); });
-            this.zScoresMax = this.zScores.map(function (p) { return _.max(_.flattenDeep(p)); });
+            this.zScores = [];
+            this.wellIndex.forEach(function (pS, pI) { return _this.zScores[pI] = pS.map(function (plS) { return plS.map(function (cS) { return cS.map(function (s) { return (s - _this.shareStatistics[pI].mean) / _this.shareStatistics[pI].standardDeviation; }); }); }); });
+            this.zScoresMin = [];
+            this.zScoresMax = [];
+            this.zScores.forEach(function (p, pI) {
+                _this.zScoresMin[pI] = _.min(_.flattenDeep(p));
+                _this.zScoresMax[pI] = _.max(_.flattenDeep(p));
+            });
         }
         WellClusterShares.prototype.inject = function (value, subIndex, indices) {
             var nextIndex = _.head(indices);
@@ -530,25 +570,26 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         return WellClusterShares;
     })(NumberFrame);
     exports.WellClusterShares = WellClusterShares;
-    var Clusters = (function () {
-        function Clusters(clusterMap) {
-            var _this = this;
-            if (clusterMap === void 0) { clusterMap = {}; }
-            this.clusterMap = clusterMap;
-            this.identifiers = _.uniq(_.values(clusterMap).map(function (c) { return Number(c); }));
-            // Check for no cluster case (-1 cluster).
-            if (this.identifiers.length > 0 && this.identifiers[0] > -1) {
-                this.identifierIndex = {};
-                this.identifiers.forEach(function (id, I) { return _this.identifierIndex[id] = I; });
-                this.members = [];
-                this.identifiers.forEach(function (c) { return _this.members[c] = []; });
-                _.pairs(clusterMap).forEach(function (p) { return _this.members[p[1]].push(p[0]); });
-            }
-        }
-        Clusters.CLUSTER_PREAMBLE = "c_";
-        return Clusters;
-    })();
-    exports.Clusters = Clusters;
+    //export class Clusters {
+    //    static CLUSTER_PREAMBLE = "c_";
+    //
+    //    identifiers: number[];              // Cluster representative identifiers.
+    //    identifierIndex: StringMap<number>; // Cluster indices.
+    //    members: number[][];                // Cluster member identifiers (of small sub-sample).
+    //
+    //    constructor(public clusterMap: StringMap<number> = {}) {
+    //        this.identifiers = _.uniq(_.values(clusterMap).map(c => Number(c)));
+    //
+    //        // Check for no cluster case (-1 cluster).
+    //        if(this.identifiers.length > 0 && this.identifiers[0] > -1) {
+    //            this.identifierIndex = {};
+    //            this.identifiers.forEach((id, I) => this.identifierIndex[id] = I);
+    //            this.members = [];
+    //            this.identifiers.forEach(c => this.members[c] = []);
+    //            _.pairs(clusterMap).forEach((p) => this.members[p[1]].push(p[0]));
+    //        }
+    //    }
+    //}
     var FeatureHistograms = (function () {
         function FeatureHistograms(dict) {
             var _this = this;
@@ -567,6 +608,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.column = column;
             this.row = row;
         }
+        WellCoordinates.fromJSON = function (data) {
+            return new WellCoordinates(data['column'], data['row']);
+        };
         // Generate the coordinates of all wells on a plate.
         WellCoordinates.allWells = function (columnCount, rowCount) {
             return _.flatten(_.range(0, columnCount).map(function (c) { return _.range(0, rowCount).map(function (r) { return new WellCoordinates(c, r); }); }));

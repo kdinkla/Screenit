@@ -36,6 +36,9 @@ define(["require", "exports", 'lodash'], function (require, exports, _) {
             this.length = 0;
             elements.forEach(function (e) { return _this.pushMutation(e); });
         }
+        Chain.fromJSON = function (data) {
+            return new Chain(data['elements']);
+        };
         Chain.prototype.pushMutation = function (e) {
             if (!this.index[identify(e)]) {
                 this.elements.push(e);

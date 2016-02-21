@@ -6,10 +6,8 @@ import random
 # Required (non-image feature) columns.
 systemObjectColumns = ['plate', 'column', 'row', 'x', 'y']
 
-dataPath = '../dataset/' #CellMorph/'
-#numpyPath = dataPath + 'columns/'
-
 # Data sets available at directory of dataPath, where data set name matches sub-directory name.
+dataPath = '../dataset/'
 dataSetPaths = {o: os.path.join(dataPath, o) for o in os.listdir(dataPath) if os.path.isdir(os.path.join(dataPath, o))}
 numpyPaths = {o: path + '/columns/' for o, path in dataSetPaths.iteritems()}
 

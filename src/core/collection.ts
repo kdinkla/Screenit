@@ -59,6 +59,10 @@ export class Chain<E extends Identifiable> {
         elements.forEach(e => this.pushMutation(e));
     }
 
+    static fromJSON<E>(data: {}) {
+        return new Chain<E>(data['elements']);
+    }
+
     private pushMutation(e: E) {
         if (!this.index[identify(e)]) {
             this.elements.push(e);

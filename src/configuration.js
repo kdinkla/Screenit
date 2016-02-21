@@ -72,6 +72,9 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.clusterAdditionLabel = new Font(34); //new LabelStyle(new Font(30), this.baseSelected);
             this.exemplarSpace = 1;
             this.exemplarColumnSpace = 4 * this.exemplarSpace;
+            // Transfer editor.
+            this.transferPlotSize = this.clusterTileInnerSize;
+            this.transferFont = new Font(8);
             // Plate view.
             this.wellRadius = 7;
             this.wellDiameter = 2 * this.wellRadius;
@@ -83,14 +86,12 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.plateIndexInnerHeight = 10;
             this.plateIndexSpace = 5;
             this.plateIndexMargin = 5;
-            //(normVal: number) => style.Color.grey(0, normVal > 0 ? Math.sqrt(normVal) : 0); //style.Color.grey(Math.ceil(255 * (1 - normVal)));
             // Plate mini heatmap view.
             this.miniHeatWellDiameter = 2;
             this.miniHeatSpace = 1;
             this.miniHeatColumnCount = 5;
             // Well details view.
             this.wellViewMaxWidth = 600;
-            //wellViewMaxDim = [500, 370];
             // Object details view.
             this.objectViewImageRadius = 40;
         }

@@ -71,6 +71,9 @@ define(["require", "exports"], function (require, exports) {
             var nS = 1 - s;
             return new Color(Math.round(nS * this.r + s * target.r), Math.round(nS * this.g + s * target.g), Math.round(nS * this.b + s * target.b), nS * this.a + s * target.a);
         };
+        Color.fromJSON = function (data) {
+            return new Color(data['r'], data['g'], data['b'], data['a']);
+        };
         // Construct gray-scale value (in [0..255]).
         Color.grey = function (v, a) {
             if (a === void 0) { a = 1; }

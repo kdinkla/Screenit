@@ -3,9 +3,10 @@ import pandas as pd
 import itertools
 import json
 import numpyData as data    # Swappable data backend.
+from wrapt import synchronized
 from sklearn.ensemble import RandomForestClassifier
 from scipy.ndimage.morphology import grey_erosion
-from multiprocessing import Pool
+from multiprocessing.dummy import Pool  # Use multi-threading instead of multi-processing; synchronize functions!
 from cache import lru_cache
 
 # Names of available data sets.
@@ -41,7 +42,7 @@ def exemplarDict(exemplars):
     return frozenset(tpls)
 
 # Load and combine multiple columns into a data frame.
-@lru_cache(maxsize=5)
+#@lru_cache(maxsize=100)
 def columns(dataSet, columns):
     cols = list(columns)
     return data.columnsDump(dataSet, cols)
@@ -56,15 +57,15 @@ def smallSample(dataSet):
 def wellIndex(dataSet):
     return data.columnsDump(dataSet, data.systemObjectColumns)
 
+def ftrMet(dataSet, ftr):
+    col = data.numpyDump(dataSet, ftr)
+    return {metric: np.asscalar(getattr(np, metric)(col)) for metric in ['min', 'max', 'mean']}
+
+@synchronized
 @lru_cache(maxsize=5)
 def featureMetrics(dataSet):
     print "Computing image feature metrics for " + dataSet
-
-    def ftrMet(ftr):
-        col = data.numpyDump(dataSet, ftr)
-        return {metric: np.asscalar(getattr(np, metric)(col)) for metric in ['min', 'max', 'mean']}
-
-    return {feature: ftrMet(feature) for feature in data.imageFeatures(dataSet)}
+    return {feature: ftrMet(dataSet, feature) for feature in data.imageFeatures(dataSet)}
 
 @lru_cache(maxsize=5)
 def wellToObjects(dataSet):
@@ -108,27 +109,13 @@ def scale(dataSet, subset):
 def scaledSmallSample(dataSet):
     return scale(selectImageFeatures(dataSet, smallSample))
 
-@lru_cache(maxsize=5)
+@synchronized
+@lru_cache(maxsize=100)
 def scaledArray(dataSet, column):
     return adaptiveScale(data.numpyDump(dataSet, column), featureMetrics(dataSet)[column])
 
-#@lru_cache(maxsize=20)
-def scaledColumn(dataSet, column):
-    return scale(dataSet, data.columnsDump(dataSet, [column]))
-
-#@lru_cache(maxsize=5)
 def scaledColumns(dataSet, columns):
-    cols = list(columns)
-    cls = [scaledColumn(dataSet, c) for c in cols]
-
-    if len(cols) > 0:
-        mrg = pd.DataFrame(index=cls[0].index, columns=cols)
-        for i, c in enumerate(cls):
-            mrg[cols[i]] = c[cols[i]]
-    else:
-        mrg = pd.DataFrame(index=wellIndex(dataSet).index)
-
-    return mrg
+    return pd.DataFrame(index=wellIndex(dataSet).index, data={c: scaledArray(dataSet, c) for c in columns})
 
 def dataFrameToDict(frame):
     return {str(k): v for k, v in frame.to_dict().iteritems()}
@@ -150,42 +137,43 @@ def featureOrdering(dataSet):
 def featureInfo(dataSet):
     return featureOrdering(dataSet)
 
+@synchronized
 @lru_cache(maxsize=5)
-def clustersAsTable(dataSet, features, exemplars):
+def clusters(dataSet, features, exemplars):
     ftrs = list(features)
-    table = scaledColumns(dataSet, ftrs).copy()
+
+    predicted = np.empty(len(wellIndex(dataSet)), dtype=np.int)
 
     if ftrs and exemplars:
+        valueMatrix = np.matrix([scaledArray(dataSet, ftr) for ftr in features], copy=False).transpose()
+
+        exemplarDict = dict(exemplars)
+        exemplarObjects = np.array([exObj for exObjects in exemplarDict.values() for exObj in exObjects], dtype=np.int)
+        exemplarLabels = np.array([exId for exId, exObjects in exemplarDict.iteritems() for exObj in exObjects], dtype=np.int)
+
         print "Begin training"
-        def exemplarTable(id, objects):
-            subTable = table.loc[list(objects)]
-            subTable['population'] = pd.Series(id, subTable.index)
-            return subTable
-
-        trainingTables = {id: exemplarTable(id, objects) for id, objects in dict(exemplars).iteritems()}
-        trainingTable = pd.concat(trainingTables.values())
-
+        trainingValues = np.take(valueMatrix, exemplarObjects, axis=0)
         forest = RandomForestClassifier(n_estimators=10, n_jobs=-1, class_weight="balanced")
-        forest = forest.fit(trainingTable.drop('population', 1).values, trainingTable['population'].values)
+        forest = forest.fit(trainingValues, exemplarLabels)
         print "End training"
 
         print "Begin classification"
-        assignPop = forest.predict(table.values)
-        table['population'] = pd.Series(assignPop, table.index)
+        predicted = forest.predict(valueMatrix)
         print "End classification"
     else:
-        table['population'] = -1
+        predicted.fill(1)   # 1 is reserved in case no phenotypes have been defined yet.
 
-    return table
+    # Partition predicted column to object indices.
+    return predicted
 
-#@lru_cache(maxsize=5)
-def clustersAsPartition(dataSet, features, exemplars):
-    return clustersAsTable(dataSet, features, exemplars).groupby('population')
-
-#@lru_cache(maxsize=5)
+@synchronized
+@lru_cache(maxsize=5)
 def clustersAsMap(dataSet, features, exemplars):
-    return {grp: table.index.values for grp, table in clustersAsPartition(dataSet, features, exemplars)}
+    clst = clusters(dataSet, features, exemplars)
+    return {int(id): np.where(clst == int(id))[0]
+            for id in (dict(exemplars).keys() if len(exemplars) > 0 and len(features) > 0 else [1])}
 
+@lru_cache(maxsize=5)
 def closestObject(dataSet, probes):
     result = []
 
@@ -207,10 +195,10 @@ def allObjects(dataSet, column, row, plate, exemplars, probes):
 @lru_cache(maxsize=5)
 def objectInfo(dataSet, featureSet, column, row, plate, exemplars, probes):
     objects = allObjects(dataSet, column, row, plate, exemplars, probes)
+    combined = wellIndex(dataSet).loc[objects].copy()
 
-    clusters = clustersAsTable(dataSet, featureSet, exemplars).loc[objects]
-    wellInfo = wellIndex(dataSet).loc[objects]
-    combined = clusters.join(wellInfo)
+    for ftr in featureSet:
+        combined[ftr] = np.take(scaledArray(dataSet, ftr), objects)
 
     # Generate well URLs on the spot, based on config.
     wellImages = data.config(dataSet).wellImages
@@ -224,16 +212,11 @@ def histoLog(counts):
     return np.where(counts > 0, (np.log(counts) / 2 + 1), 0)
 
 def featureHistogram(args):
-    (dataSet, feature, cluster, bins) = args
-    clusterMap = workerShare[cluster]
+    (dataSet, featureSet, exemplars, feature, cluster, bins) = args
+    clusterMap = clustersAsMap(dataSet, featureSet, exemplars)[cluster]
     prunedColumn = np.take(scaledArray(dataSet, feature), clusterMap)
     digitized = (prunedColumn * bins).astype(np.int8)
     return feature, cluster, {i: cnt for i, cnt in enumerate(np.bincount(digitized, minlength=bins))}
-
-# Worker global variable set.
-def setupWorkerShare(value):
-    global workerShare
-    workerShare = value
 
 @lru_cache(maxsize=5)
 def featureHistograms(dataSet, featureSet, exemplars, bins):
@@ -241,11 +224,11 @@ def featureHistograms(dataSet, featureSet, exemplars, bins):
 
     # All computation combinations.
     #print "Compute feature histograms."
-    tasks = [(dataSet, feature, cluster, bins)
+    tasks = [(dataSet, featureSet, exemplars, feature, cluster, bins)
              for feature in data.imageFeatures(dataSet)
              for cluster, clusterMap in partition.iteritems()]
 
-    pool = Pool(initializer=setupWorkerShare, initargs=[partition])
+    pool = Pool()
     results = pool.imap(featureHistogram, tasks)
     pool.close()
     pool.join()
@@ -261,7 +244,7 @@ def featureHistograms(dataSet, featureSet, exemplars, bins):
 def wellClusterShares(dataSet, features, exemplars):
     print "Join clustering and well info."
     sampleWellsClst = wellIndex(dataSet)[['plate', 'column', 'row']].copy()
-    sampleWellsClst['population'] = clustersAsTable(dataSet, features, exemplars)['population']
+    sampleWellsClst['population'] = clusters(dataSet, features, exemplars)
 
     print "Start pivot table."
     pivoted = pd.pivot_table(sampleWellsClst,
@@ -269,9 +252,9 @@ def wellClusterShares(dataSet, features, exemplars):
                              index=['plate', 'column', 'row'],
                              aggfunc=len)
     total = pivoted.sum(axis='columns')
-    maxTotal = total.max()
+    #maxTotal = total.max()
     pivoted = pivoted.divide(total, axis='index')
-    pivoted['objects'] = total.divide(maxTotal, axis='index')
+    pivoted['0'] = total
     print "Finish pivot table."
 
     return pivoted
@@ -287,21 +270,22 @@ def wellClusterSharesFlat(dataSet, features, exemplars):
 
 #@lru_cache(maxsize=20)
 def objectHistogram2D(args):
-    (xFeature, yFeature, bins) = args
+    (dataSet, features, exemplars, xFeature, yFeature, bins) = args
+    partition = clustersAsMap(dataSet, features, exemplars)
 
     # Contour maps per cluster.
     contours = {}
     kernel = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]  # Morphology kernel.
-    for cluster, table in workerShare:
+    for cluster, objects in partition.iteritems():
         tBins = bins - 1
-        xCol = (table[xFeature].values * tBins).astype(np.int16)
-        yCol = (table[yFeature].values * tBins).astype(np.int16)
+        xCol = (np.take(scaledArray(dataSet, xFeature), objects) * tBins).astype(np.int16)
+        yCol = (np.take(scaledArray(dataSet, yFeature), objects) * tBins).astype(np.int16)
         digitized = (xCol * bins) + yCol
         counts = np.bincount(digitized, minlength=bins*bins)
         counts.shape = (bins, bins)
 
         # Scale histogram densities to base 10 logarithm levels.
-        levels = histoLog(counts).astype(np.int8)   #np.where(counts > 0, (np.log(counts) / 2 + 1), 0).astype(np.int8)
+        levels = histoLog(counts).astype(np.int8)
 
         # Level set outlines as contours (retain level as outline number).
         eroded = grey_erosion(levels, footprint=kernel, mode='constant')
@@ -313,10 +297,8 @@ def objectHistogram2D(args):
     return xFeature, yFeature, contours
 
 def objectHistogramMatrix(dataSet, features, exemplars, bins):
-    partition = clustersAsPartition(dataSet, features, exemplars)
-
-    pool = Pool(initializer=setupWorkerShare, initargs=[partition])
-    tasks = [(xFtr, yFtr, bins) for yFtr in features for xFtr in features if xFtr < yFtr]
+    pool = Pool()
+    tasks = [(dataSet, features, exemplars, xFtr, yFtr, bins) for yFtr in features for xFtr in features if xFtr < yFtr]
     results = pool.imap(objectHistogram2D, tasks)
     pool.close()
     pool.join()
@@ -330,16 +312,15 @@ def objectHistogramMatrix(dataSet, features, exemplars, bins):
     return histograms
 
 def forObjectFeatureValues(args):
-    (dataSet, col) = args
-    objects = workerShare
+    (dataSet, col, objects) = args
     return col, np.take(scaledArray(dataSet, col), objects)
 
 def objectFeatureValues(dataSet, column, row, plate, exemplars, probes):
     objects = allObjects(dataSet, column, row, plate, exemplars, probes)
     cols = data.imageFeatures(dataSet)
 
-    pool = Pool(initializer=setupWorkerShare, initargs=[objects])
-    results = pool.imap(forObjectFeatureValues, [(dataSet, col) for col in cols])
+    pool = Pool()
+    results = pool.imap(forObjectFeatureValues, [(dataSet, col, objects) for col in cols])
     pool.close()
     pool.join()
 

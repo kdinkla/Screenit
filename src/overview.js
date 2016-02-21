@@ -200,11 +200,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cacheTag = this.identifier + "_" + focusedPopulation;
             var cachedImage = histograms[cacheTag];
             if (!cachedImage) {
+                console.log("Histogram frames:");
+                console.log(frames);
                 cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], function (plainContext) {
                     _.keys(frames).map(function (fK) {
                         var frame = frames[fK];
                         var normFrequencies = frame.matrix[frame.columnIndex[_this.feature]];
-                        var fontColor = fK === '-1' ? cfg.baseDim : _this.state.populationColorTranslucent(_this.state.populationSpace.populations.byId(fK));
+                        var fontColor = fK === Population.POPULATION_ALL_NAME.toString() ? cfg.baseDim : _this.state.populationColorTranslucent(_this.state.populationSpace.populations.byId(fK));
                         plainContext.fillStyle = fontColor.toString();
                         //plainContext.beginPath();
                         var len = normFrequencies.length - 1;
@@ -468,7 +470,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var exemplarSelected = state.focused().object !== null && !state.hoveredObjectIsExemplar();
             var additionButtons = exemplarSelected ? new List("ExemplarAdditions", this.state.populationSpace.populations.elements.map(function (p) { return new ExemplarAdditionButton(state.focused().object, p, state); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left') : null;
             var transferLabel = new Label("PopulationTransfersLbl", "Well Score", [0, 0], state.configuration.subPanelHeaderLabel, true);
-            var transferButtons = new List("PopulationTransfers", this.state.populationSpace.populations.elements.map(function (p) { return new PopulationTransferEdit(p, state); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var transferButtons = new List("PopulationTransfers", this.state.populationSpace.populations.elements.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
             var selectedObjectDetailView = exemplarSelected ? new ObjectDetailView(state.focused().object, state, [0, 0]) : null;
             var segSnippets = _.compact([transferLabel, transferButtons, exemplarLabel, columns, additionButtons, selectedObjectDetailView]);
             this.segments = new List("ExemplarSegments", segSnippets, [0, 0], [0, 0], 'vertical', cfg.subPanelSpace);
@@ -514,8 +516,18 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.textBaseline('middle');
             context.textAlign('center');
             context.fillStyle(cfg.baseDim);
-            context.font(this.labelStyle.font.toString());
-            context.fillText('+');
+            // Distinguish between regular phenotype and cell count phenotype.
+            if (this.population.identifier === -1) {
+                context.font(cfg.sideFont.toString());
+                context.textBaseline('bottom');
+                context.fillText('New');
+                context.textBaseline('top');
+                context.fillText('Pheno.');
+            }
+            else {
+                context.font(this.labelStyle.font.toString());
+                context.fillText(this.population.identifier === -1 ? '*' : '+');
+            }
             context.restore();
         };
         ExemplarAdditionButton.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
@@ -562,36 +574,66 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     })(List);
     var PopulationTransferEdit = (function (_super) {
         __extends(PopulationTransferEdit, _super);
-        function PopulationTransferEdit(population, state) {
+        function PopulationTransferEdit(population, state, leftMost) {
+            if (leftMost === void 0) { leftMost = false; }
             _super.call(this, "TransferEdit_" + population.identifier, [0, 0]);
             this.population = population;
             this.state = state;
+            this.leftMost = leftMost;
+            var minScore = state.wellClusterShares.value.zScoresMin[population.identifier];
+            var maxScore = state.wellClusterShares.value.zScoresMax[population.identifier];
+            this.minZScoreLabel = minScore < 0 ? minScore.toFixed(0) : '?';
+            this.maxZScoreLabel = maxScore > 0 ? maxScore.toFixed(0) : '?';
             var cfg = state.configuration;
-            this.setDimensions([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize]);
+            this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + 3 * cfg.transferFont.size]);
         }
         PopulationTransferEdit.prototype.paint = function (context) {
-            var _this = this;
             _super.prototype.paint.call(this, context);
             var cfg = this.state.configuration;
-            var center = Vector.mul(this.dimensions, .5);
+            var center = Vector.mul([cfg.transferPlotSize, cfg.transferPlotSize], .5);
             context.save();
             context.translate(this.topLeft);
             // Internal axes.
             context.strokeStyle(cfg.baseVeryDim);
-            context.strokeLine([center[0], 0], [center[0], this.dimensions[1]]);
-            context.strokeLine([0, center[1]], [this.dimensions[1], center[1]]);
+            context.strokeLine([center[0], 0], [center[0], cfg.transferPlotSize]);
+            context.strokeLine([0, center[1]], [cfg.transferPlotSize, center[1]]);
             // Outlines.
             context.strokeStyle(cfg.baseDim);
-            context.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
-            var funcPoint = function (cs) { return [.5 * (1 + cs[0]) * _this.dimensions[0], .5 * (1 - cs[1]) * _this.dimensions[1]]; };
+            context.strokeRect(0, 0, cfg.transferPlotSize, cfg.transferPlotSize);
+            // Side axis labels.
+            context.transitioning = false;
+            // Left-most axis score labels.
+            if (this.leftMost) {
+                context.fillStyle(cfg.base);
+                context.font(cfg.transferFont.toString());
+                context.textAlign('right');
+                context.textBaseline('middle');
+                context.fillText('1  ', 0, 3);
+                context.fillText('0  ', 0, .5 * cfg.transferPlotSize);
+                context.fillText('-1  ', 0, cfg.transferPlotSize - 3);
+            }
+            // Bottom axis labels.
+            context.fillStyle(cfg.base);
+            context.font(cfg.transferFont.toString());
+            context.textBaseline('top');
+            context.textAlign('left');
+            context.fillText(this.minZScoreLabel, 0, cfg.transferPlotSize);
+            context.textAlign('center');
+            context.fillText('0', .5 * cfg.transferPlotSize, cfg.transferPlotSize);
+            context.textAlign('right');
+            context.fillText(this.maxZScoreLabel, cfg.transferPlotSize, cfg.transferPlotSize);
+            context.textAlign('center');
+            context.fillText('\u03C3', .5 * cfg.transferPlotSize, cfg.transferPlotSize + cfg.transferFont.size);
+            context.transitioning = true;
             // Function curve.
+            var funcPoint = function (cs) { return [.5 * (1 + cs[0]) * cfg.transferPlotSize, .5 * (1 - cs[1]) * cfg.transferPlotSize]; };
             context.strokeStyle(this.population.color);
             context.lineWidth(2);
             context.beginPath();
             var startPoint = funcPoint([-1, this.population.activate(-1)]);
             context.moveTo(startPoint[0], startPoint[1]);
-            for (var x = 1; x <= this.dimensions[0]; x += 3) {
-                var actInput = (2 * x / this.dimensions[0]) - 1;
+            for (var x = 1; x <= cfg.transferPlotSize; x += 3) {
+                var actInput = (2 * x / cfg.transferPlotSize) - 1;
                 var pnt = funcPoint([actInput, this.population.activate(actInput)]);
                 context.lineTo(pnt[0], pnt[1]);
             }
@@ -602,9 +644,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var pnt = funcPoint(cP);
                 context.fillEllipse(pnt[0], pnt[1], 2, 2);
             });
+            // Picking area.
             context.picking = true;
-            context.translate(Vector.mul(this.dimensions, 0.5));
-            context.scale(.5 * this.dimensions[0], -.5 * this.dimensions[1]);
+            context.translate(Vector.mul([cfg.transferPlotSize, cfg.transferPlotSize], 0.5));
+            context.scale(.5 * cfg.transferPlotSize, -.5 * cfg.transferPlotSize);
             context.fillStyle(Color.NONE);
             context.fillRect(-1, -1, 2, 2);
             context.picking = false;
@@ -616,7 +659,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var closestIndex = -1;
             var minDistance = Number.MAX_VALUE;
             controlPoints.forEach(function (c, cI) {
-                var distance = Math.abs(c[0] - coordinates[0]); //Vector.distance(c, coordinates);
+                var distance = Math.abs(c[0] - coordinates[0]);
                 if (distance < minDistance) {
                     closestIndex = cI;
                     minDistance = distance;
@@ -1198,7 +1241,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.translate(this.topLeft);
             // Outline, in case of no share data.
             context.strokeStyle(cfg.baseDim);
-            context.strokeRect(.5, .5, this.dimensions[0] - .5, this.dimensions[1] - .5);
+            context.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
             // Heat map image.
             context.drawImage(this.shareImg);
             context.transitioning = false;

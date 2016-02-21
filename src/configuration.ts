@@ -89,6 +89,10 @@ export class BaseConfiguration {
     exemplarSpace = 1;
     exemplarColumnSpace = 4 * this.exemplarSpace;
 
+    // Transfer editor.
+    transferPlotSize = this.clusterTileInnerSize;
+    transferFont = new Font(8);
+
     // Plate view.
     wellRadius = 7;
     wellDiameter = 2 * this.wellRadius;
@@ -107,8 +111,6 @@ export class BaseConfiguration {
     static shareColorMap = (normVal: number) => (normVal >= 0 ? heatLookup[Math.ceil(255 * (1 - normVal))] :
                                                 BaseConfiguration.voidColor);
 
-    //(normVal: number) => style.Color.grey(0, normVal > 0 ? Math.sqrt(normVal) : 0); //style.Color.grey(Math.ceil(255 * (1 - normVal)));
-
     // Plate mini heatmap view.
     miniHeatWellDiameter = 2;
     miniHeatSpace = 1;
@@ -116,7 +118,6 @@ export class BaseConfiguration {
 
     // Well details view.
     wellViewMaxWidth = 600;
-    //wellViewMaxDim = [500, 370];
 
     // Object details view.
     objectViewImageRadius = 40;

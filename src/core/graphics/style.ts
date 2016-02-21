@@ -56,10 +56,10 @@ export class Color {
     cssString: string;
 
     // Construct color from red, green, and blue in [0..255].
-    constructor(public r:number,
-                public g:number,
-                public b:number,
-                public a:number = 1) {
+    constructor(public r: number,
+                public g: number,
+                public b: number,
+                public a: number = 1) {
         this.cssString = "rgba(" + r + "," + g + "," + b + "," + a + ")";
     }
 
@@ -79,6 +79,10 @@ export class Color {
             Math.round(nS * this.g + s * target.g),
             Math.round(nS * this.b + s * target.b),
             nS * this.a + s * target.a);
+    }
+
+    static fromJSON(data: {}) {
+        return new Color(data['r'], data['g'], data['b'], data['a']);
     }
 
     // Static shortcuts.
