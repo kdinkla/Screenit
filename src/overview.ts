@@ -74,8 +74,8 @@ export class OverView extends View<EnrichedState> {
             new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)));
         this.panelColumns = new List("pnlCols", openPanels, [0,0], [0,0], 'horizontal', cfg.panelSpace, 'left');
 
-        //console.log("Model:");
-        //console.log(mod);
+        //console.log("State:");
+        //console.log(state);
     }
 
     paint(c: ViewContext, iMod: EnrichedState) {
@@ -695,7 +695,7 @@ class ExemplarAdditionButton extends PlacedSnippet {
         context.fillStyle(cfg.baseDim);
 
         // Distinguish between regular phenotype and cell count phenotype.
-        if(this.population.identifier === -1) {
+        if(this.population.identifier === Population.POPULATION_TOTAL_NAME) {
             context.font(cfg.sideFont.toString());
             context.textBaseline('bottom');
             context.fillText('New');
@@ -722,7 +722,7 @@ class ExemplarColumn extends List<PlacedSnippet> {
         super(
             "esc_" + population.identifier,
             _.union<PlacedSnippet>(
-                [new ExemplarLabel(population, state)],
+                population.identifier === Population.POPULATION_TOTAL_NAME ? [] : [new ExemplarLabel(population, state)],
                 population.exemplars.elements.map(ex => new ObjectDetailView(ex, state, [0,0]))
             ),
             topLeft,
@@ -782,7 +782,7 @@ class PopulationTransferEdit extends PlacedSnippet {
         this.maxZScoreLabel = maxScore > 0 ? maxScore.toFixed(0) : '?';
 
         var cfg = state.configuration;
-        this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + 3 * cfg.transferFont.size]);
+        this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + 2 * cfg.transferFont.size]);
     }
 
     paint(context: ViewContext) {
@@ -1187,11 +1187,13 @@ class TemplatePlate extends AbstractPlate {
             for(var r = 0; r < info.rowCount; r++) {
                 var y = r * cfg.wellDiameter;
 
+
+                ctx.strokeRect(x, y, cfg.wellDiameter, cfg.wellDiameter);
+
                 if(wellShares[c] && wellShares[c][r] >= -1) {
                     ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
                     ctx.fillRect(x + .25, y + .25, cfg.wellDiameter - .5, cfg.wellDiameter - .5);
                 } else {
-                    ctx.strokeRect(x + 1, y + 1, cfg.wellDiameter - 2, cfg.wellDiameter - 2);
                     //ctx.strokeLine([x + .25, y + .25], [x + cfg.wellDiameter - .25, y + cfg.wellDiameter - .25]);
                     //ctx.strokeLine([x + .25, y + cfg.wellDiameter - .25], [x + cfg.wellDiameter - .25, y + .25]);
                 }
@@ -1541,7 +1543,7 @@ class PlateIndex extends PlacedSnippet {
 
         this.heatmapColumns = new List("pics",
             colMaps.map((c, cI) => new List("pic_" + cI, c, [0,0], [0,0], 'vertical', cfg.miniHeatSpace)),
-            [0,0], [0,0], 'horizontal', 2 * cfg.miniHeatSpace, 'left'
+            [0,0], [0,0], 'horizontal', cfg.miniHeatSpace, 'left'
         );
 
         this.dimensions = this.heatmapColumns.dimensions;

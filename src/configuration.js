@@ -88,7 +88,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.plateIndexMargin = 5;
             // Plate mini heatmap view.
             this.miniHeatWellDiameter = 2;
-            this.miniHeatSpace = 1;
+            this.miniHeatSpace = 2;
             this.miniHeatColumnCount = 5;
             // Well details view.
             this.wellViewMaxWidth = 600;

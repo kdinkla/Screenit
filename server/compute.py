@@ -47,6 +47,11 @@ def columns(dataSet, columns):
     cols = list(columns)
     return data.columnsDump(dataSet, cols)
 
+# Retrieve well annotations.
+@lru_cache(maxsize=5)
+def wellAnnotations(dataSet):
+    return data.wellAnnotations(dataSet)
+
 # Small sample for visualizations.
 @lru_cache(maxsize=5)
 def smallSample(dataSet):

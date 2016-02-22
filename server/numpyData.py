@@ -2,6 +2,8 @@ import os
 import numpy as np
 import pandas as pd
 import random
+import csv
+from collections import defaultdict
 
 # Required (non-image feature) columns.
 systemObjectColumns = ['plate', 'column', 'row', 'x', 'y']
@@ -36,3 +38,25 @@ def objectSample(dataSet, size):
     index = range(len(columnsDump(dataSet, ['plate'])))
     indexSample = random.sample(index, size)
     return pd.DataFrame({col: np.take(numpyDump(dataSet, col), indexSample) for col in columns}, index=indexSample)
+
+# Well annotation data.
+wellPaths = {o: path + '/wells.tab' for o, path in dataSetPaths.iteritems()}
+
+# Well annotations as a (plate, column, row) to attributes map.
+def wellAnnotations(dataSet):
+    wellAnnotations = {}
+
+    if dataSet in wellPaths:
+        with open(wellPaths[dataSet]) as file:
+            wellAnnotations = {attributes['plate'] + "_" + attributes['column'] + "_" + attributes['row']:
+                                   {cat: val.split('|') for cat, val in attributes.iteritems()
+                                    if cat not in ['plate', 'column', 'row']}
+                               for attributes in csv.DictReader(file, delimiter='\t')}
+
+            # Invert nested dictionary, to put column keys at highest level.
+            inverted = defaultdict(dict)
+            for key, val in wellAnnotations.items():
+                for subkey, subval in val.items():
+                    inverted[subkey][key] = subval
+
+    return inverted

@@ -62,13 +62,13 @@ else {
     proxyService.output.onValue(m => overView.update(m));
 
     // Finally, trigger model update by fetching existing one from server or pushing a new one.
-    var sessionKey = Number(sessionPart);
+    var oldSessionKey = Number(sessionPart);
     Promise
         .resolve($.ajax({
             type: "POST",
             url: serverPath + "/loadSession",
             dataType: "json",
-            data: { key: sessionKey }
+            data: { key: oldSessionKey }
         }))
         // Redirect to new url with session key.
         .then(v => {
@@ -79,13 +79,13 @@ else {
             }
             // Otherwise go for default state.
             catch(ex) {
-                console.log("Failed to load session " + sessionKey);
+                console.log("Failed to load session " + oldSessionKey);
                 interactionStates.push(interactionState);
             }
         });
 
     // Fetch new session id (to prevent overwriting old one).
-    sessionKey = null;
+    var newSessionKey = null;
     Promise
         .resolve($.ajax({
             type: "POST",
@@ -94,20 +94,20 @@ else {
         }))
         // Redirect to new url with session key.
         .then(v => {
-            sessionKey = v;
+            newSessionKey = v;
             history.pushState({}, "HighCons", "index.html?" + v);
         });
 
     // Save interaction states to server.
     interactionStates.throttle(3000).onValue(s => {
         // Guard from overwriting old session.
-        if(sessionKey >= 0) {
+        if(newSessionKey !== null) {
             $.ajax({
                 type: "POST",
                 url: serverPath + "/storeSession",
                 dataType: "json",
                 data: {
-                    key: sessionKey,
+                    key: newSessionKey,
                     state: s.toJSON()
                 }
             })

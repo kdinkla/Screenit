@@ -40,8 +40,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Active panels.
             var openPanels = model.viewCycle.map(function (ov) { return new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)); });
             this.panelColumns = new List("pnlCols", openPanels, [0, 0], [0, 0], 'horizontal', cfg.panelSpace, 'left');
-            //console.log("Model:");
-            //console.log(mod);
+            //console.log("State:");
+            //console.log(state);
         };
         OverView.prototype.paint = function (c, iMod) {
             var cfg = iMod.configuration;
@@ -517,7 +517,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.textAlign('center');
             context.fillStyle(cfg.baseDim);
             // Distinguish between regular phenotype and cell count phenotype.
-            if (this.population.identifier === -1) {
+            if (this.population.identifier === Population.POPULATION_TOTAL_NAME) {
                 context.font(cfg.sideFont.toString());
                 context.textBaseline('bottom');
                 context.fillText('New');
@@ -539,7 +539,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         __extends(ExemplarColumn, _super);
         function ExemplarColumn(state, population, topLeft) {
             if (topLeft === void 0) { topLeft = [0, 0]; }
-            _super.call(this, "esc_" + population.identifier, _.union([new ExemplarLabel(population, state)], population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
+            _super.call(this, "esc_" + population.identifier, _.union(population.identifier === Population.POPULATION_TOTAL_NAME ? [] : [new ExemplarLabel(population, state)], population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
             this.state = state;
             this.population = population;
             this.topLeft = topLeft;
@@ -585,7 +585,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.minZScoreLabel = minScore < 0 ? minScore.toFixed(0) : '?';
             this.maxZScoreLabel = maxScore > 0 ? maxScore.toFixed(0) : '?';
             var cfg = state.configuration;
-            this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + 3 * cfg.transferFont.size]);
+            this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + 2 * cfg.transferFont.size]);
         }
         PopulationTransferEdit.prototype.paint = function (context) {
             _super.prototype.paint.call(this, context);
@@ -914,12 +914,12 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var x = c * cfg.wellDiameter;
                 for (var r = 0; r < info.rowCount; r++) {
                     var y = r * cfg.wellDiameter;
+                    ctx.strokeRect(x, y, cfg.wellDiameter, cfg.wellDiameter);
                     if (wellShares[c] && wellShares[c][r] >= -1) {
                         ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
                         ctx.fillRect(x + .25, y + .25, cfg.wellDiameter - .5, cfg.wellDiameter - .5);
                     }
                     else {
-                        ctx.strokeRect(x + 1, y + 1, cfg.wellDiameter - 2, cfg.wellDiameter - 2);
                     }
                 }
             }
@@ -1185,7 +1185,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
             var colMaps = _.range(0, cfg.miniHeatColumnCount).map(function (cI) { return _.compact(_.range(0, colCapacity).map(function (rI) { return heatMaps[cI * colCapacity + rI]; })); });
             //var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
-            this.heatmapColumns = new List("pics", colMaps.map(function (c, cI) { return new List("pic_" + cI, c, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace); }), [0, 0], [0, 0], 'horizontal', 2 * cfg.miniHeatSpace, 'left');
+            this.heatmapColumns = new List("pics", colMaps.map(function (c, cI) { return new List("pic_" + cI, c, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace); }), [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'left');
             this.dimensions = this.heatmapColumns.dimensions;
             this.updatePositions();
             if (state.focused().plate === null) {

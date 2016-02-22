@@ -113,7 +113,7 @@ export class BaseConfiguration {
 
     // Plate mini heatmap view.
     miniHeatWellDiameter = 2;
-    miniHeatSpace = 1;
+    miniHeatSpace = 2;
     miniHeatColumnCount = 5;
 
     // Well details view.

@@ -36,42 +36,42 @@ define(["require", "exports", 'bacon', './model', './core/dataprovider', './over
         // Extend model with information from server.
         proxyService.output.onValue(function (m) { return overView.update(m); });
         // Finally, trigger model update by fetching existing one from server or pushing a new one.
-        var sessionKey = Number(sessionPart);
+        var oldSessionKey = Number(sessionPart);
         Promise.resolve($.ajax({
             type: "POST",
             url: serverPath + "/loadSession",
             dataType: "json",
-            data: { key: sessionKey }
+            data: { key: oldSessionKey }
         })).then(function (v) {
             try {
                 var loadedState = InteractionState.fromJSON(v);
                 interactionStates.push(loadedState);
             }
             catch (ex) {
-                console.log("Failed to load session " + sessionKey);
+                console.log("Failed to load session " + oldSessionKey);
                 interactionStates.push(interactionState);
             }
         });
         // Fetch new session id (to prevent overwriting old one).
-        sessionKey = null;
+        var newSessionKey = null;
         Promise.resolve($.ajax({
             type: "POST",
             url: serverPath + "/makeSession",
             dataType: "json"
         })).then(function (v) {
-            sessionKey = v;
+            newSessionKey = v;
             history.pushState({}, "HighCons", "index.html?" + v);
         });
         // Save interaction states to server.
         interactionStates.throttle(3000).onValue(function (s) {
             // Guard from overwriting old session.
-            if (sessionKey >= 0) {
+            if (newSessionKey !== null) {
                 $.ajax({
                     type: "POST",
                     url: serverPath + "/storeSession",
                     dataType: "json",
                     data: {
-                        key: sessionKey,
+                        key: newSessionKey,
                         state: s.toJSON()
                     }
                 });

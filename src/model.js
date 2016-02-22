@@ -84,6 +84,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             addObjectInfo(objectValuesDict);
             this.dataSets = new ProxyValue("dataSetList", {}, []);
             this.dataSetInfo = new ProxyValue("dataSetInfo", { dataSet: dataSet }, new DataSetInfo(), function (ds) { return new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels); });
+            this.wellAnnotations = new ProxyValue("wellAnnotations", { dataSet: dataSet }, new WellAnnotations(), function (wa) { return new WellAnnotations(wa); });
             this.features = new ProxyValue("features", { dataSet: dataSet }, []);
             this.objectInfo = new ProxyValue("objectInfo", objectInfoDict, new NumberFrame(), function (o) { return new NumberFrame(o); });
             this.objectHistograms = new ProxyValue("objectHistograms2D", histogramDict, new HistogramMatrix(), function (m) { return new HistogramMatrix(m); });
@@ -570,26 +571,16 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         return WellClusterShares;
     })(NumberFrame);
     exports.WellClusterShares = WellClusterShares;
-    //export class Clusters {
-    //    static CLUSTER_PREAMBLE = "c_";
-    //
-    //    identifiers: number[];              // Cluster representative identifiers.
-    //    identifierIndex: StringMap<number>; // Cluster indices.
-    //    members: number[][];                // Cluster member identifiers (of small sub-sample).
-    //
-    //    constructor(public clusterMap: StringMap<number> = {}) {
-    //        this.identifiers = _.uniq(_.values(clusterMap).map(c => Number(c)));
-    //
-    //        // Check for no cluster case (-1 cluster).
-    //        if(this.identifiers.length > 0 && this.identifiers[0] > -1) {
-    //            this.identifierIndex = {};
-    //            this.identifiers.forEach((id, I) => this.identifierIndex[id] = I);
-    //            this.members = [];
-    //            this.identifiers.forEach(c => this.members[c] = []);
-    //            _.pairs(clusterMap).forEach((p) => this.members[p[1]].push(p[0]));
-    //        }
-    //    }
-    //}
+    var WellAnnotations = (function (_super) {
+        __extends(WellAnnotations, _super);
+        function WellAnnotations(dictionary) {
+            if (dictionary === void 0) { dictionary = {}; }
+            _super.call(this, dictionary);
+        }
+        WellAnnotations.ANNOTATION_SPLIT = "|";
+        return WellAnnotations;
+    })(DataFrame);
+    exports.WellAnnotations = WellAnnotations;
     var FeatureHistograms = (function () {
         function FeatureHistograms(dict) {
             var _this = this;

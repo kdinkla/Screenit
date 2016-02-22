@@ -81,6 +81,7 @@ export class EnrichedState extends InteractionState {
 
     dataSets: ProxyValue<string[]>;                     // Available data sets.
     dataSetInfo: ProxyValue<DataSetInfo>;               // Data set specifications.
+    wellAnnotations: ProxyValue<WellAnnotations>;       // Well annotation tags, listed by category.
     features: ProxyValue<string[]>;                     // Available parameters.
     objectInfo: ProxyValue<NumberFrame>;                // All features for prime sample.
     objectHistograms: ProxyValue<HistogramMatrix>;      // 2D histograms for selected cluster and feature combinations.
@@ -129,6 +130,11 @@ export class EnrichedState extends InteractionState {
             "dataSetInfo",
             {dataSet: dataSet},
             new DataSetInfo(), ds => new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels)
+        );
+        this.wellAnnotations = new ProxyValue(
+            "wellAnnotations",
+            {dataSet: dataSet},
+            new WellAnnotations(), wa => new WellAnnotations(wa)
         );
         this.features = new ProxyValue(
             "features",
@@ -774,26 +780,13 @@ export class WellClusterShares extends NumberFrame {
     }
 }
 
-//export class Clusters {
-//    static CLUSTER_PREAMBLE = "c_";
-//
-//    identifiers: number[];              // Cluster representative identifiers.
-//    identifierIndex: StringMap<number>; // Cluster indices.
-//    members: number[][];                // Cluster member identifiers (of small sub-sample).
-//
-//    constructor(public clusterMap: StringMap<number> = {}) {
-//        this.identifiers = _.uniq(_.values(clusterMap).map(c => Number(c)));
-//
-//        // Check for no cluster case (-1 cluster).
-//        if(this.identifiers.length > 0 && this.identifiers[0] > -1) {
-//            this.identifierIndex = {};
-//            this.identifiers.forEach((id, I) => this.identifierIndex[id] = I);
-//            this.members = [];
-//            this.identifiers.forEach(c => this.members[c] = []);
-//            _.pairs(clusterMap).forEach((p) => this.members[p[1]].push(p[0]));
-//        }
-//    }
-//}
+export class WellAnnotations extends DataFrame<string[]> {
+    static ANNOTATION_SPLIT = "|";
+
+    constructor(dictionary: any = {}) {
+        super(dictionary);
+    }
+}
 
 export class FeatureHistograms {
     histograms: StringMap<DataFrame<number>>;
