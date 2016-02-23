@@ -61,6 +61,13 @@ export class InteractionState implements AbstractModel {
         this.openViews = new Chain([viewCycle[Math.max(0, index - 1)], viewCycle[index], 'exemplars']);
     }
 
+    toggleAnnotation(category: string, tag: string) {
+        var annotations = this.selectedCoordinates.wellAnnotations;
+        annotations[category] = _.contains(annotations[category], tag) ?
+            _.difference(annotations[category], [tag]) :
+            _.union(annotations[category], [tag]);
+    }
+
     toJSON() {
         return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
     }
@@ -158,7 +165,7 @@ export class EnrichedState extends InteractionState {
         );
         this.featureHistograms = new ProxyValue(
             "featureHistograms",
-            populationDict,
+            histogramDict,
             new FeatureHistograms(), hs => new FeatureHistograms(hs)
         );
         this.objectFeatureValues = new ProxyValue(
@@ -231,11 +238,11 @@ export class EnrichedState extends InteractionState {
     }
 
     // Well selections, including single focused well.
-    allWellSelections() {
+    /*allWellSelections() {
         var location = this.selectionWell(this.focused());
         var focusedWell = location ? [location.toWellSelection("Selected")] : [];
         return _.union(this.dataSetInfo.value.wellSelections, focusedWell);
-    }
+    }*/
 
     // Focused coordinates.
     focused() {
@@ -273,7 +280,7 @@ export class EnrichedState extends InteractionState {
     // Population color, includes focused population highlight.
     populationColor(population: Population) {
         var focus = this.focused();
-        return focus && focus.population === population.identifier ?
+        return !population || (focus && focus.population === population.identifier) ?
             this.configuration.highlight :
             population.color;
     }
@@ -281,7 +288,7 @@ export class EnrichedState extends InteractionState {
     // Translucent population color, includes population highlight.
     populationColorTranslucent(population: Population) {
         var focus = this.focused();
-        return focus && focus.population === population.identifier ?
+        return !population || (focus && focus.population === population.identifier) ?
             this.configuration.highlight :
             population.colorTrans;
     }
@@ -391,11 +398,11 @@ export class EnrichedState extends InteractionState {
 
                 populations.forEach(population => {
                     var pop = population.identifier;
-                    var minZ = shares.zScoresMin[pop];
-                    var maxZ = shares.zScoresMax[pop];
+                    //var minZ = -this.configuration.activationZScoreRange;   //shares.zScoresMin[pop];
+                    //var maxZ = this.configuration.activationZScoreRange;    //shares.zScoresMax[pop];
 
                     shares.zScores[pop].forEach((plt, pltI) => plt.forEach((col, colI) => col.forEach((val, rowI) => {
-                        var normZ = val <= 0 ? val / Math.abs(minZ) : val / maxZ;
+                        var normZ = val / this.configuration.activationZScoreRange; //val <= 0 ? val / Math.abs(minZ) : val / maxZ;
                         this.wellScs[pltI][colI][rowI] += population.activate(normZ);
                     })));
                 });
@@ -455,6 +462,61 @@ export class EnrichedState extends InteractionState {
             _.compact(_.range(0, colCapacity).map(rI => platesOrdered[cI * colCapacity + rI])).sort((p1, p2) => p1 - p2));
 
         return colMaps;
+    }
+
+    plateAnnotationPartition(): { annotations: string[]; plates: number[] }[] {
+        // Plate score by id.
+        var plateRange = this.plates();
+        //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
+        //var platesOrdered = _.clone(plateRange);
+
+        // Focused annotations.
+        var allTargetPlateSelections = plateRange.map(p => this.plateTargetAnnotations(p));
+
+        // Bin plates by annotations.
+        var bins: StringMap<{ annotations: string[]; plates: number[] }> = {};
+        allTargetPlateSelections.forEach((sel, p) => {
+            var tags = _.uniq(_.flatten(_.values(sel).map(tags =>
+                            _.keys(tags).filter(t => tags[t].wells.length > 0))).sort(), true);
+            var binKey = tags.join(",");
+            //var binKey = _.keys(sel).map(cat => cat + ":" + _.keys(sel[cat]).join(",")).join(";");
+
+            if(!(binKey in bins)) bins[binKey] = { annotations: tags, plates: <number[]>[] };
+            bins[binKey].plates.push(p);
+        });
+
+        return <any>_.values(bins);
+    }
+
+    // Plate annotations as well selections, returned as a map of annotation category and tag.
+    plateTargetAnnotations(plate: number) {
+        var dataInfo = this.dataSetInfo.value;
+        var wellAnnotations = this.wellAnnotations.value;
+        var focusAnnotations = this.focused().wellAnnotations;
+
+        var selections: StringMap<StringMap<WellSelection>> = {};
+        _.keys(focusAnnotations).forEach(cat => {
+            selections[cat] = {};
+            focusAnnotations[cat].forEach(tag =>
+                selections[cat][tag] = new WellSelection(cat, tag, plate, [])
+            );
+        });
+        dataInfo.columnLabels.forEach((c, cI) =>
+            dataInfo.rowLabels.forEach((r, rI) => {
+                var wellCoordinates = new WellCoordinates(cI, rI);
+                var annotations = wellAnnotations.annotationsAt(plate, wellCoordinates);
+
+                _.keys(annotations).forEach(cat => annotations[cat].forEach(tag => {
+                    if(cat in selections && tag in selections[cat])
+                        selections[cat][tag].wells.push(wellCoordinates);
+                }));
+        }));
+
+        // Add focused well.
+        selections["Selected"] = {};
+        selections["Selected"]["Selected"] = new WellSelection("Selected", "Selected", plate, [this.focused().well]);
+
+        return selections;
     }
 
     /*private plateScore(targetVector: number[], populationMatrices: number[][][], colCount: number, rowCount: number) {
@@ -633,8 +695,9 @@ export class SelectionCoordinates {
                 public object: number = null,                               // Object (e.g. cell) id.
                 public well: WellCoordinates = new WellCoordinates(0, 0),   // Well coordinates (column, row).
                 public plate: number = 0,                                   // Plate id.
-                public probeColumns: string[] = [],
-                public probeCoordinates: number[] = []) {
+                public probeColumns: string[] = [],                         // Object query by coordinate columns.
+                public probeCoordinates: number[] = [],                     // Object query by coordinates.
+                public wellAnnotations: StringMap<string[]> = {}) {         // Selected well annotations.
     }
 
     // Correct for missing values with given coordinates.
@@ -685,7 +748,8 @@ export class SelectionCoordinates {
             WellCoordinates.fromJSON(data['well']),
             data['plate'],
             data['probeColumns'],
-            data['probeCoordinates']
+            data['probeCoordinates'],
+            data['wellAnnotations']
         );
     }
 }
@@ -695,7 +759,7 @@ export class DataSetInfo {
     columnCount: number;
     rowCount: number;
 
-    wellSelections: WellSelection[];
+    //wellSelections: WellSelection[];
 
     constructor(public plateLabels: string[] = [],
                 public columnLabels: string[] = [],
@@ -705,10 +769,10 @@ export class DataSetInfo {
         this.rowCount = rowLabels.length;
 
         // Well selection placeholder; complete selection and control wells, for now.
-        this.wellSelections = [
+        //this.wellSelections = [
             //new WellSelection("All", [[0, this.plateCount-1]], WellCoordinates.allWells(this.columnCount, this.rowCount)),
             //new WellSelection("Control", [[0, this.plateCount-1]], WellCoordinates.rowWells(this.columnCount, [0]))  // First two columns.
-        ];
+        //];
     }
 }
 
@@ -786,6 +850,14 @@ export class WellAnnotations extends DataFrame<string[]> {
     constructor(dictionary: any = {}) {
         super(dictionary);
     }
+
+    // Return dictionary of annotations for given plate and well coordinates.
+    annotationsAt(plate: number, coordinates: WellCoordinates) {
+        var rowIndex = this.rowIndex[plate + "_" + coordinates.column + "_" + coordinates.row];
+        var dict: StringMap<string[]> = {};
+        if(rowIndex >= 0) this.columns.forEach(c => dict[c] = this.matrix[this.columnIndex[c]][rowIndex]);
+        return dict;
+    }
 }
 
 export class FeatureHistograms {
@@ -842,7 +914,7 @@ export class WellLocation extends WellCoordinates {
 
     // This (singular) location as a well selection.
     toWellSelection(id: string) {
-        return new WellSelection(id, [[this.plate, this.plate]], [new WellCoordinates(this.column, this.row)]);
+        return new WellSelection("Location", id, this.plate, [new WellCoordinates(this.column, this.row)]);
     }
 
     // Well column and row coordinates. Excludes plate coordinate.
@@ -866,10 +938,10 @@ export class WellLocation extends WellCoordinates {
 }
 
 export class WellSelection {
-    constructor(public id: string,
-                public plates: number[][],  // Plate ranges, or individual indices as singleton arrays.
-                public wells: WellCoordinates[]
-    ) {}
+    constructor(public category: string,
+                public tag: string,
+                public plate: number,
+                public wells: WellCoordinates[]) {}
 }
 
 export class HistogramMatrix {

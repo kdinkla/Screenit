@@ -47,6 +47,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var index = exports.viewCycle.indexOf(identifier);
             this.openViews = new Chain([exports.viewCycle[Math.max(0, index - 1)], exports.viewCycle[index], 'exemplars']);
         };
+        InteractionState.prototype.toggleAnnotation = function (category, tag) {
+            var annotations = this.selectedCoordinates.wellAnnotations;
+            annotations[category] = _.contains(annotations[category], tag) ? _.difference(annotations[category], [tag]) : _.union(annotations[category], [tag]);
+        };
         InteractionState.prototype.toJSON = function () {
             return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
         };
@@ -89,7 +93,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.objectInfo = new ProxyValue("objectInfo", objectInfoDict, new NumberFrame(), function (o) { return new NumberFrame(o); });
             this.objectHistograms = new ProxyValue("objectHistograms2D", histogramDict, new HistogramMatrix(), function (m) { return new HistogramMatrix(m); });
             this.wellClusterShares = new ProxyValue("wellClusterShares", populationDict, new WellClusterShares(), function (s) { return new WellClusterShares(s); });
-            this.featureHistograms = new ProxyValue("featureHistograms", populationDict, new FeatureHistograms(), function (hs) { return new FeatureHistograms(hs); });
+            this.featureHistograms = new ProxyValue("featureHistograms", histogramDict, new FeatureHistograms(), function (hs) { return new FeatureHistograms(hs); });
             this.objectFeatureValues = new ProxyValue("objectFeatureValues", objectValuesDict, new NumberFrame(), function (vs) { return new NumberFrame(vs); });
         }
         EnrichedState.prototype.cloneInteractionState = function () {
@@ -141,11 +145,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return bestIndex >= 0 ? Number(tbl.rows[bestIndex]) : null;
         };
         // Well selections, including single focused well.
-        EnrichedState.prototype.allWellSelections = function () {
+        /*allWellSelections() {
             var location = this.selectionWell(this.focused());
             var focusedWell = location ? [location.toWellSelection("Selected")] : [];
             return _.union(this.dataSetInfo.value.wellSelections, focusedWell);
-        };
+        }*/
         // Focused coordinates.
         EnrichedState.prototype.focused = function () {
             var _this = this;
@@ -168,12 +172,12 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         // Population color, includes focused population highlight.
         EnrichedState.prototype.populationColor = function (population) {
             var focus = this.focused();
-            return focus && focus.population === population.identifier ? this.configuration.highlight : population.color;
+            return !population || (focus && focus.population === population.identifier) ? this.configuration.highlight : population.color;
         };
         // Translucent population color, includes population highlight.
         EnrichedState.prototype.populationColorTranslucent = function (population) {
             var focus = this.focused();
-            return focus && focus.population === population.identifier ? this.configuration.highlight : population.colorTrans;
+            return !population || (focus && focus.population === population.identifier) ? this.configuration.highlight : population.colorTrans;
         };
         // Complete, or correct, coordinates, from object level up to plate level.
         /*conformHoveredCoordinates(targetState: InteractionState) {
@@ -259,10 +263,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     this.wellScs = shares.zScores[populations[0].identifier].map(function (plt) { return plt.map(function (col) { return col.map(function (v) { return 0; }); }); });
                     populations.forEach(function (population) {
                         var pop = population.identifier;
-                        var minZ = shares.zScoresMin[pop];
-                        var maxZ = shares.zScoresMax[pop];
+                        //var minZ = -this.configuration.activationZScoreRange;   //shares.zScoresMin[pop];
+                        //var maxZ = this.configuration.activationZScoreRange;    //shares.zScoresMax[pop];
                         shares.zScores[pop].forEach(function (plt, pltI) { return plt.forEach(function (col, colI) { return col.forEach(function (val, rowI) {
-                            var normZ = val <= 0 ? val / Math.abs(minZ) : val / maxZ;
+                            var normZ = val / _this.configuration.activationZScoreRange; //val <= 0 ? val / Math.abs(minZ) : val / maxZ;
                             _this.wellScs[pltI][colI][rowI] += population.activate(normZ);
                         }); }); });
                     });
@@ -311,6 +315,49 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
             var colMaps = _.range(0, cfg.miniHeatColumnCount).map(function (cI) { return _.compact(_.range(0, colCapacity).map(function (rI) { return platesOrdered[cI * colCapacity + rI]; })).sort(function (p1, p2) { return p1 - p2; }); });
             return colMaps;
+        };
+        EnrichedState.prototype.plateAnnotationPartition = function () {
+            var _this = this;
+            // Plate score by id.
+            var plateRange = this.plates();
+            //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
+            //var platesOrdered = _.clone(plateRange);
+            // Focused annotations.
+            var allTargetPlateSelections = plateRange.map(function (p) { return _this.plateTargetAnnotations(p); });
+            // Bin plates by annotations.
+            var bins = {};
+            allTargetPlateSelections.forEach(function (sel, p) {
+                var tags = _.uniq(_.flatten(_.values(sel).map(function (tags) { return _.keys(tags).filter(function (t) { return tags[t].wells.length > 0; }); })).sort(), true);
+                var binKey = tags.join(",");
+                //var binKey = _.keys(sel).map(cat => cat + ":" + _.keys(sel[cat]).join(",")).join(";");
+                if (!(binKey in bins))
+                    bins[binKey] = { annotations: tags, plates: [] };
+                bins[binKey].plates.push(p);
+            });
+            return _.values(bins);
+        };
+        // Plate annotations as well selections, returned as a map of annotation category and tag.
+        EnrichedState.prototype.plateTargetAnnotations = function (plate) {
+            var dataInfo = this.dataSetInfo.value;
+            var wellAnnotations = this.wellAnnotations.value;
+            var focusAnnotations = this.focused().wellAnnotations;
+            var selections = {};
+            _.keys(focusAnnotations).forEach(function (cat) {
+                selections[cat] = {};
+                focusAnnotations[cat].forEach(function (tag) { return selections[cat][tag] = new WellSelection(cat, tag, plate, []); });
+            });
+            dataInfo.columnLabels.forEach(function (c, cI) { return dataInfo.rowLabels.forEach(function (r, rI) {
+                var wellCoordinates = new WellCoordinates(cI, rI);
+                var annotations = wellAnnotations.annotationsAt(plate, wellCoordinates);
+                _.keys(annotations).forEach(function (cat) { return annotations[cat].forEach(function (tag) {
+                    if (cat in selections && tag in selections[cat])
+                        selections[cat][tag].wells.push(wellCoordinates);
+                }); });
+            }); });
+            // Add focused well.
+            selections["Selected"] = {};
+            selections["Selected"]["Selected"] = new WellSelection("Selected", "Selected", plate, [this.focused().well]);
+            return selections;
         };
         return EnrichedState;
     })(InteractionState);
@@ -450,7 +497,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             object, // Object (e.g. cell) id.
             well, // Well coordinates (column, row).
             plate, // Plate id.
-            probeColumns, probeCoordinates) {
+            probeColumns, // Object query by coordinate columns.
+            probeCoordinates, // Object query by coordinates.
+            wellAnnotations) {
             if (dataSet === void 0) { dataSet = null; }
             if (population === void 0) { population = null; }
             if (object === void 0) { object = null; }
@@ -458,6 +507,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (plate === void 0) { plate = 0; }
             if (probeColumns === void 0) { probeColumns = []; }
             if (probeCoordinates === void 0) { probeCoordinates = []; }
+            if (wellAnnotations === void 0) { wellAnnotations = {}; }
             this.dataSet = dataSet;
             this.population = population;
             this.object = object;
@@ -465,6 +515,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.plate = plate;
             this.probeColumns = probeColumns;
             this.probeCoordinates = probeCoordinates;
+            this.wellAnnotations = wellAnnotations;
         }
         // Correct for missing values with given coordinates.
         SelectionCoordinates.prototype.otherwise = function (that) {
@@ -496,12 +547,13 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.probeCoordinates = [];
         };
         SelectionCoordinates.fromJSON = function (data) {
-            return new SelectionCoordinates(data['dataSet'], data['population'], data['object'], WellCoordinates.fromJSON(data['well']), data['plate'], data['probeColumns'], data['probeCoordinates']);
+            return new SelectionCoordinates(data['dataSet'], data['population'], data['object'], WellCoordinates.fromJSON(data['well']), data['plate'], data['probeColumns'], data['probeCoordinates'], data['wellAnnotations']);
         };
         return SelectionCoordinates;
     })();
     exports.SelectionCoordinates = SelectionCoordinates;
     var DataSetInfo = (function () {
+        //wellSelections: WellSelection[];
         function DataSetInfo(plateLabels, columnLabels, rowLabels) {
             if (plateLabels === void 0) { plateLabels = []; }
             if (columnLabels === void 0) { columnLabels = []; }
@@ -513,8 +565,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.columnCount = columnLabels.length;
             this.rowCount = rowLabels.length;
             // Well selection placeholder; complete selection and control wells, for now.
-            this.wellSelections = [
-            ];
+            //this.wellSelections = [
+            //new WellSelection("All", [[0, this.plateCount-1]], WellCoordinates.allWells(this.columnCount, this.rowCount)),
+            //new WellSelection("Control", [[0, this.plateCount-1]], WellCoordinates.rowWells(this.columnCount, [0]))  // First two columns.
+            //];
         }
         return DataSetInfo;
     })();
@@ -577,6 +631,15 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (dictionary === void 0) { dictionary = {}; }
             _super.call(this, dictionary);
         }
+        // Return dictionary of annotations for given plate and well coordinates.
+        WellAnnotations.prototype.annotationsAt = function (plate, coordinates) {
+            var _this = this;
+            var rowIndex = this.rowIndex[plate + "_" + coordinates.column + "_" + coordinates.row];
+            var dict = {};
+            if (rowIndex >= 0)
+                this.columns.forEach(function (c) { return dict[c] = _this.matrix[_this.columnIndex[c]][rowIndex]; });
+            return dict;
+        };
         WellAnnotations.ANNOTATION_SPLIT = "|";
         return WellAnnotations;
     })(DataFrame);
@@ -635,7 +698,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // This (singular) location as a well selection.
         WellLocation.prototype.toWellSelection = function (id) {
-            return new WellSelection(id, [[this.plate, this.plate]], [new WellCoordinates(this.column, this.row)]);
+            return new WellSelection("Location", id, this.plate, [new WellCoordinates(this.column, this.row)]);
         };
         // Well column and row coordinates. Excludes plate coordinate.
         WellLocation.prototype.coordinates = function () {
@@ -658,10 +721,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     })(WellCoordinates);
     exports.WellLocation = WellLocation;
     var WellSelection = (function () {
-        function WellSelection(id, plates, // Plate ranges, or individual indices as singleton arrays.
-            wells) {
-            this.id = id;
-            this.plates = plates;
+        function WellSelection(category, tag, plate, wells) {
+            this.category = category;
+            this.tag = tag;
+            this.plate = plate;
             this.wells = wells;
         }
         return WellSelection;

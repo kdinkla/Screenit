@@ -46,12 +46,6 @@ export class BaseConfiguration {
     guideArrowLength = 5;
     guideVisible = false;
 
-    // Features.
-    featureFont = new Font(10);
-    featureCellSpace = [4, 2];
-    featureCellDimensions = [50, this.featureFont.size];
-    featureSplit = 'joint'; // else 'separate'
-
     // Scatter plots.
     minDotSize = 1;
     maxDotSize = 3;
@@ -89,6 +83,12 @@ export class BaseConfiguration {
     exemplarSpace = 1;
     exemplarColumnSpace = 4 * this.exemplarSpace;
 
+    // Features.
+    featureFont = new Font(10);
+    featureCellSpace = [4, 2];
+    featureCellDimensions = [this.splomInnerSize, this.featureFont.size];   //[50, this.featureFont.size];
+    featureSplit = 'joint'; // else 'separate'
+
     // Transfer editor.
     transferPlotSize = this.clusterTileInnerSize;
     transferFont = new Font(8);
@@ -114,10 +114,19 @@ export class BaseConfiguration {
     // Plate mini heatmap view.
     miniHeatWellDiameter = 2;
     miniHeatSpace = 2;
+    miniHeatColumnMax = 10;
     miniHeatColumnCount = 5;
 
     // Well details view.
     wellViewMaxWidth = 600;
+    annotationFont = new Font(12);
+    annotationCategoryLabel = new LabelStyle(this.annotationFont, this.base);
+    annotationLabel = new LabelStyle(this.annotationFont, this.baseDim);
+    annotationSelectedLabel = new LabelStyle(this.annotationFont, this.baseEmphasis);
+    annotationTagSpace = 5;
+
+    // Activation function.
+    activationZScoreRange = 4;
 
     // Object details view.
     objectViewImageRadius = 40;

@@ -288,9 +288,6 @@ class FeatureHistogram extends PlacedSnippet {
 
         var cachedImage = histograms[cacheTag];
         if(!cachedImage) {
-            console.log("Histogram frames:");
-            console.log(frames);
-
             cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], plainContext => {
                 _.keys(frames).map(fK => {
                     var frame = frames[fK];
@@ -300,24 +297,22 @@ class FeatureHistogram extends PlacedSnippet {
                             this.state.populationColorTranslucent(this.state.populationSpace.populations.byId(fK));
 
                     plainContext.fillStyle = fontColor.toString();
-                    //plainContext.beginPath();
+                    plainContext.beginPath();
                     var len = normFrequencies.length - 1;
-                    var spanWidth = this.dimensions[0] - 1;
+                    var spanWidth = this.dimensions[0];
                     var spanHeight = this.dimensions[1] - 1;
+                    plainContext.moveTo(0, 0);
                     for(var i = 0; i <= len; i++) {
                         var x1 = i * spanWidth / len;
                         var f1 = normFrequencies[i];
                         var y1 = (1 - f1) * spanHeight;
 
-                        plainContext.fillRect(x1, y1, 1, 1);
+                        //plainContext.fillRect(x1, y1, 1, 1);
 
-
-                        //if(i > 0)
-                        //    plainContext.lineTo(x1, y1);
-                        //else
-                        //    plainContext.moveTo(x1, y1);
+                        plainContext.lineTo(x1, y1);
                     }
-                    //plainContext.stroke();
+                    plainContext.lineTo(0, spanWidth);
+                    plainContext.fill();
                 });
             });
 
@@ -776,10 +771,10 @@ class PopulationTransferEdit extends PlacedSnippet {
     constructor(public population: Population, public state: EnrichedState, public leftMost: boolean = false) {
         super("TransferEdit_" + population.identifier, [0,0]);
 
-        var minScore = state.wellClusterShares.value.zScoresMin[population.identifier];
-        var maxScore = state.wellClusterShares.value.zScoresMax[population.identifier];
-        this.minZScoreLabel = minScore < 0 ? minScore.toFixed(0) : '?';
-        this.maxZScoreLabel = maxScore > 0 ? maxScore.toFixed(0) : '?';
+        //var minScore = state.wellClusterShares.value.zScoresMin[population.identifier];
+        //var maxScore = state.wellClusterShares.value.zScoresMax[population.identifier];
+        this.minZScoreLabel = (-state.configuration.activationZScoreRange).toString();  //minScore < 0 ? minScore.toFixed(0) : '?';
+        this.maxZScoreLabel = state.configuration.activationZScoreRange.toString();     //maxScore > 0 ? maxScore.toFixed(0) : '?';
 
         var cfg = state.configuration;
         this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + 2 * cfg.transferFont.size]);
@@ -919,24 +914,44 @@ class ExemplarLabel extends Label {
 }
 
 class AbstractPlate extends PlacedSnippet {
+    flatAnnotations: WellSelection[];
     selectionOutlines: jsts.geom.Geometry[];
+    selectionRims: jsts.geom.Geometry[];
 
-    constructor(id: string, topLeft: number[],
+    constructor(id: string,
+                topLeft: number[],
                 public state: EnrichedState,
                 public columnLabels: boolean = true,
                 public rowLabels: boolean = true) {
         super(id, topLeft);
 
         var cfg = state.configuration;
+        var plate = this.state.focused().plate;
+        var annotations =  this.state.plateTargetAnnotations(plate);
+        this.flatAnnotations = <WellSelection[]> _.flatten(_.values(annotations).map(ann => _.values(ann)));
 
         var gf = new jsts.geom.GeometryFactory();
-        this.selectionOutlines = state.allWellSelections().map(ws => {
+        this.selectionOutlines = this.flatAnnotations.map(ws => {
             // Tile per well.
             var wellTiles = ws.wells.map(wc => {
                 var topLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter, wc.row * cfg.wellDiameter);
                 var topRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter, wc.row * cfg.wellDiameter);
                 var bottomRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter, (wc.row + 1) * cfg.wellDiameter);
                 var bottomLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter, (wc.row + 1) * cfg.wellDiameter);
+
+                return gf.createPolygon(gf.createLinearRing([topLeft, topRight, bottomRight, bottomLeft, topLeft]), []);
+            });
+
+            return new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
+        });
+        this.selectionRims = this.flatAnnotations.map(ws => {
+            // Tile per well.
+            var wellTiles = ws.wells.map(wc => {
+                var dilate = .5;
+                var topLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter - dilate, wc.row * cfg.wellDiameter - dilate);
+                var topRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter + dilate, wc.row * cfg.wellDiameter - dilate);
+                var bottomRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter + dilate, (wc.row + 1) * cfg.wellDiameter + dilate);
+                var bottomLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter - dilate, (wc.row + 1) * cfg.wellDiameter + dilate);
 
                 return gf.createPolygon(gf.createLinearRing([topLeft, topRight, bottomRight, bottomLeft, topLeft]), []);
             });
@@ -1019,11 +1034,11 @@ class AbstractPlate extends PlacedSnippet {
             ctx.strokeStyle(cfg.backgroundColor);
             ctx.lineWidth(3.5);
             ctx.beginPath();
-            TemplatePlate.geometryToPath(ctx, so);
+            TemplatePlate.geometryToPath(ctx, this.selectionRims[i]);
             ctx.stroke();
 
-            ctx.strokeStyle(this.state.allWellSelections()[i].id === "Selected" ? cfg.baseSelected : cfg.base);
-            ctx.lineWidth(2);
+            ctx.strokeStyle(this.flatAnnotations[i].category === "Selected" ? cfg.baseSelected : cfg.base);
+            ctx.lineWidth(1.5);
             ctx.beginPath();
             TemplatePlate.geometryToPath(ctx, so);
             ctx.stroke();
@@ -1296,6 +1311,7 @@ class JointWellPlates extends List<AbstractPlate> {
 
 class WellDetailView extends PlacedSnippet {
     imageTypeOption: ConfigurationOptions;
+    annotationTable: WellAnnotationTable;
 
     guide: GuideLabel;
 
@@ -1303,7 +1319,7 @@ class WellDetailView extends PlacedSnippet {
         super("WellDetailView", []);
 
         var cfg = state.configuration;
-        this.setDimensions([cfg.wellViewMaxWidth, cfg.wellViewMaxWidth]);      //(cfg.wellViewMaxDim);
+        this.setDimensions([cfg.wellViewMaxWidth, cfg.wellViewMaxWidth]);
 
         var availableTypes = _.keys(state.availableImageTypes());
         var wellOptions: StringMap<string> = {};
@@ -1315,7 +1331,8 @@ class WellDetailView extends PlacedSnippet {
             "imageType",
             wellOptions);
 
-        if(state.focused().object === null) {
+        var focused = state.focused();
+        if(focused.object === null) {
             this.guide = new GuideLabel(
                 "well",
                 "Hover over a cell to inspect it.",
@@ -1325,15 +1342,24 @@ class WellDetailView extends PlacedSnippet {
                 state
             );
         }
+
+        this.annotationTable = new WellAnnotationTable(
+            "focusedAnnotations",
+            state.wellAnnotations.value.annotationsAt(focused.plate, focused.well), state
+        );
     }
 
     setTopLeft(topLeft: number[]) {
         super.setTopLeft(topLeft);
 
         if(this.imageTypeOption)
-            this.imageTypeOption.setTopLeft(Vector.add(this.topLeft, [0, .75 * this.dimensions[1] + 10]));  //this.bottomLeft);
+            this.imageTypeOption.setTopLeft(
+                Vector.add(this.topRight, [-this.imageTypeOption.dimensions[0], .75 * this.dimensions[1] + 10]));
         if(this.guide)
             this.guide.setTopLeft(Vector.add(this.bottomRight, [-200, 25]));
+        if(this.annotationTable)
+            this.annotationTable.setTopLeft(
+                Vector.add(this.topLeft, [0, .75 * this.dimensions[1] + 10]));
     }
 
     paint(ctx: ViewContext) {
@@ -1350,7 +1376,7 @@ class WellDetailView extends PlacedSnippet {
             if (img) {
                 ctx.transitioning = false;
 
-                var wellScale = Math.min(1, cfg.wellViewMaxWidth / img.width);   //Math.min(cfg.wellViewMaxDim[0] / img.width, 2 * cfg.wellViewMaxDim[1] / img.height);
+                var wellScale = Math.min(1, cfg.wellViewMaxWidth / img.width);
                 ctx.picking = true;
                 ctx.drawImageClipped(
                     img,
@@ -1384,8 +1410,8 @@ class WellDetailView extends PlacedSnippet {
 
         // Well type button.
         ctx.snippet(this.imageTypeOption);
-
         ctx.snippet(this.guide);
+        ctx.snippet(this.annotationTable);
     }
 
     mouseClick(event: ViewMouseEvent, coordinates: number[],
@@ -1423,6 +1449,53 @@ class WellDetailView extends PlacedSnippet {
         var info = this.state.dataSetInfo.value;
         var focusedWell = this.state.focused().well;
         return "Well " + info.columnLabels[focusedWell.column] + info.rowLabels[focusedWell.row];
+    }
+}
+
+class WellAnnotationTable extends List<List<Label>> {
+    constructor(identifier: string, annotations: StringMap<string[]>, state: EnrichedState) {
+        super(identifier,
+            _.keys(annotations).map(k => new WellAnnotationRow(identifier, k, annotations[k], state)),
+            [0,0],
+            [0,0],
+            'horizontal',
+            state.configuration.annotationTagSpace,
+            'left');
+    }
+}
+
+class WellAnnotationRow extends List<Label> {
+    constructor(tableId: string, category: string, tags: string[], state: EnrichedState) {
+        super(tableId + "_" + category,
+            _.union(
+                [new Label(tableId + "_" + category + "_lbl", category, [0,0], state.configuration.annotationCategoryLabel, true)],
+                tags.map(tag => new AnnotationButton(category, tag, state))),
+                //new Label(tableId + "_" + category + "_" + t, t, [0,0], state.configuration.annotationLabel, true))),
+            [0,0],
+            [0,0],
+            'vertical',
+            state.configuration.annotationTagSpace,
+            'left'
+        );
+    }
+}
+
+class AnnotationButton extends Label {
+    constructor(public category: string,
+                public tag: string,
+                state: EnrichedState) {
+        super(
+            "annBut_" + category + "_" + tag,
+            tag,
+            [0,0],
+            _.contains(state.focused().wellAnnotations[category], tag) ?
+                state.configuration.annotationSelectedLabel :
+                state.configuration.annotationLabel,
+            true);
+    }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        interaction.toggleAnnotation(this.category, this.tag);
     }
 }
 
@@ -1525,7 +1598,7 @@ class ObjectDetailView extends PlacedSnippet {
 }
 
 class PlateIndex extends PlacedSnippet {
-    private heatmapColumns: List<List<PlateMiniHeatmap>>;
+    private heatmapColumns: List<PlacedSnippet>;
     private guide: GuideLabel;
 
     constructor(public state: EnrichedState) {
@@ -1540,6 +1613,32 @@ class PlateIndex extends PlacedSnippet {
             _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
 
         //var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
+
+        /*var colPartitions = state.plateAnnotationPartition();
+
+
+        var colLists = colPartitions.map((cP, cI) => {
+            var plateStacks = _.range(0, Math.ceil(cP.plates.length / cfg.miniHeatColumnMax)).map(c => []);
+            cP.plates.forEach((p, pI) => plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p));
+
+            var stackLists = plateStacks.map((ps, psI) => new List(
+                "pic_" + cI + "_" + psI,
+                ps.map(p => new PlateMiniHeatmap(p, state)),
+                [0, 0], [0, 0],
+                'vertical',
+                cfg.miniHeatSpace,
+                'left'));
+
+            return new List(
+                "pic_" + cI,
+                stackLists,
+                [0, 0], [0, 0],
+                'horizontal',
+                cfg.miniHeatSpace,
+                'left');
+        });
+
+        this.heatmapColumns = new List("pics", colLists, [0,0], [0,0], 'horizontal', 2 * cfg.miniHeatSpace, 'left');*/
 
         this.heatmapColumns = new List("pics",
             colMaps.map((c, cI) => new List("pic_" + cI, c, [0,0], [0,0], 'vertical', cfg.miniHeatSpace)),
@@ -1733,8 +1832,8 @@ class ConfigurationOptions extends PlacedSnippet {
         super(identifier, topLeft);
 
         var cfg = targetState.configuration;
-        var baseStyle: LabelStyle = new LabelStyle(cfg.sideFont, cfg.baseDim, 'left', 'top');
-        var selectedStyle: LabelStyle = new LabelStyle(cfg.sideFont, cfg.baseEmphasis, 'left', 'top');
+        var baseStyle: LabelStyle = new LabelStyle(cfg.annotationFont, cfg.baseDim, 'left', 'top');
+        var selectedStyle: LabelStyle = new LabelStyle(cfg.annotationFont, cfg.baseEmphasis, 'left', 'top');
 
         var buttonSnippets = _.pairs(targetMap).map((p, pI) => {
             var label = p[0];

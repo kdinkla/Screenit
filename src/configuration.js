@@ -34,11 +34,6 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.bigGuideStyle = new LabelStyle(new Font(32, 180), Color.CRIMSON, 'left', 'top');
             this.guideArrowLength = 5;
             this.guideVisible = false;
-            // Features.
-            this.featureFont = new Font(10);
-            this.featureCellSpace = [4, 2];
-            this.featureCellDimensions = [50, this.featureFont.size];
-            this.featureSplit = 'joint'; // else 'separate'
             // Scatter plots.
             this.minDotSize = 1;
             this.maxDotSize = 3;
@@ -72,6 +67,11 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.clusterAdditionLabel = new Font(34); //new LabelStyle(new Font(30), this.baseSelected);
             this.exemplarSpace = 1;
             this.exemplarColumnSpace = 4 * this.exemplarSpace;
+            // Features.
+            this.featureFont = new Font(10);
+            this.featureCellSpace = [4, 2];
+            this.featureCellDimensions = [this.splomInnerSize, this.featureFont.size]; //[50, this.featureFont.size];
+            this.featureSplit = 'joint'; // else 'separate'
             // Transfer editor.
             this.transferPlotSize = this.clusterTileInnerSize;
             this.transferFont = new Font(8);
@@ -89,9 +89,17 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             // Plate mini heatmap view.
             this.miniHeatWellDiameter = 2;
             this.miniHeatSpace = 2;
+            this.miniHeatColumnMax = 10;
             this.miniHeatColumnCount = 5;
             // Well details view.
             this.wellViewMaxWidth = 600;
+            this.annotationFont = new Font(12);
+            this.annotationCategoryLabel = new LabelStyle(this.annotationFont, this.base);
+            this.annotationLabel = new LabelStyle(this.annotationFont, this.baseDim);
+            this.annotationSelectedLabel = new LabelStyle(this.annotationFont, this.baseEmphasis);
+            this.annotationTagSpace = 5;
+            // Activation function.
+            this.activationZScoreRange = 4;
             // Object details view.
             this.objectViewImageRadius = 40;
         }

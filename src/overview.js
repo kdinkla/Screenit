@@ -200,25 +200,26 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cacheTag = this.identifier + "_" + focusedPopulation;
             var cachedImage = histograms[cacheTag];
             if (!cachedImage) {
-                console.log("Histogram frames:");
-                console.log(frames);
                 cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], function (plainContext) {
                     _.keys(frames).map(function (fK) {
                         var frame = frames[fK];
                         var normFrequencies = frame.matrix[frame.columnIndex[_this.feature]];
                         var fontColor = fK === Population.POPULATION_ALL_NAME.toString() ? cfg.baseDim : _this.state.populationColorTranslucent(_this.state.populationSpace.populations.byId(fK));
                         plainContext.fillStyle = fontColor.toString();
-                        //plainContext.beginPath();
+                        plainContext.beginPath();
                         var len = normFrequencies.length - 1;
-                        var spanWidth = _this.dimensions[0] - 1;
+                        var spanWidth = _this.dimensions[0];
                         var spanHeight = _this.dimensions[1] - 1;
+                        plainContext.moveTo(0, 0);
                         for (var i = 0; i <= len; i++) {
                             var x1 = i * spanWidth / len;
                             var f1 = normFrequencies[i];
                             var y1 = (1 - f1) * spanHeight;
-                            plainContext.fillRect(x1, y1, 1, 1);
+                            //plainContext.fillRect(x1, y1, 1, 1);
+                            plainContext.lineTo(x1, y1);
                         }
-                        //plainContext.stroke();
+                        plainContext.lineTo(0, spanWidth);
+                        plainContext.fill();
                     });
                 });
                 histograms[cacheTag] = cachedImage;
@@ -580,10 +581,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.population = population;
             this.state = state;
             this.leftMost = leftMost;
-            var minScore = state.wellClusterShares.value.zScoresMin[population.identifier];
-            var maxScore = state.wellClusterShares.value.zScoresMax[population.identifier];
-            this.minZScoreLabel = minScore < 0 ? minScore.toFixed(0) : '?';
-            this.maxZScoreLabel = maxScore > 0 ? maxScore.toFixed(0) : '?';
+            //var minScore = state.wellClusterShares.value.zScoresMin[population.identifier];
+            //var maxScore = state.wellClusterShares.value.zScoresMax[population.identifier];
+            this.minZScoreLabel = (-state.configuration.activationZScoreRange).toString(); //minScore < 0 ? minScore.toFixed(0) : '?';
+            this.maxZScoreLabel = state.configuration.activationZScoreRange.toString(); //maxScore > 0 ? maxScore.toFixed(0) : '?';
             var cfg = state.configuration;
             this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + 2 * cfg.transferFont.size]);
         }
@@ -703,14 +704,29 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.columnLabels = columnLabels;
             this.rowLabels = rowLabels;
             var cfg = state.configuration;
+            var plate = this.state.focused().plate;
+            var annotations = this.state.plateTargetAnnotations(plate);
+            this.flatAnnotations = _.flatten(_.values(annotations).map(function (ann) { return _.values(ann); }));
             var gf = new jsts.geom.GeometryFactory();
-            this.selectionOutlines = state.allWellSelections().map(function (ws) {
+            this.selectionOutlines = this.flatAnnotations.map(function (ws) {
                 // Tile per well.
                 var wellTiles = ws.wells.map(function (wc) {
                     var topLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter, wc.row * cfg.wellDiameter);
                     var topRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter, wc.row * cfg.wellDiameter);
                     var bottomRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter, (wc.row + 1) * cfg.wellDiameter);
                     var bottomLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter, (wc.row + 1) * cfg.wellDiameter);
+                    return gf.createPolygon(gf.createLinearRing([topLeft, topRight, bottomRight, bottomLeft, topLeft]), []);
+                });
+                return new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
+            });
+            this.selectionRims = this.flatAnnotations.map(function (ws) {
+                // Tile per well.
+                var wellTiles = ws.wells.map(function (wc) {
+                    var dilate = .5;
+                    var topLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter - dilate, wc.row * cfg.wellDiameter - dilate);
+                    var topRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter + dilate, wc.row * cfg.wellDiameter - dilate);
+                    var bottomRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter + dilate, (wc.row + 1) * cfg.wellDiameter + dilate);
+                    var bottomLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter - dilate, (wc.row + 1) * cfg.wellDiameter + dilate);
                     return gf.createPolygon(gf.createLinearRing([topLeft, topRight, bottomRight, bottomLeft, topLeft]), []);
                 });
                 return new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
@@ -774,10 +790,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 ctx.strokeStyle(cfg.backgroundColor);
                 ctx.lineWidth(3.5);
                 ctx.beginPath();
-                TemplatePlate.geometryToPath(ctx, so);
+                TemplatePlate.geometryToPath(ctx, _this.selectionRims[i]);
                 ctx.stroke();
-                ctx.strokeStyle(_this.state.allWellSelections()[i].id === "Selected" ? cfg.baseSelected : cfg.base);
-                ctx.lineWidth(2);
+                ctx.strokeStyle(_this.flatAnnotations[i].category === "Selected" ? cfg.baseSelected : cfg.base);
+                ctx.lineWidth(1.5);
                 ctx.beginPath();
                 TemplatePlate.geometryToPath(ctx, so);
                 ctx.stroke();
@@ -1009,21 +1025,25 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             _super.call(this, "WellDetailView", []);
             this.state = state;
             var cfg = state.configuration;
-            this.setDimensions([cfg.wellViewMaxWidth, cfg.wellViewMaxWidth]); //(cfg.wellViewMaxDim);
+            this.setDimensions([cfg.wellViewMaxWidth, cfg.wellViewMaxWidth]);
             var availableTypes = _.keys(state.availableImageTypes());
             var wellOptions = {};
             availableTypes.forEach(function (t) { return wellOptions[t] = t; });
             this.imageTypeOption = new ConfigurationOptions("WellDetailOptions", [0, 0], state, "imageType", wellOptions);
-            if (state.focused().object === null) {
+            var focused = state.focused();
+            if (focused.object === null) {
                 this.guide = new GuideLabel("well", "Hover over a cell to inspect it.", [0, 0], [0, -75], 20, state);
             }
+            this.annotationTable = new WellAnnotationTable("focusedAnnotations", state.wellAnnotations.value.annotationsAt(focused.plate, focused.well), state);
         }
         WellDetailView.prototype.setTopLeft = function (topLeft) {
             _super.prototype.setTopLeft.call(this, topLeft);
             if (this.imageTypeOption)
-                this.imageTypeOption.setTopLeft(Vector.add(this.topLeft, [0, .75 * this.dimensions[1] + 10])); //this.bottomLeft);
+                this.imageTypeOption.setTopLeft(Vector.add(this.topRight, [-this.imageTypeOption.dimensions[0], .75 * this.dimensions[1] + 10]));
             if (this.guide)
                 this.guide.setTopLeft(Vector.add(this.bottomRight, [-200, 25]));
+            if (this.annotationTable)
+                this.annotationTable.setTopLeft(Vector.add(this.topLeft, [0, .75 * this.dimensions[1] + 10]));
         };
         WellDetailView.prototype.paint = function (ctx) {
             var state = this.state;
@@ -1036,7 +1056,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var img = well.image(cfg.imageType);
                 if (img) {
                     ctx.transitioning = false;
-                    var wellScale = Math.min(1, cfg.wellViewMaxWidth / img.width); //Math.min(cfg.wellViewMaxDim[0] / img.width, 2 * cfg.wellViewMaxDim[1] / img.height);
+                    var wellScale = Math.min(1, cfg.wellViewMaxWidth / img.width);
                     ctx.picking = true;
                     ctx.drawImageClipped(img, [0, 0], [img.width, 0.5 * img.height], [0, 0], [wellScale * img.width, wellScale * 0.5 * img.height]);
                     ctx.picking = false;
@@ -1063,6 +1083,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Well type button.
             ctx.snippet(this.imageTypeOption);
             ctx.snippet(this.guide);
+            ctx.snippet(this.annotationTable);
         };
         WellDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             var object = enriched.closestWellObject(coordinates);
@@ -1096,6 +1117,32 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         return WellDetailView;
     })(PlacedSnippet);
+    var WellAnnotationTable = (function (_super) {
+        __extends(WellAnnotationTable, _super);
+        function WellAnnotationTable(identifier, annotations, state) {
+            _super.call(this, identifier, _.keys(annotations).map(function (k) { return new WellAnnotationRow(identifier, k, annotations[k], state); }), [0, 0], [0, 0], 'horizontal', state.configuration.annotationTagSpace, 'left');
+        }
+        return WellAnnotationTable;
+    })(List);
+    var WellAnnotationRow = (function (_super) {
+        __extends(WellAnnotationRow, _super);
+        function WellAnnotationRow(tableId, category, tags, state) {
+            _super.call(this, tableId + "_" + category, _.union([new Label(tableId + "_" + category + "_lbl", category, [0, 0], state.configuration.annotationCategoryLabel, true)], tags.map(function (tag) { return new AnnotationButton(category, tag, state); })), [0, 0], [0, 0], 'vertical', state.configuration.annotationTagSpace, 'left');
+        }
+        return WellAnnotationRow;
+    })(List);
+    var AnnotationButton = (function (_super) {
+        __extends(AnnotationButton, _super);
+        function AnnotationButton(category, tag, state) {
+            _super.call(this, "annBut_" + category + "_" + tag, tag, [0, 0], _.contains(state.focused().wellAnnotations[category], tag) ? state.configuration.annotationSelectedLabel : state.configuration.annotationLabel, true);
+            this.category = category;
+            this.tag = tag;
+        }
+        AnnotationButton.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
+            interaction.toggleAnnotation(this.category, this.tag);
+        };
+        return AnnotationButton;
+    })(Label);
     var ObjectDetailView = (function (_super) {
         __extends(ObjectDetailView, _super);
         function ObjectDetailView(object, state, topLeft) {
@@ -1185,6 +1232,31 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
             var colMaps = _.range(0, cfg.miniHeatColumnCount).map(function (cI) { return _.compact(_.range(0, colCapacity).map(function (rI) { return heatMaps[cI * colCapacity + rI]; })); });
             //var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
+            /*var colPartitions = state.plateAnnotationPartition();
+    
+    
+            var colLists = colPartitions.map((cP, cI) => {
+                var plateStacks = _.range(0, Math.ceil(cP.plates.length / cfg.miniHeatColumnMax)).map(c => []);
+                cP.plates.forEach((p, pI) => plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p));
+    
+                var stackLists = plateStacks.map((ps, psI) => new List(
+                    "pic_" + cI + "_" + psI,
+                    ps.map(p => new PlateMiniHeatmap(p, state)),
+                    [0, 0], [0, 0],
+                    'vertical',
+                    cfg.miniHeatSpace,
+                    'left'));
+    
+                return new List(
+                    "pic_" + cI,
+                    stackLists,
+                    [0, 0], [0, 0],
+                    'horizontal',
+                    cfg.miniHeatSpace,
+                    'left');
+            });
+    
+            this.heatmapColumns = new List("pics", colLists, [0,0], [0,0], 'horizontal', 2 * cfg.miniHeatSpace, 'left');*/
             this.heatmapColumns = new List("pics", colMaps.map(function (c, cI) { return new List("pic_" + cI, c, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace); }), [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'left');
             this.dimensions = this.heatmapColumns.dimensions;
             this.updatePositions();
@@ -1330,8 +1402,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.targetField = targetField;
             this.targetMap = targetMap;
             var cfg = targetState.configuration;
-            var baseStyle = new LabelStyle(cfg.sideFont, cfg.baseDim, 'left', 'top');
-            var selectedStyle = new LabelStyle(cfg.sideFont, cfg.baseEmphasis, 'left', 'top');
+            var baseStyle = new LabelStyle(cfg.annotationFont, cfg.baseDim, 'left', 'top');
+            var selectedStyle = new LabelStyle(cfg.annotationFont, cfg.baseEmphasis, 'left', 'top');
             var buttonSnippets = _.pairs(targetMap).map(function (p, pI) {
                 var label = p[0];
                 var value = p[1];
