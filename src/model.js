@@ -622,6 +622,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.inject(value, targetIndex, remainder);
             }
         };
+        // Retrieve zScore, returns null if not available.
+        WellClusterShares.prototype.zScore = function (population, plate, well) {
+            return (((this.zScores[population] || [])[plate] || [])[well.column] || [])[well.row] || null;
+        };
         return WellClusterShares;
     })(NumberFrame);
     exports.WellClusterShares = WellClusterShares;

@@ -842,6 +842,11 @@ export class WellClusterShares extends NumberFrame {
             this.inject(value, targetIndex, remainder);
         }
     }
+
+    // Retrieve zScore, returns null if not available.
+    zScore(population: number, plate: number, well: WellCoordinates) {
+        return (((this.zScores[population] || [])[plate] || [])[well.column] || [])[well.row] || null;
+    }
 }
 
 export class WellAnnotations extends DataFrame<string[]> {

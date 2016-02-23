@@ -840,6 +840,8 @@ class PopulationTransferEdit extends PlacedSnippet {
             var pnt = funcPoint([actInput, this.population.activate(actInput)]);
             context.lineTo(pnt[0], pnt[1]);
         }
+        var endPoint = funcPoint([1, this.population.activate(1)]);
+        context.lineTo(endPoint[0], endPoint[1]);
         context.stroke();
 
         // Control points.
@@ -848,6 +850,14 @@ class PopulationTransferEdit extends PlacedSnippet {
             var pnt = funcPoint(cP);
             context.fillEllipse(pnt[0], pnt[1], 2, 2);
         });
+
+        // Selected well point.
+        var focus = this.state.focused();
+        var wellShare = this.state.wellClusterShares.value.zScore(this.population.identifier, focus.plate, focus.well) || 0;
+        context.fillStyle(cfg.baseSelected);
+        var wellInput = wellShare / cfg.activationZScoreRange;
+        var wellPnt = funcPoint([wellInput, this.population.activate(wellInput)]);
+        context.fillEllipse(wellPnt[0], wellPnt[1], 2.5, 2.5);
 
         // Picking area.
         context.picking = true;
