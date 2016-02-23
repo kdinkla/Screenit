@@ -210,7 +210,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                         var len = normFrequencies.length - 1;
                         var spanWidth = _this.dimensions[0];
                         var spanHeight = _this.dimensions[1] - 1;
-                        plainContext.moveTo(0, 0);
+                        plainContext.moveTo(0, _this.dimensions[1]);
                         for (var i = 0; i <= len; i++) {
                             var x1 = i * spanWidth / len;
                             var f1 = normFrequencies[i];
@@ -218,7 +218,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                             //plainContext.fillRect(x1, y1, 1, 1);
                             plainContext.lineTo(x1, y1);
                         }
-                        plainContext.lineTo(0, spanWidth);
+                        plainContext.lineTo(_this.dimensions[0], _this.dimensions[1]);
                         plainContext.fill();
                     });
                 });

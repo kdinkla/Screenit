@@ -225,7 +225,6 @@ class FeatureHistogramTable extends List<PlacedSnippet> {
 
     paint(context: ViewContext) {
         super.paint(context);
-
         context.snippet(this.guide);
     }
 
@@ -301,7 +300,7 @@ class FeatureHistogram extends PlacedSnippet {
                     var len = normFrequencies.length - 1;
                     var spanWidth = this.dimensions[0];
                     var spanHeight = this.dimensions[1] - 1;
-                    plainContext.moveTo(0, 0);
+                    plainContext.moveTo(0, this.dimensions[1]);
                     for(var i = 0; i <= len; i++) {
                         var x1 = i * spanWidth / len;
                         var f1 = normFrequencies[i];
@@ -311,7 +310,7 @@ class FeatureHistogram extends PlacedSnippet {
 
                         plainContext.lineTo(x1, y1);
                     }
-                    plainContext.lineTo(0, spanWidth);
+                    plainContext.lineTo(this.dimensions[0], this.dimensions[1]);
                     plainContext.fill();
                 });
             });
