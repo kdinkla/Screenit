@@ -176,7 +176,7 @@ export class Chain<E extends Identifiable> {
                 // Determine whether element is also in other target sets.
                 var consensus = true;
                 for (var j = 1; j < tLen; j++) {
-                    if (!targets[j].index[identify(el)]) {
+                    if (identify(el) in targets[j].index) {
                         consensus = false;
                         break;
                     }

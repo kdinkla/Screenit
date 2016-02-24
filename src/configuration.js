@@ -29,6 +29,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
             this.panelHeaderOpenLabel = new LabelStyle(this.panelHeaderFont, this.base, 'left', 'top');
             this.subPanelHeaderLabel = new LabelStyle(new Font(14), this.base, 'left', 'top');
+            this.sideLabel = new LabelStyle(this.sideFont, this.baseMuted, 'left', 'top');
             // Guide labels.
             this.guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
             this.bigGuideStyle = new LabelStyle(new Font(32, 180), Color.CRIMSON, 'left', 'top');
@@ -89,7 +90,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             // Plate mini heatmap view.
             this.miniHeatWellDiameter = 2;
             this.miniHeatSpace = 2;
-            this.miniHeatColumnMax = 10;
+            this.miniHeatColumnMax = 12;
             this.miniHeatColumnCount = 5;
             // Well details view.
             this.wellViewMaxWidth = 600;

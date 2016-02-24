@@ -1143,7 +1143,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     var AnnotationButton = (function (_super) {
         __extends(AnnotationButton, _super);
         function AnnotationButton(category, tag, state) {
-            _super.call(this, "annBut_" + category + "_" + tag, tag, [0, 0], _.contains(state.focused().wellAnnotations[category], tag) ? state.configuration.annotationSelectedLabel : state.configuration.annotationLabel, true);
+            _super.call(this, "annBut_" + (category || "") + "_" + tag, tag, [0, 0], !category || _.contains(state.focused().wellAnnotations[category], tag) ? state.configuration.annotationSelectedLabel : state.configuration.annotationLabel, true);
             this.category = category;
             this.tag = tag;
         }
@@ -1238,35 +1238,57 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = state.configuration;
             var datInfo = state.dataSetInfo.value;
             var heatMaps = _.range(0, datInfo.plateCount).map(function (pI) { return new PlateMiniHeatmap(pI, state); });
-            var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
-            var colMaps = _.range(0, cfg.miniHeatColumnCount).map(function (cI) { return _.compact(_.range(0, colCapacity).map(function (rI) { return heatMaps[cI * colCapacity + rI]; })); });
+            //var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
+            //var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
+            //    _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
             //var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
-            /*var colPartitions = state.plateAnnotationPartition();
-    
-    
-            var colLists = colPartitions.map((cP, cI) => {
-                var plateStacks = _.range(0, Math.ceil(cP.plates.length / cfg.miniHeatColumnMax)).map(c => []);
-                cP.plates.forEach((p, pI) => plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p));
-    
-                var stackLists = plateStacks.map((ps, psI) => new List(
-                    "pic_" + cI + "_" + psI,
-                    ps.map(p => new PlateMiniHeatmap(p, state)),
-                    [0, 0], [0, 0],
-                    'vertical',
-                    cfg.miniHeatSpace,
-                    'left'));
-    
-                return new List(
-                    "pic_" + cI,
-                    stackLists,
-                    [0, 0], [0, 0],
-                    'horizontal',
-                    cfg.miniHeatSpace,
-                    'left');
+            var colPartitions = state.plateAnnotationPartition();
+            var colLists = colPartitions.map(function (cP, cI) {
+                var addedPlates = [];
+                for (var i = 0; i < cP.plates.length; i++) {
+                    var prevP = cP.plates[i - 1];
+                    var p = cP.plates[i];
+                    if (prevP < p - 1)
+                        addedPlates.push(null); // Insert additional plate.
+                    addedPlates.push(p);
+                }
+                var plateStacks = _.range(0, Math.ceil(addedPlates.length / cfg.miniHeatColumnMax)).map(function (c) { return []; });
+                addedPlates.forEach(function (p, pI) { return plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p); });
+                var stackLists = plateStacks.map(function (ps, psI) {
+                    var snippetStack = [];
+                    for (var i = 0; i < ps.length; i++) {
+                        if (ps[i] === null) {
+                            var firstHeatmap = snippetStack[1];
+                            snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...", Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
+                        }
+                        else {
+                            var prevP = ps[i - 1];
+                            var p = ps[i];
+                            var nextP = ps[i + 1];
+                            var miniHeatMap = new PlateMiniHeatmap(p, state);
+                            // Add top plate label.
+                            if (prevP === null || !((i - 1) in ps)) {
+                                snippetStack.push(new Label("plateLblTop_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
+                            }
+                            // Add heat map label.
+                            snippetStack.push(miniHeatMap);
+                            // Add bottom plate label.
+                            if (nextP === null || !((i + 1) in ps)) {
+                                snippetStack.push(new Label("plateLblBottom_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
+                            }
+                        }
+                    }
+                    return new List("pic_" + cI + "_" + psI, snippetStack, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
+                });
+                var stackWrappedLists = new List("pic_" + cI, stackLists, [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'left');
+                var stackFooter = new List("picf_" + cI, cP.tags.map(function (t) { return new AnnotationButton(null, t, state); }), [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
+                return new List("tpic_" + cI, [stackWrappedLists, stackFooter], [0, 0], [0, 0], 'vertical', 2 * cfg.miniHeatSpace, 'middle');
             });
-    
-            this.heatmapColumns = new List("pics", colLists, [0,0], [0,0], 'horizontal', 2 * cfg.miniHeatSpace, 'left');*/
-            this.heatmapColumns = new List("pics", colMaps.map(function (c, cI) { return new List("pic_" + cI, c, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace); }), [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'left');
+            this.heatmapColumns = new List("pics", colLists, [0, 0], [0, 0], 'horizontal', cfg.splomSpace, 'left');
+            /*this.heatmapColumns = new List("pics",
+                colMaps.map((c, cI) => new List("pic_" + cI, c, [0,0], [0,0], 'vertical', cfg.miniHeatSpace)),
+                [0,0], [0,0], 'horizontal', cfg.miniHeatSpace, 'left'
+            );*/
             this.dimensions = this.heatmapColumns.dimensions;
             this.updatePositions();
             if (state.focused().plate === null) {
@@ -1302,6 +1324,15 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         return PlateIndex;
     })(PlacedSnippet);
+    var SubstitutePlateLabel = (function (_super) {
+        __extends(SubstitutePlateLabel, _super);
+        function SubstitutePlateLabel(identifier, label, dimensions, style) {
+            _super.call(this, identifier, label, [0, 0], style);
+            if (dimensions !== null)
+                this.setDimensions([this.dimensions[0], dimensions[1] - 2 * this.dimensions[1]]);
+        }
+        return SubstitutePlateLabel;
+    })(Label);
     var PlateMiniHeatmap = (function (_super) {
         __extends(PlateMiniHeatmap, _super);
         function PlateMiniHeatmap(plateNumber, state) {

@@ -49,7 +49,13 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         InteractionState.prototype.toggleAnnotation = function (category, tag) {
             var annotations = this.selectedCoordinates.wellAnnotations;
-            annotations[category] = _.contains(annotations[category], tag) ? _.difference(annotations[category], [tag]) : _.union(annotations[category], [tag]);
+            // Specific category is targeted; toggle its tag.
+            if (category) {
+                annotations[category] = _.contains(annotations[category], tag) ? _.difference(annotations[category], [tag]) : _.union(annotations[category], [tag]);
+            }
+            else {
+                _.keys(annotations).forEach(function (k) { return annotations[k] = annotations[k].filter(function (annTag) { return annTag !== tag; }); });
+            }
         };
         InteractionState.prototype.toJSON = function () {
             return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
@@ -99,28 +105,6 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         EnrichedState.prototype.cloneInteractionState = function () {
             return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.configuration));
         };
-        /*closestObject(features: string[], coordinates: number[]): number {
-            var bestIndex = -1;
-    
-            var tbl = this.objectInfo.value;
-            if(features[0] in tbl.columnIndex && features[1] in tbl.columnIndex && coordinates) {
-                var xColI = tbl.columnIndex[features[0]];
-                var yColI = tbl.columnIndex[features[1]];
-                var x = tbl.normalizedMatrix[xColI];
-                var y = tbl.normalizedMatrix[yColI];
-    
-                var minDist = Number.MAX_VALUE;
-                for(var i = 0; i < tbl.rows.length; i++) {
-                    var csDist = Vector.distance(coordinates, [x[i], y[i]]);
-                    if (csDist < minDist) {
-                        minDist = csDist;
-                        bestIndex = i;
-                    }
-                }
-            }
-    
-            return bestIndex >= 0 ? Number(tbl.rows[bestIndex]) : null;
-        }*/
         EnrichedState.prototype.closestWellObject = function (coordinates) {
             var bestIndex = -1;
             var tbl = this.objectInfo.value;
@@ -144,12 +128,6 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             }
             return bestIndex >= 0 ? Number(tbl.rows[bestIndex]) : null;
         };
-        // Well selections, including single focused well.
-        /*allWellSelections() {
-            var location = this.selectionWell(this.focused());
-            var focusedWell = location ? [location.toWellSelection("Selected")] : [];
-            return _.union(this.dataSetInfo.value.wellSelections, focusedWell);
-        }*/
         // Focused coordinates.
         EnrichedState.prototype.focused = function () {
             var _this = this;
@@ -179,18 +157,6 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var focus = this.focused();
             return !population || (focus && focus.population === population.identifier) ? this.configuration.highlight : population.colorTrans;
         };
-        // Complete, or correct, coordinates, from object level up to plate level.
-        /*conformHoveredCoordinates(targetState: InteractionState) {
-            var coordinates = targetState.hoveredCoordinates;
-            if(coordinates !== null) {
-                var wellInfo = this.objectWellInfo(coordinates.object);
-                if (wellInfo) {
-                    var location = wellInfo.location;
-                    coordinates.well = location.coordinates();
-                    coordinates.plate = location.plate;
-                }
-            }
-        }*/
         EnrichedState.prototype.conformSelectedCoordinates = function (targetState) {
             var coordinates = targetState.selectedCoordinates;
             if (coordinates !== null) {
@@ -263,10 +229,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     this.wellScs = shares.zScores[populations[0].identifier].map(function (plt) { return plt.map(function (col) { return col.map(function (v) { return 0; }); }); });
                     populations.forEach(function (population) {
                         var pop = population.identifier;
-                        //var minZ = -this.configuration.activationZScoreRange;   //shares.zScoresMin[pop];
-                        //var maxZ = this.configuration.activationZScoreRange;    //shares.zScoresMax[pop];
                         shares.zScores[pop].forEach(function (plt, pltI) { return plt.forEach(function (col, colI) { return col.forEach(function (val, rowI) {
-                            var normZ = val / _this.configuration.activationZScoreRange; //val <= 0 ? val / Math.abs(minZ) : val / maxZ;
+                            var normZ = val / _this.configuration.activationZScoreRange;
                             _this.wellScs[pltI][colI][rowI] += population.activate(normZ);
                         }); }); });
                     });
@@ -317,21 +281,33 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return colMaps;
         };
         EnrichedState.prototype.plateAnnotationPartition = function () {
-            var _this = this;
             // Plate score by id.
             var plateRange = this.plates();
             //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
             //var platesOrdered = _.clone(plateRange);
             // Focused annotations.
-            var allTargetPlateSelections = plateRange.map(function (p) { return _this.plateTargetAnnotations(p); });
+            /*var allTargetPlateSelections = plateRange.map(p => this.plateTargetAnnotations(p));
+    
             // Bin plates by annotations.
-            var bins = {};
-            allTargetPlateSelections.forEach(function (sel, p) {
-                var tags = _.uniq(_.flatten(_.values(sel).map(function (tags) { return _.keys(tags).filter(function (t) { return tags[t].wells.length > 0; }); })).sort(), true);
+            var bins: StringMap<{ annotations: string[]; plates: number[] }> = {};
+            allTargetPlateSelections.forEach((sel, p) => {
+                var tags = _.uniq(_.flatten(_.values(sel).map(tags =>
+                                _.keys(tags).filter(t => tags[t].wells.length > 0))).sort(), true);
                 var binKey = tags.join(",");
-                //var binKey = _.keys(sel).map(cat => cat + ":" + _.keys(sel[cat]).join(",")).join(";");
+                if(!(binKey in bins)) bins[binKey] = { annotations: tags, plates: <number[]>[] };
+                bins[binKey].plates.push(p);
+            });
+    
+            return <any>_.values(bins);*/
+            var focusTags = new Chain(_.flatten(_.values(this.focused().wellAnnotations)));
+            var plateTags = this.wellAnnotations.value.plateTags;
+            var bins = {};
+            plateRange.forEach(function (p) {
+                var tags = plateTags[p] || new Chain();
+                var matchTags = _.intersection(focusTags.elements, tags.elements); ///Chain.intersection<string>([focusTags, tags]);
+                var binKey = matchTags.join(",");
                 if (!(binKey in bins))
-                    bins[binKey] = { annotations: tags, plates: [] };
+                    bins[binKey] = { tags: matchTags, plates: [] };
                 bins[binKey].plates.push(p);
             });
             return _.values(bins);
@@ -634,6 +610,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         function WellAnnotations(dictionary) {
             if (dictionary === void 0) { dictionary = {}; }
             _super.call(this, dictionary);
+            this.computePlateAnnotations();
         }
         // Return dictionary of annotations for given plate and well coordinates.
         WellAnnotations.prototype.annotationsAt = function (plate, coordinates) {
@@ -643,6 +620,51 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (rowIndex >= 0)
                 this.columns.forEach(function (c) { return dict[c] = _this.matrix[_this.columnIndex[c]][rowIndex]; });
             return dict;
+        };
+        WellAnnotations.prototype.computePlateAnnotations = function () {
+            var _this = this;
+            this.plateTags = [];
+            // Accumulate plate annotations by scanning all rows.
+            this.rows.forEach(function (row) {
+                var parts = row.split('_');
+                var plate = Number(parts[0]);
+                //var column = Number(parts[1]);
+                //var row = Number(parts[2]);
+                // Create plate selection array.
+                if (!(plate in _this.plateTags))
+                    _this.plateTags[plate] = new Chain();
+                //var plateSelection = this.plateTags[plate];
+                // Columns are annotation categories.
+                _this.columns.forEach(function (column) {
+                    var tags = _this.cell(column, row);
+                    _this.plateTags[plate] = _this.plateTags[plate].pushAll(tags);
+                    /*if(tags.length > 0) {
+                        if(!(column in plateSelection)) plateSelection[column] = new Chain<string>();
+                        plateSelection[column] = plateSelection[column].pushAll(tags);
+                    }*/
+                });
+            });
+            // Sort tags, in place.
+            this.plateTags.forEach(function (ts) { return ts.elements.sort(); });
+            return this.plateTags;
+            /*var selections: StringMap<StringMap<WellSelection>> = {};
+            _.keys(focusAnnotations).forEach(cat => {
+                selections[cat] = {};
+                focusAnnotations[cat].forEach(tag =>
+                        selections[cat][tag] = new WellSelection(cat, tag, plate, [])
+                );
+            });
+            dataInfo.columnLabels.forEach((c, cI) =>
+                    dataInfo.rowLabels.forEach((r, rI) => {
+                        var wellCoordinates = new WellCoordinates(cI, rI);
+                        var annotations = wellAnnotations.annotationsAt(plate, wellCoordinates);
+    
+                        _.keys(annotations).forEach(cat => annotations[cat].forEach(tag => {
+                            if (cat in selections && tag in selections[cat])
+                                selections[cat][tag].wells.push(wellCoordinates);
+                        }));
+                    })
+            );*/
         };
         WellAnnotations.ANNOTATION_SPLIT = "|";
         return WellAnnotations;

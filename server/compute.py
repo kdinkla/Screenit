@@ -96,13 +96,14 @@ def selectImageFeatures(dataSet, subset):
 def minMaxScale(vec, vecMin, vecMax):
     return (vec - vecMin) / (vecMax - vecMin)
 
+# Assume that the features are scaled, and behave decently, already. Do normalize to [0,1].
 # TODO: add client-side marking for log scaled features.
 def adaptiveScale(vec, metrics):
     vecMin = metrics['min']
     vecMax = metrics['max']
-    vecMean = metrics['mean']
+    #vecMean = metrics['mean']
     minMaxed = minMaxScale(vec, vecMin, vecMax)
-    return np.log(1 + 100000 * minMaxed) / np.log(100000) if vecMean - vecMin < 0.2 * (vecMax - vecMean) else minMaxed
+    return minMaxed     #np.log(1 + 100000 * minMaxed) / np.log(100000) if vecMean - vecMin < 0.2 * (vecMax - vecMean) else minMaxed
 
 def scale(dataSet, subset):
     subset = subset.copy()

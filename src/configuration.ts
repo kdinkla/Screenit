@@ -39,6 +39,7 @@ export class BaseConfiguration {
     panelHeaderLabel = new LabelStyle(this.panelHeaderFont, this.panelHeaderColor, 'left', 'top');
     panelHeaderOpenLabel = new LabelStyle(this.panelHeaderFont, this.base, 'left', 'top');
     subPanelHeaderLabel = new LabelStyle(new Font(14), this.base, 'left', 'top');
+    sideLabel = new LabelStyle(this.sideFont, this.baseMuted, 'left', 'top');
 
     // Guide labels.
     guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
@@ -114,7 +115,7 @@ export class BaseConfiguration {
     // Plate mini heatmap view.
     miniHeatWellDiameter = 2;
     miniHeatSpace = 2;
-    miniHeatColumnMax = 10;
+    miniHeatColumnMax = 12;
     miniHeatColumnCount = 5;
 
     // Well details view.

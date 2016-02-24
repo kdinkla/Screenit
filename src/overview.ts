@@ -1494,10 +1494,10 @@ class AnnotationButton extends Label {
                 public tag: string,
                 state: EnrichedState) {
         super(
-            "annBut_" + category + "_" + tag,
+            "annBut_" + (category || "") + "_" + tag,
             tag,
             [0,0],
-            _.contains(state.focused().wellAnnotations[category], tag) ?
+            !category || _.contains(state.focused().wellAnnotations[category], tag) ?
                 state.configuration.annotationSelectedLabel :
                 state.configuration.annotationLabel,
             true);
@@ -1617,42 +1617,99 @@ class PlateIndex extends PlacedSnippet {
         var datInfo = state.dataSetInfo.value;
 
         var heatMaps = _.range(0, datInfo.plateCount).map(pI => new PlateMiniHeatmap(pI, state));
-        var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
-        var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
-            _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
+        //var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
+        //var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
+        //    _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
 
         //var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
 
-        /*var colPartitions = state.plateAnnotationPartition();
-
+        var colPartitions = state.plateAnnotationPartition();
 
         var colLists = colPartitions.map((cP, cI) => {
-            var plateStacks = _.range(0, Math.ceil(cP.plates.length / cfg.miniHeatColumnMax)).map(c => []);
-            cP.plates.forEach((p, pI) => plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p));
+            var addedPlates: number[] = [];
+            for(var i = 0; i < cP.plates.length; i++) {
+                var prevP = cP.plates[i-1];
+                var p = cP.plates[i];
 
-            var stackLists = plateStacks.map((ps, psI) => new List(
-                "pic_" + cI + "_" + psI,
-                ps.map(p => new PlateMiniHeatmap(p, state)),
-                [0, 0], [0, 0],
-                'vertical',
-                cfg.miniHeatSpace,
-                'left'));
+                if(prevP < p - 1) addedPlates.push(null);   // Insert additional plate.
 
-            return new List(
+                addedPlates.push(p);
+            }
+
+            var plateStacks = _.range(0, Math.ceil(addedPlates.length / cfg.miniHeatColumnMax)).map(c => []);
+            addedPlates.forEach((p, pI) => plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p));
+
+            var stackLists = plateStacks.map((ps, psI) => {
+                var snippetStack: PlacedSnippet[] = [];
+                for(var i = 0; i < ps.length; i++) {
+                    if(ps[i] === null) {
+                        var firstHeatmap = snippetStack[1];
+                        snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...",
+                            Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
+                    } else {
+                        var prevP = ps[i - 1];
+                        var p = ps[i];
+                        var nextP = ps[i + 1];
+
+                        var miniHeatMap = new PlateMiniHeatmap(p, state);
+
+                        // Add top plate label.
+                        if (prevP === null || !((i-1) in ps)) {
+                            snippetStack.push(new Label("plateLblTop_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
+                        }
+
+                        // Add heat map label.
+                        snippetStack.push(miniHeatMap);
+
+                        // Add bottom plate label.
+                        if (nextP === null || !((i+1) in ps)) {
+                            snippetStack.push(new Label("plateLblBottom_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
+                        }
+                    }
+                }
+
+                return new List(
+                    "pic_" + cI + "_" + psI,
+                    snippetStack,   //ps.map(p => new PlateMiniHeatmap(p, state)),
+                    [0, 0], [0, 0],
+                    'vertical',
+                    cfg.miniHeatSpace,
+                    'middle');
+            });
+
+            var stackWrappedLists = new List(
                 "pic_" + cI,
                 stackLists,
                 [0, 0], [0, 0],
                 'horizontal',
                 cfg.miniHeatSpace,
                 'left');
+
+            var stackFooter = new List(
+                "picf_" + cI,
+                cP.tags.map(t => new AnnotationButton(null, t, state)),
+                [0,0], [0,0],
+                'vertical',
+                cfg.miniHeatSpace,
+                'middle'
+            );
+
+            return new List(
+                "tpic_" + cI,
+                [stackWrappedLists, stackFooter],
+                [0,0], [0,0],
+                'vertical',
+                2 * cfg.miniHeatSpace,
+                'middle'
+            );
         });
 
-        this.heatmapColumns = new List("pics", colLists, [0,0], [0,0], 'horizontal', 2 * cfg.miniHeatSpace, 'left');*/
+        this.heatmapColumns = new List("pics", colLists, [0,0], [0,0], 'horizontal', cfg.splomSpace, 'left');
 
-        this.heatmapColumns = new List("pics",
+        /*this.heatmapColumns = new List("pics",
             colMaps.map((c, cI) => new List("pic_" + cI, c, [0,0], [0,0], 'vertical', cfg.miniHeatSpace)),
             [0,0], [0,0], 'horizontal', cfg.miniHeatSpace, 'left'
-        );
+        );*/
 
         this.dimensions = this.heatmapColumns.dimensions;
         this.updatePositions();
@@ -1697,6 +1754,18 @@ class PlateIndex extends PlacedSnippet {
 
     toString() {
         return "Plates";
+    }
+}
+
+class SubstitutePlateLabel extends Label {
+    constructor(identifier: string,
+                label: string,
+                dimensions: number[],
+                style: LabelStyle) {
+        super(identifier, label, [0,0], style);
+
+        if(dimensions !== null)
+            this.setDimensions([this.dimensions[0], dimensions[1] - 2 * this.dimensions[1]]);
     }
 }
 
