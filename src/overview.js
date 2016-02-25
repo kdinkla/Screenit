@@ -66,7 +66,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             c.textBaseline('bottom');
             c.textAlign('left');
             var compTxt = 'Computing' + (secondsMod === 1 ? '.' : secondsMod === 2 ? '..' : '...');
+            c.transitioning = false;
             c.translate([.5 * this.dimensions()[0] - 20, this.dimensions()[1] - cfg.windowMargin]);
+            c.transitioning = true;
             c.strokeText(compTxt);
             c.fillText(compTxt);
             c.restore();
@@ -194,17 +196,18 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var _this = this;
             var state = this.state;
             var cfg = state.configuration;
-            var focusedPopulation = state.focused().population;
             var histograms = state.featureHistograms.value;
-            var frames = state.featureHistograms.value.histograms;
-            var cacheTag = this.identifier + "_" + focusedPopulation;
+            var frames = histograms.histograms;
+            var populations = state.populationSpace.activeOrAll().elements.filter(function (p) { return p.identifier.toString() in frames; });
+            var cacheTag = this.identifier + "_" + populations;
             var cachedImage = histograms[cacheTag];
             if (!cachedImage) {
                 cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], function (plainContext) {
-                    _.keys(frames).map(function (fK) {
-                        var frame = frames[fK];
+                    // Per population frame.
+                    populations.forEach(function (population) {
+                        var frame = frames[population.identifier];
                         var normFrequencies = frame.matrix[frame.columnIndex[_this.feature]];
-                        var fontColor = fK === Population.POPULATION_ALL_NAME.toString() ? cfg.baseDim : _this.state.populationColorTranslucent(_this.state.populationSpace.populations.byId(fK));
+                        var fontColor = population.colorTrans;
                         plainContext.fillStyle = fontColor.toString();
                         plainContext.beginPath();
                         var len = normFrequencies.length - 1;
@@ -255,7 +258,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var _this = this;
             var state = this.state;
             var cfg = state.configuration;
-            var populations = this.state.populationSpace.populations.elements;
+            var populations = this.state.populationSpace.activeOrAll().elements;
             context.save();
             context.translate(this.topLeft);
             context.transitioning = false;
@@ -282,6 +285,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             if (object in featureValues.rowIndex) {
                 context.strokeStyle(color);
                 context.lineWidth(lineWidth);
+                context.context.lineJoin = 'round';
                 context.beginPath();
                 features.forEach(function (f, fI) {
                     var x = featureValues.cell(f, object) * width;
@@ -354,26 +358,29 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = this.configuration;
             var size = this.size;
             // Paint histograms, if available.
-            var histograms = mod.objectHistograms.value.matricesFor(this.feature1, this.feature2);
-            var pairHistos = _.pairs(histograms);
-            if (pairHistos) {
-                context.save();
-                var focusedPopulation = mod.focused().population;
-                pairHistos.forEach(function (hP) {
-                    var cK = hP[0];
-                    var matrix = hP[1];
-                    var population = mod.populationSpace.populations.byId(cK);
-                    var focused = !(Number(cK) >= 0) || focusedPopulation === Number(cK);
-                    var coreColor = Number(cK) >= 0 ? mod.populationColorTranslucent(population) : cfg.base;
-                    matrix.forEach(function (c, xI) { return c.forEach(function (cell, yI) {
-                        if ((focused && cell) || (!focused && (cell === 2 || cell === 3))) {
-                            context.fillStyle = coreColor;
-                            context.fillRect(xI, size - yI, 1, 1);
-                        }
-                    }); });
-                });
-                context.restore();
-            }
+            var histograms = mod.objectHistograms.value.matricesFor(this.feature1, this.feature2) || [];
+            //var pairHistos = _.pairs(histograms);
+            //if(pairHistos) {
+            context.save();
+            var populations = mod.populationSpace.activeOrAll().filter(function (p) { return p.identifier in histograms; });
+            //var focusedPopulation = mod.focused().population;
+            populations.forEach(function (p) {
+                //pairHistos.forEach(hP => {
+                //var cK = hP[0];
+                var matrix = histograms[p.identifier.toString()]; //hP[1];
+                //var population = mod.populationSpace.populations.byId(cK);
+                //var focused = Number(cK) == Population.POPULATION_ALL_NAME || focusedPopulation === Number(cK);
+                var coreColor = mod.populationColorTranslucent(p); //Number(cK) >= 2 ? mod.populationColorTranslucent(population) : cfg.base;
+                matrix.forEach(function (c, xI) { return c.forEach(function (cell, yI) {
+                    if (cell) {
+                        //if((focused && cell) || (!focused && (cell === 2 || cell === 3))) {
+                        context.fillStyle = coreColor;
+                        context.fillRect(xI, size - yI, 1, 1);
+                    }
+                }); });
+            });
+            context.restore();
+            //}
         };
         ObjectFeaturePlot.prototype.paint = function (context) {
             var _this = this;
@@ -465,13 +472,16 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             _super.call(this, "ExemplarStack", [0, 0]);
             this.state = state;
             var cfg = state.configuration;
-            var colSnippets = this.state.populationSpace.populations.elements.map(function (p) { return new ExemplarColumn(state, p); });
+            var activePopulations = this.state.populationSpace.populations.elements.filter(function (p) { return p.identifier > Population.POPULATION_ALL_NAME; });
             var exemplarLabel = new Label("ExemplarLbl", "Exemplars", [0, 0], state.configuration.subPanelHeaderLabel, true);
-            var columns = new List("ExemplarColumns", colSnippets, [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var activeExemplars = activePopulations.map(function (p) { return new ExemplarColumn(state, p); });
+            var inactiveExemplarStack = new List("InExemplarColumns", state.populationSpace.inactivePopulations.elements.map(function (ip) { return new ExemplarColumn(state, ip); }), [0, 0], [cfg.clusterTileInnerSize, 0], 'vertical', cfg.exemplarColumnSpace, 'middle');
+            var columns = new List("ExemplarColumns", _.union(activeExemplars, [inactiveExemplarStack]), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
             var exemplarSelected = state.focused().object !== null && !state.hoveredObjectIsExemplar();
-            var additionButtons = exemplarSelected ? new List("ExemplarAdditions", this.state.populationSpace.populations.elements.map(function (p) { return new ExemplarAdditionButton(state.focused().object, p, state); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left') : null;
+            var mainPopulations = _.union(activePopulations, [state.populationSpace.populations.byId(Population.POPULATION_TOTAL_NAME)]);
+            var additionButtons = exemplarSelected ? new List("ExemplarAdditions", mainPopulations.map(function (p) { return new ExemplarAdditionButton(state.focused().object, p, state); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left') : null;
             var transferLabel = new Label("PopulationTransfersLbl", "Well Score", [0, 0], state.configuration.subPanelHeaderLabel, true);
-            var transferButtons = new List("PopulationTransfers", this.state.populationSpace.populations.elements.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var transferButtons = new List("PopulationTransfers", mainPopulations.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
             var selectedObjectDetailView = exemplarSelected ? new ObjectDetailView(state.focused().object, state, [0, 0]) : null;
             var segSnippets = _.compact([transferLabel, transferButtons, exemplarLabel, columns, additionButtons, selectedObjectDetailView]);
             this.segments = new List("ExemplarSegments", segSnippets, [0, 0], [0, 0], 'vertical', cfg.subPanelSpace);
@@ -518,6 +528,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.textAlign('center');
             context.fillStyle(cfg.baseDim);
             // Distinguish between regular phenotype and cell count phenotype.
+            context.fillStyle(cfg.base);
             if (this.population.identifier === Population.POPULATION_TOTAL_NAME) {
                 context.font(cfg.sideFont.toString());
                 context.textBaseline('bottom');
@@ -540,37 +551,11 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         __extends(ExemplarColumn, _super);
         function ExemplarColumn(state, population, topLeft) {
             if (topLeft === void 0) { topLeft = [0, 0]; }
-            _super.call(this, "esc_" + population.identifier, _.union(population.identifier === Population.POPULATION_TOTAL_NAME ? [] : [new ExemplarLabel(population, state)], population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
+            _super.call(this, "esc_" + population.identifier, _.union([new ExemplarLabel(population, state)], state.populationSpace.inactivePopulations.has(population) ? [new ObjectDetailView(population.exemplars.elements[0], state, [0, 0])] : population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
             this.state = state;
             this.population = population;
             this.topLeft = topLeft;
         }
-        ExemplarColumn.prototype.paint = function (context) {
-            var state = this.state;
-            var cfg = state.configuration;
-            context.save();
-            context.translate(this.topLeft);
-            /*var verticalFocusShift = state.hoveredCoordinates.population === this.population.identifier ?
-                    cfg.sideFont.size :
-                    0;*/
-            //var tabHeight = verticalFocusShift;// + 1.5 * cfg.sideFont.size;
-            // Pickable background.
-            //context.picking = true;
-            //context.fillStyle(Color.NONE);
-            //context.fillRect(0, 0, this.dimensions[0], this.dimensions[1] - state.configuration.clusterLabel.font.size /* + tabHeight +*/);
-            //context.picking = false;
-            // Colored tab.
-            //context.fillStyle(state.populationColor(this.population));  //this.population.colorTrans);
-            //context.fillRect(0, 0, this.dimensions[0], this.dimensions[1] - state.configuration.clusterLabel.font.size); // + tabHeight);
-            // Label.
-            /*context.font(cfg.sideFont.string);
-            context.textBaseline('top');
-            context.textAlign('center');
-            context.fillStyle(cfg.base);
-            context.fillText(this.population.name, .5 * this.dimensions[0], this.dimensions[1] + verticalFocusShift);*/
-            context.restore();
-            _super.prototype.paint.call(this, context);
-        };
         return ExemplarColumn;
     })(List);
     var PopulationTransferEdit = (function (_super) {
@@ -684,68 +669,106 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     var ExemplarLabel = (function (_super) {
         __extends(ExemplarLabel, _super);
         function ExemplarLabel(population, state) {
-            _super.call(this, "lbl_" + population.identifier, population.name, [0, 0], state.focused().population === population.identifier ? state.configuration.clusterSelectedLabel : state.configuration.clusterLabel, true);
+            _super.call(this, "lbl_" + population.identifier, population.name, [0, 0], state.configuration.clusterLabel, true);
             this.population = population;
             this.state = state;
             this.setDimensions([state.configuration.clusterTileInnerSize, this.dimensions[1]]);
         }
         ExemplarLabel.prototype.paint = function (context) {
             var state = this.state;
+            var cfg = state.configuration;
             context.save();
             context.translate(this.topLeft);
             context.picking = true;
             context.fillStyle(state.populationColor(this.population));
             context.fillRect(0, 0, state.configuration.clusterTileInnerSize, this.dimensions[1]);
+            /*context.font(cfg.sideFont.toString());
+            context.fillStyle(cfg.base);
+            context.textBaseline('top');
+            context.fillText(state.populationSpace.inactivePopulations.has(this.population) ? "+" : "-");*/
             context.restore();
         };
         ExemplarLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
-            interaction.selectedCoordinates.population = this.population.identifier;
+            //interaction.selectedCoordinates.population = this.population.identifier;
+            interaction.populationSpace.toggle(this.population);
         };
         return ExemplarLabel;
     })(Label);
     var AbstractPlate = (function (_super) {
         __extends(AbstractPlate, _super);
-        function AbstractPlate(id, topLeft, state, columnLabels, rowLabels) {
+        function AbstractPlate(id, topLeft, state, columnLabels, rowLabels, prune) {
+            var _this = this;
             if (columnLabels === void 0) { columnLabels = true; }
             if (rowLabels === void 0) { rowLabels = true; }
+            if (prune === void 0) { prune = false; }
             _super.call(this, id, topLeft);
             this.state = state;
             this.columnLabels = columnLabels;
             this.rowLabels = rowLabels;
+            this.prune = prune;
             var cfg = state.configuration;
+            var info = state.dataSetInfo.value;
             var plate = this.state.focused().plate;
             var annotations = this.state.plateTargetAnnotations(plate);
             this.flatAnnotations = _.flatten(_.values(annotations).map(function (ann) { return _.values(ann); }));
+            // Build up (pruned) column and row indices.
+            if (prune) {
+                this.columnIndices = [];
+                this.rowIndices = [];
+                _.values(annotations).forEach(function (cat) { return _.values(cat).forEach(function (wS) { return wS.wells.forEach(function (w) {
+                    _this.columnIndices.push(w.column);
+                    _this.rowIndices.push(w.row);
+                }); }); });
+                this.columnIndices = _.uniq(this.columnIndices.sort(function (l, r) { return l - r; }), true);
+                this.rowIndices = _.uniq(this.rowIndices.sort(function (l, r) { return l - r; }), true);
+            }
+            else {
+                this.columnIndices = _.range(0, info.columnCount);
+                this.rowIndices = _.range(0, info.rowCount);
+            }
+            this.columnToIndex = [];
+            this.columnIndices.forEach(function (cI, i) { return _this.columnToIndex[cI] = i; });
+            this.rowToIndex = [];
+            this.rowIndices.forEach(function (rI, i) { return _this.rowToIndex[rI] = i; });
+            // Adjust well diameter, based on number of selected columns and rows.
+            this.wellDiameter = cfg.wellDiameter * Math.max(.5 * Math.min(Math.floor(info.columnCount / this.columnIndices.length), Math.floor(info.rowCount / this.rowIndices.length)), 1);
+            // Selection contours.
             var gf = new jsts.geom.GeometryFactory();
+            var tileAt = function (wc, dilation) {
+                var columnIndex = _this.columnToIndex[wc.column];
+                var rowIndex = _this.rowToIndex[wc.row];
+                var topLeft = new jsts.geom.Coordinate(columnIndex * _this.wellDiameter - dilation, rowIndex * _this.wellDiameter - dilation);
+                var topRight = new jsts.geom.Coordinate((columnIndex + 1) * _this.wellDiameter + dilation, rowIndex * _this.wellDiameter - dilation);
+                var bottomRight = new jsts.geom.Coordinate((columnIndex + 1) * _this.wellDiameter + dilation, (rowIndex + 1) * _this.wellDiameter + dilation);
+                var bottomLeft = new jsts.geom.Coordinate(columnIndex * _this.wellDiameter - dilation, (rowIndex + 1) * _this.wellDiameter + dilation);
+                return gf.createPolygon(gf.createLinearRing([topRight, topLeft, bottomLeft, bottomRight, topRight]), []);
+            };
             this.selectionOutlines = this.flatAnnotations.map(function (ws) {
                 // Tile per well.
-                var wellTiles = ws.wells.map(function (wc) {
-                    var topLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter, wc.row * cfg.wellDiameter);
-                    var topRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter, wc.row * cfg.wellDiameter);
-                    var bottomRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter, (wc.row + 1) * cfg.wellDiameter);
-                    var bottomLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter, (wc.row + 1) * cfg.wellDiameter);
-                    return gf.createPolygon(gf.createLinearRing([topLeft, topRight, bottomRight, bottomLeft, topLeft]), []);
-                });
-                return new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
+                var wellTiles = ws.wells.map(function (wc) { return tileAt(wc, 0); });
+                var body = new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
+                return body; //body ? body.buffer(1, 3, 0) : null;
             });
             this.selectionRims = this.flatAnnotations.map(function (ws) {
                 // Tile per well.
-                var wellTiles = ws.wells.map(function (wc) {
-                    var dilate = .5;
-                    var topLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter - dilate, wc.row * cfg.wellDiameter - dilate);
-                    var topRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter + dilate, wc.row * cfg.wellDiameter - dilate);
-                    var bottomRight = new jsts.geom.Coordinate((wc.column + 1) * cfg.wellDiameter + dilate, (wc.row + 1) * cfg.wellDiameter + dilate);
-                    var bottomLeft = new jsts.geom.Coordinate(wc.column * cfg.wellDiameter - dilate, (wc.row + 1) * cfg.wellDiameter + dilate);
-                    return gf.createPolygon(gf.createLinearRing([topLeft, topRight, bottomRight, bottomLeft, topLeft]), []);
-                });
-                return new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
+                var wellTiles = ws.wells.map(function (wc) { return tileAt(wc, .5); });
+                var body = new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
+                return body; //body ? body.buffer(1, 3, 0) : null;
             });
-            var info = state.dataSetInfo.value;
-            this.setDimensions([info.columnCount * cfg.wellDiameter + cfg.plateColLabelMargin + cfg.sideFont.width("000"), info.rowCount * cfg.wellDiameter + cfg.plateRowLabelMargin + cfg.sideFont.size + 4]);
+            this.setDimensions([this.columnIndices.length * this.wellDiameter + cfg.plateColLabelMargin + cfg.sideFont.width("000"), this.rowIndices.length * this.wellDiameter + cfg.plateRowLabelMargin + cfg.sideFont.size + 4]);
         }
+        AbstractPlate.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
+            var xIndex = Math.round(coordinates[0] * (this.columnIndices.length - 1));
+            var yIndex = Math.round(coordinates[1] * (this.rowIndices.length - 1));
+            if (xIndex in this.columnIndices && yIndex in this.rowIndices) {
+                var postPruneCoordinates = new WellCoordinates(this.columnIndices[xIndex], this.rowIndices[yIndex]);
+                interaction.selectedCoordinates.switchWell(postPruneCoordinates);
+                interaction.pushView('well');
+            }
+        };
         AbstractPlate.prototype.paint = function (context) {
             var cfg = this.state.configuration;
-            var info = this.state.dataSetInfo.value;
+            //var info = this.state.dataSetInfo.value;
             context.save();
             context.translate(this.topLeft);
             context.transitioning = false;
@@ -753,7 +776,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.paintWellLabels(context);
             this.paintSelectionOutlines(context);
             // Well selection.
-            context.scale(info.columnCount * cfg.wellDiameter, info.rowCount * cfg.wellDiameter);
+            context.scale(this.columnIndices.length * this.wellDiameter, this.rowIndices.length * this.wellDiameter);
             context.picking = true;
             context.fillStyle(Color.NONE);
             context.fillRect(0, 0, 1, 1);
@@ -762,10 +785,11 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
         };
         AbstractPlate.prototype.paintWellLabels = function (ctx) {
+            var _this = this;
             var cfg = this.state.configuration;
             var info = this.state.dataSetInfo.value;
-            var lblY = info.rowCount * cfg.wellDiameter + cfg.plateColLabelMargin;
-            var lblX = info.columnCount * cfg.wellDiameter + cfg.plateRowLabelMargin;
+            var lblX = this.columnIndices.length * this.wellDiameter + cfg.plateRowLabelMargin;
+            var lblY = this.rowIndices.length * this.wellDiameter + cfg.plateColLabelMargin;
             ctx.save();
             ctx.font(cfg.sideFont.string);
             ctx.fillStyle(cfg.base);
@@ -773,13 +797,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             if (this.columnLabels) {
                 ctx.textAlign('center');
                 ctx.textBaseline('top');
-                info.columnLabels.forEach(function (c, i) { return ctx.fillText(c, (i + .5) * cfg.wellDiameter, lblY); });
+                this.columnIndices.forEach(function (cI) { return ctx.fillText(info.columnLabels[cI], (_this.columnToIndex[cI] + .5) * _this.wellDiameter, lblY); });
             }
             // Row labels at the right.
             if (this.rowLabels) {
                 ctx.textAlign('left');
                 ctx.textBaseline('middle');
-                info.rowLabels.forEach(function (r, j) { return ctx.fillText(r, lblX, (j + .5) * cfg.wellDiameter); });
+                this.rowIndices.forEach(function (rI) { return ctx.fillText(info.rowLabels[rI], lblX, (_this.rowToIndex[rI] + .5) * _this.wellDiameter); });
             }
             ctx.restore();
         };
@@ -893,22 +917,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             }
             context.closePath();
         };
-        AbstractPlate.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
-            var plate = this.state.focused().plate;
-            if (plate !== null) {
-                //interaction.selectedCoordinates.plate = plate;
-                interaction.selectedCoordinates.switchWell(PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched));
-                //interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
-                interaction.pushView('well');
-            }
-        };
         /*static ringToPath(context: ViewContext, ring: jsts.geom.LineString) {
             var cs = ring.getCoordinates();
             context.moveTo(cs[0].x, cs[0].y);
             for (var i = 1; i < cs.length; i++) context.lineTo(cs[i].x, cs[i].y);
             context.closePath();
         }*/
-        AbstractPlate.arcRad = 2;
+        AbstractPlate.arcRad = 4;
         return AbstractPlate;
     })(PlacedSnippet);
     var TemplatePlate = (function (_super) {
@@ -939,10 +954,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var x = c * cfg.wellDiameter;
                 for (var r = 0; r < info.rowCount; r++) {
                     var y = r * cfg.wellDiameter;
-                    ctx.strokeRect(x, y, cfg.wellDiameter, cfg.wellDiameter);
+                    ctx.strokeRect(x, y, this.wellDiameter, this.wellDiameter);
                     if (wellShares[c] && wellShares[c][r] >= -1) {
                         ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
-                        ctx.fillRect(x + .25, y + .25, cfg.wellDiameter - .5, cfg.wellDiameter - .5);
+                        ctx.fillRect(x + .25, y + .25, this.wellDiameter - .5, this.wellDiameter - .5);
                     }
                     else {
                     }
@@ -954,7 +969,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     var FlowerPlate = (function (_super) {
         __extends(FlowerPlate, _super);
         function FlowerPlate(topLeft, state) {
-            _super.call(this, "flwPlt", topLeft, state, false);
+            _super.call(this, "flwPlt", topLeft, state, true, true, true);
             this.state = state;
         }
         FlowerPlate.prototype.paint = function (context) {
@@ -968,12 +983,15 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
         };
         FlowerPlate.prototype.paintWells = function (ctx) {
+            var _this = this;
             var cfg = this.state.configuration;
             var info = this.state.dataSetInfo.value;
             ctx.save();
-            for (var c = 0; c < info.columnCount; c++)
-                for (var r = 0; r < info.rowCount; r++)
-                    this.paintPopulationFlower(ctx, c, r);
+            // Population abundance flowers.
+            //for(var c = 0; c < info.columnCount; c++)
+            //    for(var r = 0; r < info.rowCount; r++)
+            //        this.paintPopulationFlower(ctx, c, r);
+            this.columnIndices.forEach(function (cI) { return _this.rowIndices.forEach(function (rI) { return _this.paintPopulationFlower(ctx, cI, rI); }); });
             ctx.restore();
         };
         // Population abundance flower.
@@ -981,8 +999,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var _this = this;
             var cfg = this.state.configuration;
             var selection = this.state.focused();
-            var x = (column + .5) * cfg.wellDiameter;
-            var y = (row + .5) * cfg.wellDiameter;
+            var x = (this.columnToIndex[column] + .5) * this.wellDiameter;
+            var y = (this.rowToIndex[row] + .5) * this.wellDiameter;
             // Fetch total cellCount.
             var wellClusterShares = this.state.wellClusterShares.value;
             var totalPopulation = wellClusterShares.wellIndex[Population.POPULATION_TOTAL_NAME] || [];
@@ -1002,12 +1020,12 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 ctx.strokeStyle(cfg.backgroundColor);
                 ctx.lineWidth(.25);
                 if (share >= 0 && cellCount >= 0) {
-                    var beginRad = 0.25 * Math.PI + 2 * Math.PI * pI / populations.length;
-                    var endRad = 0.25 * Math.PI + 2 * Math.PI * (pI + 1) / populations.length;
+                    var beginRad = 0.5 * Math.PI + 2 * Math.PI * pI / populations.length;
+                    var endRad = 0.5 * Math.PI + 2 * Math.PI * (pI + 1) / populations.length;
                     var normWellCount = Math.sqrt(share * cellCount) / normObjectCellCount;
                     ctx.beginPath();
                     ctx.moveTo(x, y);
-                    ctx.arc(x, y, normWellCount * cfg.wellRadius, beginRad, endRad);
+                    ctx.arc(x, y, normWellCount * 0.5 * _this.wellDiameter, beginRad, endRad);
                     ctx.lineTo(x, y);
                     ctx.fill();
                     ctx.stroke();
@@ -1019,7 +1037,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     var JointWellPlates = (function (_super) {
         __extends(JointWellPlates, _super);
         function JointWellPlates(state) {
-            _super.call(this, "jntPlt", [new TemplatePlate([0, 0], state), new FlowerPlate([0, 0], state)]);
+            _super.call(this, "jntPlt", [new TemplatePlate([0, 0], state), new FlowerPlate([0, 0], state)], [0, 0], [0, 0], 'vertical', state.configuration.panelHeaderSpace);
             this.state = state;
         }
         JointWellPlates.prototype.toString = function () {
@@ -1237,7 +1255,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.state = state;
             var cfg = state.configuration;
             var datInfo = state.dataSetInfo.value;
-            var heatMaps = _.range(0, datInfo.plateCount).map(function (pI) { return new PlateMiniHeatmap(pI, state); });
+            //var heatMaps = _.range(0, datInfo.plateCount).map(pI => new PlateMiniHeatmap(pI, state));
             //var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
             //var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
             //    _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
@@ -1258,8 +1276,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     var snippetStack = [];
                     for (var i = 0; i < ps.length; i++) {
                         if (ps[i] === null) {
-                            var firstHeatmap = snippetStack[1];
-                            snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...", Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
+                            if (snippetStack[1]) {
+                                var firstHeatmap = snippetStack[1];
+                                snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...", Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
+                            }
                         }
                         else {
                             var prevP = ps[i - 1];
@@ -1359,14 +1379,19 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.transitioning = false;
             // Plate highlight outline.
             if (state.focused().plate === this.plateNumber) {
+                context.strokeStyle(cfg.backgroundColor);
+                context.lineWidth(2);
+                context.strokeRect(-1, -1, this.dimensions[0] + 2, this.dimensions[1] + 2);
                 context.strokeStyle(cfg.baseSelected);
-                context.lineWidth(1);
-                context.strokeRect(-.5, -.5, this.dimensions[0] + 1, this.dimensions[1] + 1);
+                context.lineWidth(1.5);
+                context.strokeRect(-1, -1, this.dimensions[0] + 2, this.dimensions[1] + 2);
                 // Well highlight dot.
                 var well = state.focused().well;
                 if (well) {
+                    context.fillStyle(cfg.backgroundColor);
+                    context.fillRect(well.column * cfg.miniHeatWellDiameter - 1, well.row * cfg.miniHeatWellDiameter - 1, cfg.miniHeatWellDiameter + 2, cfg.miniHeatWellDiameter + 2);
                     context.fillStyle(cfg.baseSelected);
-                    context.fillRect(well.column * cfg.miniHeatWellDiameter, well.row * cfg.miniHeatWellDiameter, cfg.miniHeatWellDiameter, cfg.miniHeatWellDiameter);
+                    context.fillRect(well.column * cfg.miniHeatWellDiameter - .5, well.row * cfg.miniHeatWellDiameter - .5, cfg.miniHeatWellDiameter + 1, cfg.miniHeatWellDiameter + 1);
                 }
             }
             context.transitioning = true;

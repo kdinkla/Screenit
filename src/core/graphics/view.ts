@@ -140,7 +140,7 @@ export class View<M extends Model> {
 
         // Pre draw.
         var nT = new Date().getTime();  // Determine the time passed since last draw.
-        man.dT = Math.min(100, man.oT ? (nT - man.oT) : 100);
+        man.dT = Math.min(1000 / 30, man.oT ? (nT - man.oT) : 1000 / 30);
         man.oT = nT;
         man.snippetList.forEach(sV => {  // Initialize snippet values.
             sV.drawn = false;
@@ -756,7 +756,7 @@ export class ViewContext {
         this.context.globalAlpha = Math.max(0, this.sV.presence);
 
         this.context.drawImage(img,
-            this.t(spos[0]), this.t(spos[1]), this.t(sdim[0]), this.t(sdim[1]),
+            spos[0], spos[1], sdim[0], sdim[1], //this.t(spos[0]), this.t(spos[1]), this.t(sdim[0]), this.t(sdim[1]),
             this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
 
         // Correct mouse coordinates for image scaling.

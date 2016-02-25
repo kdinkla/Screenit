@@ -87,7 +87,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             //this.resizeBus.push(new ViewResizeEvent(this.dimensions()));
             // Pre draw.
             var nT = new Date().getTime(); // Determine the time passed since last draw.
-            man.dT = Math.min(100, man.oT ? (nT - man.oT) : 100);
+            man.dT = Math.min(1000 / 30, man.oT ? (nT - man.oT) : 1000 / 30);
             man.oT = nT;
             man.snippetList.forEach(function (sV) {
                 sV.drawn = false;
@@ -584,7 +584,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         ViewContext.prototype.drawImageClipped = function (img, spos, sdim, pos, dim) {
             var oldAlpha = this.context.globalAlpha;
             this.context.globalAlpha = Math.max(0, this.sV.presence);
-            this.context.drawImage(img, this.t(spos[0]), this.t(spos[1]), this.t(sdim[0]), this.t(sdim[1]), this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
+            this.context.drawImage(img, spos[0], spos[1], sdim[0], sdim[1], this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
             // Correct mouse coordinates for image scaling.
             this.mouseR = [this.mouseR[0] * sdim[0] / dim[0], this.mouseR[1] * sdim[1] / dim[1]];
             // Mouse hit. TODO: scale.

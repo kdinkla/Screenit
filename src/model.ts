@@ -252,18 +252,22 @@ export class EnrichedState extends InteractionState {
 
     // Population color, includes focused population highlight.
     populationColor(population: Population) {
-        var focus = this.focused();
-        return !population || (focus && focus.population === population.identifier) ?
-            this.configuration.highlight :
+        //var focus = this.focused();
+        return this.populationSpace.inactivePopulations.has(population) ?
+            this.configuration.baseDim :
             population.color;
+
+        //return !population || (focus && focus.population === population.identifier) ?
+        //    this.configuration.highlight :
+        //    population.color;
     }
 
     // Translucent population color, includes population highlight.
     populationColorTranslucent(population: Population) {
-        var focus = this.focused();
-        return !population || (focus && focus.population === population.identifier) ?
-            this.configuration.highlight :
-            population.colorTrans;
+        //var focus = this.focused();
+        //return !population || (focus && focus.population === population.identifier) ?
+        //    this.configuration.highlight :
+        return population.colorTrans;
     }
 
     conformSelectedCoordinates(targetState: InteractionState) {
@@ -493,7 +497,8 @@ export class EnrichedState extends InteractionState {
 // Populations and their feature space.
 export class PopulationSpace {
     constructor(public features: Chain<string> = new Chain<string>(), // Feature axes of space to model in.
-                public populations: Chain<Population> = new Chain<Population>()) {
+                public populations: Chain<Population> = new Chain<Population>(),
+                public inactivePopulations: Chain<Population> = new Chain<Population>()) {
         // Total cell count population.
         var totalPop = new Population(Population.POPULATION_TOTAL_NAME, "Cell Count",
                             new Chain<number>(), Population.POPULATION_TOTAL_COLOR);
@@ -513,6 +518,27 @@ export class PopulationSpace {
             totalPopulation.exemplars = new Chain<number>();
         }
         //this.createPopulation();    // Add one empty population at end.
+    }
+
+    // Active and inactive populations.
+    allPopulations() {
+        return Chain.union<Population>([this.populations, this.inactivePopulations]);
+    }
+
+    // Active populations, or all population as fallback.
+    activeOrAll() {
+        return this.populations.length > 1 ? this.populations : new Chain([Population.ALL]);
+    }
+
+    // Toggle activation of population.
+    toggle(population: Population) {
+        if(this.populations.has(population)) {
+            this.populations = this.populations.pull(population);
+            this.inactivePopulations = this.inactivePopulations.push(population);
+        } else {
+            this.populations = this.populations.push(population);
+            this.inactivePopulations = this.inactivePopulations.pull(population);
+        }
     }
 
     // Add given object to given population.
@@ -545,8 +571,11 @@ export class PopulationSpace {
     // Dictionary for communicating population description.
     toDict(includeFeatures = true) {
         var exemplars = {};
-        this.populations.filter(p => p.exemplars.length > 0)
-            .forEach(p => exemplars[p.identifier] = _.clone(p.exemplars.elements)); // DO NOT REMOVE!
+
+        // Active populations.
+        this.allPopulations().filter(p => p.exemplars.length > 0)
+            .forEach(p => exemplars[p.identifier] = _.clone(p.exemplars.elements));
+
         return includeFeatures ?
             { features: this.features.elements, exemplars: exemplars } :
             { exemplars: exemplars };
@@ -554,7 +583,7 @@ export class PopulationSpace {
 
     // Whether given object is an exemplar.
     isExemplar(object: number) {
-        return this.populations.elements.some(p => p.exemplars.has(object));
+        return this.allPopulations().elements.some(p => p.exemplars.has(object));
     }
 
     // Population activation function as a string.
@@ -567,13 +596,14 @@ export class PopulationSpace {
 
     // Return all exemplars of populations.
     allExemplars() {
-        return Chain.union<number>(this.populations.elements.map(p => p.exemplars));
+        return Chain.union<number>(this.allPopulations().elements.map(p => p.exemplars));
     }
 
     static fromJSON(data: {}) {
-        return new PopulationSpace(
-            Chain.fromJSON<string>(data['features']),
-            new Chain<Population>(data['populations']['elements'].map(p => Population.fromJSON(p)))
+        return new PopulationSpace(Chain.fromJSON<string>(
+                data['features']),
+                new Chain<Population>(data['populations']['elements'].map(p => Population.fromJSON(p))),
+                new Chain<Population>(data['inactivePopulations']['elements'].map(p => Population.fromJSON(p)))
         );
     }
 }
@@ -583,6 +613,9 @@ export class Population {
     public static POPULATION_TOTAL_NAME = 0;    // All cell population (for cell count purposes).
     public static POPULATION_ALL_NAME = 1;      // Population code in case of no known phenotypes.
     public static POPULATION_TOTAL_COLOR = new Color(150, 150, 150);
+
+    static ALL = new Population(Population.POPULATION_ALL_NAME, "All",
+                                new Chain<number>(), Population.POPULATION_TOTAL_COLOR);
 
     private static POPULATION_ID_COUNTER = 2;   // 0 and 1 are reserved for above population identifiers
 

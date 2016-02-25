@@ -63,6 +63,10 @@ export class Chain<E extends Identifiable> {
         return new Chain<E>(data['elements']);
     }
 
+    toString() {
+        return this.elements.map(e => e.toString()).join(",");
+    }
+
     private pushMutation(e: E) {
         if (!this.index[identify(e)]) {
             this.elements.push(e);

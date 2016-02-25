@@ -149,13 +149,18 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Population color, includes focused population highlight.
         EnrichedState.prototype.populationColor = function (population) {
-            var focus = this.focused();
-            return !population || (focus && focus.population === population.identifier) ? this.configuration.highlight : population.color;
+            //var focus = this.focused();
+            return this.populationSpace.inactivePopulations.has(population) ? this.configuration.baseDim : population.color;
+            //return !population || (focus && focus.population === population.identifier) ?
+            //    this.configuration.highlight :
+            //    population.color;
         };
         // Translucent population color, includes population highlight.
         EnrichedState.prototype.populationColorTranslucent = function (population) {
-            var focus = this.focused();
-            return !population || (focus && focus.population === population.identifier) ? this.configuration.highlight : population.colorTrans;
+            //var focus = this.focused();
+            //return !population || (focus && focus.population === population.identifier) ?
+            //    this.configuration.highlight :
+            return population.colorTrans;
         };
         EnrichedState.prototype.conformSelectedCoordinates = function (targetState) {
             var coordinates = targetState.selectedCoordinates;
@@ -341,11 +346,13 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     // Populations and their feature space.
     var PopulationSpace = (function () {
         function PopulationSpace(features, // Feature axes of space to model in.
-            populations) {
+            populations, inactivePopulations) {
             if (features === void 0) { features = new Chain(); }
             if (populations === void 0) { populations = new Chain(); }
+            if (inactivePopulations === void 0) { inactivePopulations = new Chain(); }
             this.features = features;
             this.populations = populations;
+            this.inactivePopulations = inactivePopulations;
             // Total cell count population.
             var totalPop = new Population(Population.POPULATION_TOTAL_NAME, "Cell Count", new Chain(), Population.POPULATION_TOTAL_COLOR);
             totalPop.activation = [[-1, 0], [0, 1], [1, 1]];
@@ -361,6 +368,25 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 totalPopulation.exemplars = new Chain();
             }
             //this.createPopulation();    // Add one empty population at end.
+        };
+        // Active and inactive populations.
+        PopulationSpace.prototype.allPopulations = function () {
+            return Chain.union([this.populations, this.inactivePopulations]);
+        };
+        // Active populations, or all population as fallback.
+        PopulationSpace.prototype.activeOrAll = function () {
+            return this.populations.length > 1 ? this.populations : new Chain([Population.ALL]);
+        };
+        // Toggle activation of population.
+        PopulationSpace.prototype.toggle = function (population) {
+            if (this.populations.has(population)) {
+                this.populations = this.populations.pull(population);
+                this.inactivePopulations = this.inactivePopulations.push(population);
+            }
+            else {
+                this.populations = this.populations.push(population);
+                this.inactivePopulations = this.inactivePopulations.pull(population);
+            }
         };
         // Add given object to given population.
         PopulationSpace.prototype.addExemplar = function (object, population) {
@@ -388,12 +414,13 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         PopulationSpace.prototype.toDict = function (includeFeatures) {
             if (includeFeatures === void 0) { includeFeatures = true; }
             var exemplars = {};
-            this.populations.filter(function (p) { return p.exemplars.length > 0; }).forEach(function (p) { return exemplars[p.identifier] = _.clone(p.exemplars.elements); }); // DO NOT REMOVE!
+            // Active populations.
+            this.allPopulations().filter(function (p) { return p.exemplars.length > 0; }).forEach(function (p) { return exemplars[p.identifier] = _.clone(p.exemplars.elements); });
             return includeFeatures ? { features: this.features.elements, exemplars: exemplars } : { exemplars: exemplars };
         };
         // Whether given object is an exemplar.
         PopulationSpace.prototype.isExemplar = function (object) {
-            return this.populations.elements.some(function (p) { return p.exemplars.has(object); });
+            return this.allPopulations().elements.some(function (p) { return p.exemplars.has(object); });
         };
         // Population activation function as a string.
         PopulationSpace.prototype.activationString = function () {
@@ -401,10 +428,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Return all exemplars of populations.
         PopulationSpace.prototype.allExemplars = function () {
-            return Chain.union(this.populations.elements.map(function (p) { return p.exemplars; }));
+            return Chain.union(this.allPopulations().elements.map(function (p) { return p.exemplars; }));
         };
         PopulationSpace.fromJSON = function (data) {
-            return new PopulationSpace(Chain.fromJSON(data['features']), new Chain(data['populations']['elements'].map(function (p) { return Population.fromJSON(p); })));
+            return new PopulationSpace(Chain.fromJSON(data['features']), new Chain(data['populations']['elements'].map(function (p) { return Population.fromJSON(p); })), new Chain(data['inactivePopulations']['elements'].map(function (p) { return Population.fromJSON(p); })));
         };
         return PopulationSpace;
     })();
@@ -463,6 +490,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         Population.POPULATION_TOTAL_NAME = 0; // All cell population (for cell count purposes).
         Population.POPULATION_ALL_NAME = 1; // Population code in case of no known phenotypes.
         Population.POPULATION_TOTAL_COLOR = new Color(150, 150, 150);
+        Population.ALL = new Population(Population.POPULATION_ALL_NAME, "All", new Chain(), Population.POPULATION_TOTAL_COLOR);
         Population.POPULATION_ID_COUNTER = 2; // 0 and 1 are reserved for above population identifiers
         return Population;
     })();
