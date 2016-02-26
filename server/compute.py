@@ -203,8 +203,12 @@ def objectInfo(dataSet, featureSet, column, row, plate, exemplars, probes):
     objects = allObjects(dataSet, column, row, plate, exemplars, probes)
     combined = wellIndex(dataSet).loc[objects].copy()
 
+    # Feature values.
     for ftr in featureSet:
         combined[ftr] = np.take(scaledArray(dataSet, ftr), objects)
+
+    # Predicted population values.
+    combined["population"] = np.take(clusters(dataSet, featureSet, exemplars), objects)
 
     # Generate well URLs on the spot, based on config.
     wellImages = data.config(dataSet).wellImages

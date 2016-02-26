@@ -6,7 +6,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
     var Vector = math.Vector;
     var BaseConfiguration = (function () {
         function BaseConfiguration() {
-            this.backgroundColor = new Color(247, 247, 240);
+            this.backgroundColor = Color.WHITE; //new Color(247, 247, 240);
             this.font = new Font(16, 200);
             this.sideFont = new Font(10);
             // User adjustable options.
@@ -103,6 +103,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.activationZScoreRange = 4;
             // Object details view.
             this.objectViewImageRadius = 40;
+            this.wellViewMaxObjectRadius = 50;
         }
         // Plate cluster shares.
         BaseConfiguration.voidColor = Color.NONE; //new Color(222, 220, 220);   //Color.NONE;  //Color.GREEN;

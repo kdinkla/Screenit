@@ -1149,7 +1149,7 @@ declare module jsts {
              * @see #buffer(double, int)
              * @see BufferOp
              */
-            buffer(distance: number, quadrantSegments: number, endCapStyle: number): Geometry;
+            buffer(distance: number, quadrantSegments?: number, endCapStyle?: number): Geometry;
 
             /**
              * Computes the smallest convex <code>Polygon</code> that contains all the

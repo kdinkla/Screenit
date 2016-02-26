@@ -13,7 +13,7 @@ import math = require('./core/math');
 import Vector = math.Vector;
 
 export class BaseConfiguration {
-    backgroundColor = new Color(247, 247, 240);
+    backgroundColor = Color.WHITE;  //new Color(247, 247, 240);
     font = new Font(16, 200);
     sideFont = new Font(10);
 
@@ -131,6 +131,7 @@ export class BaseConfiguration {
 
     // Object details view.
     objectViewImageRadius = 40;
+    wellViewMaxObjectRadius = 50;
 }
 
 export class NumberTableConfiguration {

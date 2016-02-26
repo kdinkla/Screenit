@@ -192,6 +192,29 @@ export class EnrichedState extends InteractionState {
         );
     }
 
+    focusedWellCoordinates(): StringMap<number[]> {
+        var result: StringMap<number[]> = {};
+
+        var tbl = this.objectInfo.value;
+        if(tbl) {
+            var x = tbl.columnVector('x');
+            var y = tbl.columnVector('y');
+            var plate = tbl.columnVector('plate');
+            var row = tbl.columnVector('row');
+            var col = tbl.columnVector('column');
+            var focusedWell = this.focused();
+
+            for(var i = 0; i < tbl.rows.length; i++) {
+                if(plate[i] === focusedWell.plate && focusedWell.well &&
+                    row[i] === focusedWell.well.row && col[i] === focusedWell.well.column) {
+                    result[Number(tbl.rows[i])] = [x[i], y[i]];
+                }
+            }
+        }
+
+        return result;
+    }
+
     closestWellObject(coordinates: number[]): number {
         var bestIndex = -1;
 
@@ -253,9 +276,9 @@ export class EnrichedState extends InteractionState {
     // Population color, includes focused population highlight.
     populationColor(population: Population) {
         //var focus = this.focused();
-        return this.populationSpace.inactivePopulations.has(population) ?
-            this.configuration.baseDim :
-            population.color;
+        return population.color;    //this.populationSpace.inactivePopulations.has(population) ?
+            //population.colorTrans :
+            //population.color;
 
         //return !population || (focus && focus.population === population.identifier) ?
         //    this.configuration.highlight :
@@ -304,6 +327,12 @@ export class EnrichedState extends InteractionState {
         return result;
     }
 
+    objectPredictedPopulation(object: number): Population {
+        var table = this.objectInfo.value;
+        var popId = table.cell("population", object);
+        return popId >= 0 ? this.populationSpace.allPopulations().byId(popId) : null;
+    }
+
     wellLocation(column: number, row: number, plate: number) {
         var objectTable = this.objectInfo.value;
 
@@ -324,7 +353,9 @@ export class EnrichedState extends InteractionState {
                     var rowObj = rowVec[i];
 
                     var imgMap:StringMap<string> = {};
-                    _.pairs(imageURLs).forEach((p, cnI) => imgMap[p[0]] = <any>objectTable.columnVector(p[1])[i]);
+                    _.pairs(imageURLs).forEach((p, cnI) => {
+                        if(p[1] !== null) imgMap[p[0]] = <any>objectTable.columnVector(p[1])[i];
+                    });
                     locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
                 }
                 objectTable['wellLocations'] = locationMap;
@@ -339,6 +370,9 @@ export class EnrichedState extends InteractionState {
 
         var columns = this.objectInfo.value.columns.filter(c => _.startsWith(c, "img_"));
         columns.forEach(c => result[c.slice(4)] = c);
+
+        // Add the none type; to hide image for better view of overlays.
+        //result["None"] = null;
 
         return result;
     }
@@ -522,7 +556,9 @@ export class PopulationSpace {
 
     // Active and inactive populations.
     allPopulations() {
-        return Chain.union<Population>([this.populations, this.inactivePopulations]);
+        var allPops = Chain.union<Population>([this.populations, this.inactivePopulations]);
+        allPops.elements.sort((lP, rP) => lP.identifier - rP.identifier);
+        return allPops;
     }
 
     // Active populations, or all population as fallback.
@@ -557,8 +593,8 @@ export class PopulationSpace {
     // Create a new population.
     createPopulation() {
         // Choose an available nominal color.
-        var takenColors = this.populations.map(p => p.color);
-        var availableColors = new Chain(Color.colorMapNominal8);
+        var takenColors = this.allPopulations().map(p => p.color);
+        var availableColors = new Chain(Color.colorMapNominal12);
         var freeColors = Chain.difference(availableColors, takenColors);
         var color = freeColors.length > 0 ? freeColors.elements[0] : Color.WHITE;
 

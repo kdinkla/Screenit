@@ -105,6 +105,24 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         EnrichedState.prototype.cloneInteractionState = function () {
             return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.hoveredCoordinates), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.configuration));
         };
+        EnrichedState.prototype.focusedWellCoordinates = function () {
+            var result = {};
+            var tbl = this.objectInfo.value;
+            if (tbl) {
+                var x = tbl.columnVector('x');
+                var y = tbl.columnVector('y');
+                var plate = tbl.columnVector('plate');
+                var row = tbl.columnVector('row');
+                var col = tbl.columnVector('column');
+                var focusedWell = this.focused();
+                for (var i = 0; i < tbl.rows.length; i++) {
+                    if (plate[i] === focusedWell.plate && focusedWell.well && row[i] === focusedWell.well.row && col[i] === focusedWell.well.column) {
+                        result[Number(tbl.rows[i])] = [x[i], y[i]];
+                    }
+                }
+            }
+            return result;
+        };
         EnrichedState.prototype.closestWellObject = function (coordinates) {
             var bestIndex = -1;
             var tbl = this.objectInfo.value;
@@ -150,7 +168,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         // Population color, includes focused population highlight.
         EnrichedState.prototype.populationColor = function (population) {
             //var focus = this.focused();
-            return this.populationSpace.inactivePopulations.has(population) ? this.configuration.baseDim : population.color;
+            return population.color; //this.populationSpace.inactivePopulations.has(population) ?
+            //population.colorTrans :
+            //population.color;
             //return !population || (focus && focus.population === population.identifier) ?
             //    this.configuration.highlight :
             //    population.color;
@@ -190,6 +210,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             }
             return result;
         };
+        EnrichedState.prototype.objectPredictedPopulation = function (object) {
+            var table = this.objectInfo.value;
+            var popId = table.cell("population", object);
+            return popId >= 0 ? this.populationSpace.allPopulations().byId(popId) : null;
+        };
         EnrichedState.prototype.wellLocation = function (column, row, plate) {
             var objectTable = this.objectInfo.value;
             var locationMap = objectTable['wellLocations'];
@@ -205,7 +230,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                         var columnObj = columnVec[i];
                         var rowObj = rowVec[i];
                         var imgMap = {};
-                        _.pairs(imageURLs).forEach(function (p, cnI) { return imgMap[p[0]] = objectTable.columnVector(p[1])[i]; });
+                        _.pairs(imageURLs).forEach(function (p, cnI) {
+                            if (p[1] !== null)
+                                imgMap[p[0]] = objectTable.columnVector(p[1])[i];
+                        });
                         locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
                     }
                     objectTable['wellLocations'] = locationMap;
@@ -217,6 +245,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var result = {};
             var columns = this.objectInfo.value.columns.filter(function (c) { return _.startsWith(c, "img_"); });
             columns.forEach(function (c) { return result[c.slice(4)] = c; });
+            // Add the none type; to hide image for better view of overlays.
+            //result["None"] = null;
             return result;
         };
         // Get range of all plates.
@@ -371,7 +401,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Active and inactive populations.
         PopulationSpace.prototype.allPopulations = function () {
-            return Chain.union([this.populations, this.inactivePopulations]);
+            var allPops = Chain.union([this.populations, this.inactivePopulations]);
+            allPops.elements.sort(function (lP, rP) { return lP.identifier - rP.identifier; });
+            return allPops;
         };
         // Active populations, or all population as fallback.
         PopulationSpace.prototype.activeOrAll = function () {
@@ -402,8 +434,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         // Create a new population.
         PopulationSpace.prototype.createPopulation = function () {
             // Choose an available nominal color.
-            var takenColors = this.populations.map(function (p) { return p.color; });
-            var availableColors = new Chain(Color.colorMapNominal8);
+            var takenColors = this.allPopulations().map(function (p) { return p.color; });
+            var availableColors = new Chain(Color.colorMapNominal12);
             var freeColors = Chain.difference(availableColors, takenColors);
             var color = freeColors.length > 0 ? freeColors.elements[0] : Color.WHITE;
             var population = new Population(null, "Tag", new Chain(), color);

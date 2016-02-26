@@ -636,7 +636,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var focus = this.state.focused();
             var wellShare = this.state.wellClusterShares.value.zScore(this.population.identifier, focus.plate, focus.well) || 0;
             context.fillStyle(cfg.baseSelected);
-            var wellInput = wellShare / cfg.activationZScoreRange;
+            var wellInput = Math.max(-1, Math.min(1, wellShare / cfg.activationZScoreRange)); // Bound to shown range.
             var wellPnt = funcPoint([wellInput, this.population.activate(wellInput)]);
             context.fillEllipse(wellPnt[0], wellPnt[1], 2.5, 2.5);
             // Picking area.
@@ -901,29 +901,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 }
             }
         };
-        AbstractPlate.trunc = function (bC, eC) {
-            var bV = [bC.x, bC.y];
-            var eV = [eC.x, eC.y];
-            return Vector.add(bV, Vector.mul(Vector.normalize(Vector.subtract(eV, bV)), TemplatePlate.arcRad));
-        };
         AbstractPlate.ringToPath = function (context, ring) {
             var cs = ring.getCoordinates();
-            var mC = TemplatePlate.trunc(cs[0], cs[1]);
-            context.moveTo(mC[0], mC[1]);
-            for (var i = 1; i < cs.length; i++) {
-                var cs0 = cs[i];
-                var cs1 = cs[i + 1 === cs.length ? 1 : i + 1];
-                context.arcTo(cs0.x, cs0.y, cs1.x, cs1.y, TemplatePlate.arcRad);
-            }
+            context.moveTo(cs[0].x, cs[0].y);
+            for (var i = 1; i < cs.length; i++)
+                context.lineTo(cs[i].x, cs[i].y);
             context.closePath();
         };
-        /*static ringToPath(context: ViewContext, ring: jsts.geom.LineString) {
-            var cs = ring.getCoordinates();
-            context.moveTo(cs[0].x, cs[0].y);
-            for (var i = 1; i < cs.length; i++) context.lineTo(cs[i].x, cs[i].y);
-            context.closePath();
-        }*/
-        AbstractPlate.arcRad = 4;
         return AbstractPlate;
     })(PlacedSnippet);
     var TemplatePlate = (function (_super) {
@@ -1010,15 +994,15 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var maxObjectCount = wellClusterShares.maxPlateObjectCount[selection.plate]; //wellClusterShares.maxObjectCount;
             var normObjectCellCount = Math.sqrt(maxObjectCount);
             // Draw flower slice
-            var populations = this.state.populationSpace.populations.elements.filter(function (p) { return p.exemplars.length > 0; });
+            var populations = this.state.populationSpace.allPopulations().elements.filter(function (p) { return p.exemplars.length > 0; });
             populations.forEach(function (p, pI) {
                 var clusterShares = _this.state.wellClusterShares.value.wellIndex[p.identifier] || [];
                 var wellShares = clusterShares[selection.plate] || [];
                 var columnShares = wellShares[column] || [];
                 var share = columnShares[row];
                 ctx.fillStyle(_this.state.populationColor(p));
-                ctx.strokeStyle(cfg.backgroundColor);
-                ctx.lineWidth(.25);
+                ctx.strokeStyle(cfg.baseEmphasis);
+                ctx.lineWidth(.5);
                 if (share >= 0 && cellCount >= 0) {
                     var beginRad = 0.5 * Math.PI + 2 * Math.PI * pI / populations.length;
                     var endRad = 0.5 * Math.PI + 2 * Math.PI * (pI + 1) / populations.length;
@@ -1062,6 +1046,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 this.guide = new GuideLabel("well", "Hover over a cell to inspect it.", [0, 0], [0, -75], 20, state);
             }
             this.annotationTable = new WellAnnotationTable("focusedAnnotations", state.wellAnnotations.value.annotationsAt(focused.plate, focused.well), state);
+            // Generate predicted population outlines.
+            this.computePopulationOutlines();
         }
         WellDetailView.prototype.setTopLeft = function (topLeft) {
             _super.prototype.setTopLeft.call(this, topLeft);
@@ -1071,6 +1057,39 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 this.guide.setTopLeft(Vector.add(this.bottomRight, [-200, 25]));
             if (this.annotationTable)
                 this.annotationTable.setTopLeft(Vector.add(this.topLeft, [0, .75 * this.dimensions[1] + 10]));
+        };
+        WellDetailView.prototype.computePopulationOutlines = function () {
+            var _this = this;
+            this.objectMaxRadi = this.state.objectInfo.value["wellOutlines"];
+            if (!this.objectMaxRadi) {
+                var objectCoordinates = this.state.focusedWellCoordinates();
+                this.objectMaxRadi = {};
+                _.pairs(objectCoordinates).forEach(function (p) { return _this.objectMaxRadi[p[0]] = [
+                    p[1][0],
+                    p[1][1],
+                    Math.min(_this.state.configuration.wellViewMaxObjectRadius, 0.5 * _.min(_.pairs(objectCoordinates).map(function (sp) { return p[0] === sp[0] ? Number.POSITIVE_INFINITY : Vector.distance(p[1], sp[1]); }))) - 5,
+                    _this.state.objectInfo.value.cell("population", p[0])
+                ]; });
+                /*var gf = new jsts.geom.GeometryFactory();
+    
+                var circleOf = (object: string) => {
+                    var cs = objectCoordinates[object];
+                    var pnt = gf.createPoint(new jsts.geom.Coordinate(cs[0], cs[1]));
+                    return pnt.buffer(objectMaxRadi[object] - 3);
+                };*/
+                /*this.outlineCircles: StringMap<jsts.geom.Geometry[]> = {};
+                this.state.populationSpace.allPopulations().forEach((pop, pI) => outlineCircles[pop.identifier] = []);
+                _.keys(objectMaxRadi).forEach(obj => {
+                    var population = this.state.objectInfo.value.cell("population", obj.toString());
+                    if (population in outlineCircles) outlineCircles[population].push(circleOf(obj));
+                });*/
+                /*this.outlines = [];
+                _.pairs(outlineCircles).forEach(p => {
+                    var joined = new jsts.operation.union.CascadedPolygonUnion(p[1]).union();
+                    if (joined) this.outlines[p[0]] = joined; //.buffer(-.5 * this.state.configuration.wellViewMaxObjectRadius);
+                });*/
+                this.state.objectInfo.value["wellOutlines"] = this.objectMaxRadi; //this.outlines;
+            }
         };
         WellDetailView.prototype.paint = function (ctx) {
             var state = this.state;
@@ -1087,6 +1106,45 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     ctx.picking = true;
                     ctx.drawImageClipped(img, [0, 0], [img.width, 0.5 * img.height], [0, 0], [wellScale * img.width, wellScale * 0.5 * img.height]);
                     ctx.picking = false;
+                    // Population outline overlay.
+                    ctx.save();
+                    /*var allPopulations = this.state.populationSpace.allPopulations();
+                    _.pairs(this.objectMaxRadi).forEach(p => {
+                        //var obj = p[0];
+                        var cs = p[1];
+                        if (cs[3] >= 0) {
+                            var x = wellScale * cs[0];
+                            var y = wellScale * cs[1];
+                            var rad = wellScale * cs[2];
+                            var population = allPopulations.byId(cs[3]);
+    
+                            if(population) {
+                                ctx.strokeStyle(Color.BLACK);
+                                ctx.lineWidth(4);
+                                ctx.strokeEllipse(x, y, rad, rad);
+    
+                                ctx.strokeStyle(population.color);
+                                ctx.lineWidth(4);
+                                ctx.strokeEllipse(x, y, rad - 1, rad - 1);
+                            }
+                        }
+                    });*/
+                    /*_.pairs(this.objectMaxRadi).forEach(p => {
+                        var population = this.state.populationSpace.allPopulations().byId(p[0]);
+                        if(population) {
+                            //AbstractPlate.geometryToPath(ctx, p[1]);
+    
+    
+                            ctx.strokeStyle(Color.BLACK);
+                            ctx.lineWidth(6);
+                            ctx.stroke();
+    
+                            ctx.strokeStyle(population.colorTrans);
+                            ctx.lineWidth(4);
+                            ctx.stroke();
+                        }
+                    });*/
+                    ctx.restore();
                     // Test object coordinates.
                     var objects = state.objectInfo.value;
                     var x = objects.columnVector("x");
@@ -1209,6 +1267,18 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     ];
                     var internalTopLeft = Vector.subtract(coordinates, internalRadius);
                     ctx.drawImageClipped(img, internalTopLeft, internalDiameter, [0, 0], this.dimensions);
+                    // Predicted population tag.
+                    ctx.transitioning = false;
+                    var predPop = mod.objectPredictedPopulation(this.object);
+                    if (predPop) {
+                        var width = .2 * this.dimensions[0];
+                        var height = .2 * this.dimensions[1];
+                        ctx.fillStyle(cfg.backgroundColor);
+                        ctx.fillRect(0, 0, width, height);
+                        ctx.fillStyle(predPop.color);
+                        ctx.fillRect(0, 0, width - 1, height - 1);
+                    }
+                    ctx.transitioning = true;
                     // Focused highlight.
                     ctx.transitioning = false;
                     if (this.focused) {

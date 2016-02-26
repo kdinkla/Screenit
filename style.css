@@ -37,7 +37,7 @@ html, body {
     bottom: 0;
     left: 0;
     right: 0;
-    background-color: hsl(60, 2%, 50%);
+    background-color: white;    /*hsl(60, 2%, 50%);*/
     font-family: OpenSans;
     font-size: 14px;
 }
@@ -48,5 +48,5 @@ html, body {
     right: 0px;
     top: 0px;
     bottom: 0px;
-    background: rgb(247, 247, 240);
+    background: white;  /*rgb(247, 247, 240);*/
 }
