@@ -20,7 +20,7 @@ define(["require", "exports", 'bacon', './model', './core/dataprovider', './over
         var overView = new OverView();
         var interactionState = new InteractionState();
         var interactionStates = new bacon.Bus();
-        var enrichedStates = interactionStates.throttle(250).map(function (s) { return new EnrichedState(s); });
+        var enrichedStates = interactionStates.throttle(100).map(function (s) { return new EnrichedState(s); });
         var proxyService = new ProxyService(serverPath, enrichedStates);
         overView.event.onValue(function (event) {
             var oldState = overView.model;
@@ -29,6 +29,17 @@ define(["require", "exports", 'bacon', './model', './core/dataprovider', './over
             event.onMouse(function (me) {
                 if (me.topHit && event.type in me.topHit.snippet)
                     me.topHit.snippet[event.type](event, me.topHit.local, oldState, newState);
+            });
+            // Alter annotation filter on key press.
+            event.onKey(function (ke) {
+                var key = ke.keyCode || ke.charCode;
+                var keyChar = String.fromCharCode(ke.which);
+                var oldFilter = oldState.selectedCoordinates.wellFilter;
+                // Backspace.
+                if (key === 8 || key === 46)
+                    newState.selectedCoordinates.wellFilter = oldFilter.substring(0, oldFilter.length - 1);
+                else if (!keyChar.match(/^[^A-Za-z0-9+#\.\-]+$/))
+                    newState.selectedCoordinates.wellFilter = oldFilter + keyChar.toLowerCase();
             });
             interactionState = newState;
             interactionStates.push(interactionState);

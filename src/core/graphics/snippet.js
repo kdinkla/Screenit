@@ -178,6 +178,65 @@ define(["require", "exports", './view', './style', '../math'], function (require
         return Triangle;
     })(BaseSnippet);
     exports.Triangle = Triangle;
+    var Polygon = (function (_super) {
+        __extends(Polygon, _super);
+        function Polygon(identifier, coordinates, fillColor, strokeColor, transition) {
+            if (fillColor === void 0) { fillColor = null; }
+            if (strokeColor === void 0) { strokeColor = null; }
+            if (transition === void 0) { transition = true; }
+            _super.call(this, identifier);
+            this.coordinates = coordinates;
+            this.fillColor = fillColor;
+            this.strokeColor = strokeColor;
+            this.transition = transition;
+        }
+        Polygon.prototype.paint = function (context) {
+            var cs = this.coordinates;
+            context.save();
+            context.context.lineJoin = "round";
+            context.transitioning = this.transition;
+            context.beginPath();
+            context.moveTo(cs[0][0], cs[0][1]);
+            for (var i = 1; i < cs.length; i++)
+                context.lineTo(cs[i][0], cs[i][1]);
+            context.closePath();
+            context.transitioning = true;
+            context.fillStyle(this.fillColor);
+            context.fill();
+            context.strokeStyle(this.strokeColor);
+            context.stroke();
+            context.restore();
+        };
+        return Polygon;
+    })(BaseSnippet);
+    exports.Polygon = Polygon;
+    var Line = (function (_super) {
+        __extends(Line, _super);
+        function Line(identifier, coordinates, strokeColor, transition) {
+            if (strokeColor === void 0) { strokeColor = null; }
+            if (transition === void 0) { transition = true; }
+            _super.call(this, identifier);
+            this.coordinates = coordinates;
+            this.strokeColor = strokeColor;
+            this.transition = transition;
+        }
+        Line.prototype.paint = function (context) {
+            var cs = this.coordinates;
+            context.save();
+            context.context.lineJoin = "round";
+            context.transitioning = this.transition;
+            context.beginPath();
+            context.moveTo(cs[0][0], cs[0][1]);
+            for (var i = 1; i < cs.length; i++)
+                context.lineTo(cs[i][0], cs[i][1]);
+            context.transitioning = true;
+            context.strokeStyle(this.strokeColor);
+            context.stroke();
+            context.restore();
+        };
+        return Line;
+    })(BaseSnippet);
+    exports.Line = Line;
     // Basic text label.
     var LabelStyle = (function () {
         function LabelStyle(font, color, horizontalAnchor, verticalAnchor, rotation) {

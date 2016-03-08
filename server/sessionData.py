@@ -1,11 +1,12 @@
 import os
 import random
 
-sessionPath = "../session/"
+sessionDirectory = "../session"
+sessionPath = sessionDirectory + "/"
 
 def paths():
-    return {int(o): os.path.join(sessionPath, o) for o in os.listdir(sessionPath)
-            if os.path.isfile(os.path.join(sessionPath, o))}
+    return {int(o): os.path.join(sessionDirectory, o) for o in os.listdir(sessionDirectory)
+            if os.path.isfile(os.path.join(sessionDirectory, o))}
 
 def create():
     # Determine existing sessions identifiers that are in use.

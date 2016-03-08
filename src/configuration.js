@@ -11,6 +11,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.sideFont = new Font(10);
             // User adjustable options.
             this.imageType = null; // The type of image to present.
+            this.imagePopulationOverlay = "None"; // Whether to show an image population overlay;
             // Default palette.
             this.base = Color.grey(75);
             this.baseEmphasis = Color.BLACK;
@@ -30,6 +31,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.panelHeaderOpenLabel = new LabelStyle(this.panelHeaderFont, this.base, 'left', 'top');
             this.subPanelHeaderLabel = new LabelStyle(new Font(14), this.base, 'left', 'top');
             this.sideLabel = new LabelStyle(this.sideFont, this.baseMuted, 'left', 'top');
+            this.selectedSideLabel = new LabelStyle(this.sideFont, this.baseSelected, 'left', 'top');
             // Guide labels.
             this.guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
             this.bigGuideStyle = new LabelStyle(new Font(32, 180), Color.CRIMSON, 'left', 'top');
@@ -50,8 +52,9 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             // Splom view.
             this.splomColor = new Color(247, 247, 247);
             this.splomInnerSize = 90;
-            this.splomSpace = 5;
+            this.splomSpace = 2;
             this.splomSize = this.splomInnerSize + this.splomSpace;
+            this.splomTotalSize = 400;
             this.splomClusterRadius = 3;
             this.splomDotRadius = 1;
             this.splomDotDensityColor = Color.grey(0, 0.2);
@@ -66,8 +69,8 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
             this.clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
             this.clusterAdditionLabel = new Font(34); //new LabelStyle(new Font(30), this.baseSelected);
-            this.exemplarSpace = 1;
-            this.exemplarColumnSpace = 4 * this.exemplarSpace;
+            this.exemplarSpace = 2;
+            this.exemplarColumnSpace = 2 * this.exemplarSpace;
             // Features.
             this.featureFont = new Font(10);
             this.featureCellSpace = [4, 2];
@@ -76,12 +79,6 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             // Transfer editor.
             this.transferPlotSize = this.clusterTileInnerSize;
             this.transferFont = new Font(8);
-            // Plate view.
-            this.wellRadius = 7;
-            this.wellDiameter = 2 * this.wellRadius;
-            this.wellInnerRadius = 4;
-            this.plateColLabelMargin = 1;
-            this.plateRowLabelMargin = 3;
             // Plate index view.
             this.plateWidth = 4;
             this.plateIndexInnerHeight = 10;
@@ -92,13 +89,28 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.miniHeatSpace = 2;
             this.miniHeatColumnMax = 12;
             this.miniHeatColumnCount = 5;
+            this.largeHeatMultiplier = 3;
+            this.heatmapFont = new Font(6);
+            // Plate view.
+            this.wellDiameter = this.miniHeatWellDiameter * this.largeHeatMultiplier;
+            this.wellRadius = .5 * this.wellDiameter;
+            this.wellInnerRadius = this.wellRadius - 1;
+            this.plateColLabelMargin = 1;
+            this.plateRowLabelMargin = 4;
+            // Well list view.
+            this.listWellsCount = 40;
+            this.listWellAbundanceWidth = 200;
+            this.listColumnSpace = 5;
+            this.listWellLabel = this.sideLabel;
+            this.listWellSpace = 2;
             // Well details view.
             this.wellViewMaxWidth = 600;
-            this.annotationFont = new Font(12);
+            this.annotationFont = this.sideFont; //new Font(12);
             this.annotationCategoryLabel = new LabelStyle(this.annotationFont, this.base);
             this.annotationLabel = new LabelStyle(this.annotationFont, this.baseDim);
             this.annotationSelectedLabel = new LabelStyle(this.annotationFont, this.baseEmphasis);
-            this.annotationTagSpace = 5;
+            this.annotationColumnSpace = 5;
+            this.annotationTagSpace = 2;
             // Activation function.
             this.activationZScoreRange = 4;
             // Object details view.

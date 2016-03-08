@@ -18,7 +18,8 @@ export class BaseConfiguration {
     sideFont = new Font(10);
 
     // User adjustable options.
-    imageType: string = null;   // The type of image to present.
+    imageType: string = null;                   // The type of image to present.
+    imagePopulationOverlay: string = "None";   // Whether to show an image population overlay;
 
     // Default palette.
     base = Color.grey(75);
@@ -40,6 +41,7 @@ export class BaseConfiguration {
     panelHeaderOpenLabel = new LabelStyle(this.panelHeaderFont, this.base, 'left', 'top');
     subPanelHeaderLabel = new LabelStyle(new Font(14), this.base, 'left', 'top');
     sideLabel = new LabelStyle(this.sideFont, this.baseMuted, 'left', 'top');
+    selectedSideLabel = new LabelStyle(this.sideFont, this.baseSelected, 'left', 'top');
 
     // Guide labels.
     guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
@@ -63,9 +65,11 @@ export class BaseConfiguration {
 
     // Splom view.
     splomColor = new Color(247, 247, 247);
+
     splomInnerSize = 90;
-    splomSpace = 5;
+    splomSpace = 2;
     splomSize = this.splomInnerSize + this.splomSpace;
+    splomTotalSize = 400;
     splomClusterRadius = 3;
     splomDotRadius = 1;
     splomDotDensityColor = Color.grey(0, 0.2);
@@ -81,8 +85,8 @@ export class BaseConfiguration {
     clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
     clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
     clusterAdditionLabel = new Font(34);    //new LabelStyle(new Font(30), this.baseSelected);
-    exemplarSpace = 1;
-    exemplarColumnSpace = 4 * this.exemplarSpace;
+    exemplarSpace = 2;
+    exemplarColumnSpace = 2 * this.exemplarSpace;
 
     // Features.
     featureFont = new Font(10);
@@ -93,13 +97,6 @@ export class BaseConfiguration {
     // Transfer editor.
     transferPlotSize = this.clusterTileInnerSize;
     transferFont = new Font(8);
-
-    // Plate view.
-    wellRadius = 7;
-    wellDiameter = 2 * this.wellRadius;
-    wellInnerRadius = 4;
-    plateColLabelMargin = 1;
-    plateRowLabelMargin = 3;
 
     // Plate index view.
     plateWidth = 4;
@@ -117,14 +114,31 @@ export class BaseConfiguration {
     miniHeatSpace = 2;
     miniHeatColumnMax = 12;
     miniHeatColumnCount = 5;
+    largeHeatMultiplier = 3;
+    heatmapFont = new Font(6);
+
+    // Plate view.
+    wellDiameter = this.miniHeatWellDiameter * this.largeHeatMultiplier;
+    wellRadius = .5 * this.wellDiameter;
+    wellInnerRadius = this.wellRadius - 1;
+    plateColLabelMargin = 1;
+    plateRowLabelMargin = 4;
+
+    // Well list view.
+    listWellsCount = 40;
+    listWellAbundanceWidth = 200;
+    listColumnSpace = 5;
+    listWellLabel = this.sideLabel;
+    listWellSpace = 2;
 
     // Well details view.
     wellViewMaxWidth = 600;
-    annotationFont = new Font(12);
+    annotationFont = this.sideFont; //new Font(12);
     annotationCategoryLabel = new LabelStyle(this.annotationFont, this.base);
     annotationLabel = new LabelStyle(this.annotationFont, this.baseDim);
     annotationSelectedLabel = new LabelStyle(this.annotationFont, this.baseEmphasis);
-    annotationTagSpace = 5;
+    annotationColumnSpace = 5;
+    annotationTagSpace = 2;
 
     // Activation function.
     activationZScoreRange = 4;

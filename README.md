@@ -46,11 +46,11 @@ Browse to the server's address to try out the prototype.
 ## Data
 Data sets are stored in the __dataset__ directory, which you will have to create upon installation. Multiple data sets are supported via sub-directories. For example, __dataset/DataSetName__ contains all files for a data set named __DataSetName__.
 
-Image feature data is stored as a NumPy array dump per image feature in __dataset/DataSetName/columns__. Every object (in a well) has a value in such an array, where the array index of an object is consistent across all columns. Everything is therefore stored at the object level, including eventual well and plate information (sacrificing disk space for sake of computation speed).
+Image feature data is stored as a NumPy array dump per image feature in __dataset/DataSetName/columns__. Every object (in a well) has a value in such an array, where the array index of an object is consistent across all columns. Everything is therefore stored at the object level, including eventual well and plate information (sacrificing disk space for sake of computation speed). Two special files __mds0__ and __mds1__ can be included in the __columns__ as well, these provide the coordinates for the landscape plot that can for example be a 2D projection of the high-dimensional feature space.
 
 Well annotation data is stored as a tab-delimited file __dataset/DataSetName/wells.tab__. The file contains __plate   column  row__ columns to designate the well, and additional columns for annotations categories. A single well can be given multiple annotations of a single category by giving a list of annotations as __annotation1|annotation2|annotation3__.
 
-The example CellMorph data is 1.5GB and can be downloaded from Google Drive for now: https://drive.google.com/open?id=0B4zuo4p8QBcaWE1JQVp4LW9vSTg
+The example CellMorph data is 1.5GB and can be downloaded from Google Drive for now: https://drive.google.com/open?id=0B4zuo4p8QBcaSThHMm1jX2kwUkU
 The __dataset/CellMorph__ directory already contains the __config.py__ file for CellMorph, which also contains explanatory comments per configuration option.
 
 The code for converting the CellMorph (per plate) tab-delimited files to NumPy columns can be found in __wrangle/numpyFill.py__.

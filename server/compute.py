@@ -8,6 +8,7 @@ from sklearn.ensemble import RandomForestClassifier
 from scipy.ndimage.morphology import grey_erosion
 from multiprocessing.dummy import Pool  # Use multi-threading instead of multi-processing; synchronize functions!
 from cache import lru_cache
+from collections import defaultdict
 
 # Names of available data sets.
 def dataSets():
@@ -52,15 +53,42 @@ def columns(dataSet, columns):
 def wellAnnotations(dataSet):
     return data.wellAnnotations(dataSet)
 
+# Retrieve well types from well annotations.
+@lru_cache(maxsize=5)
+def wellTypes(dataSet):
+    return list()   #list(set([an[0] for an in data.wellAnnotations(dataSet)['Type'].values()]))
+
 # Small sample for visualizations.
 @lru_cache(maxsize=5)
 def smallSample(dataSet):
     return data.objectSample(dataSet, 10**3)
 
-# Well coordinate information for all objects.
+# Well coordinate information for all objects, includes well type if provided in annotations.
 @lru_cache(maxsize=5)
 def wellIndex(dataSet):
-    return data.columnsDump(dataSet, data.systemObjectColumns)
+    wellColumns = data.columnsDump(dataSet, data.systemObjectColumns)
+
+    wTs = wellTypes(dataSet)
+    if len(wTs) > 0:
+        annotationMap = wellAnnotations(dataSet)['Type']
+        typeToPopID = {tp: i + 3 for i, tp in enumerate(wTs)}   # Well type IDs start at 3, see src/model.ts -> Population
+
+        cfg = configuration('CellMorph')
+        columnCnt = len(cfg.columns)
+        rowCnt = len(cfg.rows)
+        def convertTag(wellTag):
+            plate, column, row = [int(part) for part in wellTag.split("_")]
+            return plate * columnCnt * rowCnt + column * rowCnt + row
+
+        annotationDict = {convertTag(tag): typeToPopID[wT[0]] for tag, wT in annotationMap.iteritems()}
+        annotationArr = np.array([annotationDict[i] for i in range(len(annotationDict))], np.int)
+
+        objectAbsWell = wellColumns['plate'] * columnCnt * rowCnt + wellColumns['column'] * rowCnt + wellColumns['row']
+        wellColumns['type'] = annotationArr[objectAbsWell.values]
+    else:
+        wellColumns['type'] = np.nan
+
+    return wellColumns
 
 def ftrMet(dataSet, ftr):
     col = data.numpyDump(dataSet, ftr)
@@ -70,7 +98,7 @@ def ftrMet(dataSet, ftr):
 @lru_cache(maxsize=5)
 def featureMetrics(dataSet):
     print "Computing image feature metrics for " + dataSet
-    return {feature: ftrMet(dataSet, feature) for feature in data.imageFeatures(dataSet)}
+    return {feature: ftrMet(dataSet, feature) for feature in data.features(dataSet)}
 
 @lru_cache(maxsize=5)
 def wellToObjects(dataSet):
@@ -148,26 +176,57 @@ def featureInfo(dataSet):
 def clusters(dataSet, features, exemplars):
     ftrs = list(features)
 
-    predicted = np.empty(len(wellIndex(dataSet)), dtype=np.int)
+    wI = wellIndex(dataSet)
+    objectCount = len(wI)
+    predicted = np.empty(objectCount, dtype=np.int)
 
-    if ftrs and exemplars:
-        valueMatrix = np.matrix([scaledArray(dataSet, ftr) for ftr in features], copy=False).transpose()
+    # Default to use all features if none habe been selected.
+    if not ftrs:
+        ftrs = data.imageFeatures(dataSet)
 
+    if ftrs and exemplars:   #(exemplars or wellTypes(dataSet)):
+        # Training feature data.
+        valueMatrix = np.matrix([scaledArray(dataSet, ftr) for ftr in ftrs], copy=False).transpose()
+
+        # Construct from well type annotation.
+        trainingLabels = np.copy(wI['type'].values)
+
+        # Knock out large part of training values (to speed up training).
+        trainingSample = np.random.rand(trainingLabels.size) < configuration(dataSet).wellTypeSample
+        trainingLabels = np.where(trainingSample, trainingLabels, np.nan)
+
+        # Override well type annotations where exemplars have been chosen by user.
         exemplarDict = dict(exemplars)
-        exemplarObjects = np.array([exObj for exObjects in exemplarDict.values() for exObj in exObjects], dtype=np.int)
-        exemplarLabels = np.array([exId for exId, exObjects in exemplarDict.iteritems() for exObj in exObjects], dtype=np.int)
+
+        for popId, exemplars in exemplarDict.iteritems():
+            for exemplar in exemplars:
+                trainingLabels[exemplar] = popId
+
+        # Prune training features and labels, based on presence of labels.
+        trainingValues = valueMatrix[~np.isnan(trainingLabels)]
+        trainingLabels = trainingLabels[~np.isnan(trainingLabels)]
 
         print "Begin training"
-        trainingValues = np.take(valueMatrix, exemplarObjects, axis=0)
-        forest = RandomForestClassifier(n_estimators=10, n_jobs=-1, class_weight="balanced")
-        forest = forest.fit(trainingValues, exemplarLabels)
+        #trainingValues = np.take(valueMatrix, exemplarObjects, axis=0)
+        forest = RandomForestClassifier(
+            n_estimators=10,
+            n_jobs=-1,
+            class_weight="balanced"#,
+            #min_samples_split=0.01*trainingValues.size
+        )
+        forest = forest.fit(trainingValues, trainingLabels)    #forest.fit(trainingValues, exemplarLabels)
         print "End training"
 
         print "Begin classification"
-        predicted = forest.predict(valueMatrix)
+        #predicted = forest.predict(valueMatrix)
+        confidenceThreshold = data.config(dataSet).classifierConfidenceThreshold
+        probabilities = forest.predict_proba(valueMatrix)
+        maxProb = np.max(probabilities, axis=1)
+        maxArgProb = np.argmax(probabilities, axis=1)
+        predicted = np.where(maxProb > confidenceThreshold, np.choose(maxArgProb, forest.classes_), 2).astype(np.int)
         print "End classification"
     else:
-        predicted.fill(1)   # 1 is reserved in case no phenotypes have been defined yet.
+        predicted.fill(2)   # 2 unsure about all input when no training input is provided
 
     # Partition predicted column to object indices.
     return predicted
@@ -176,8 +235,8 @@ def clusters(dataSet, features, exemplars):
 @lru_cache(maxsize=5)
 def clustersAsMap(dataSet, features, exemplars):
     clst = clusters(dataSet, features, exemplars)
-    return {int(id): np.where(clst == int(id))[0]
-            for id in (dict(exemplars).keys() if len(exemplars) > 0 and len(features) > 0 else [1])}
+    ids = np.unique(clst)
+    return {int(id): np.where(clst == int(id))[0] for id in ids}    #(dict(exemplars).keys() if len(exemplars) > 0 and len(features) > 0 else [1])}
 
 @lru_cache(maxsize=5)
 def closestObject(dataSet, probes):
@@ -206,6 +265,10 @@ def objectInfo(dataSet, featureSet, column, row, plate, exemplars, probes):
     # Feature values.
     for ftr in featureSet:
         combined[ftr] = np.take(scaledArray(dataSet, ftr), objects)
+
+    if data.mdsColumnsPresent(dataSet):
+        for mdsCol in data.mdsColumns:
+            combined[mdsCol] = np.take(scaledArray(dataSet, mdsCol), objects)
 
     # Predicted population values.
     combined["population"] = np.take(clusters(dataSet, featureSet, exemplars), objects)
@@ -285,41 +348,47 @@ def objectHistogram2D(args):
 
     # Contour maps per cluster.
     contours = {}
-    kernel = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]  # Morphology kernel.
+    #kernel = [[1, 1, 1], [1, 1, 1], [1, 1, 1]]  # Morphology kernel.
     for cluster, objects in partition.iteritems():
         tBins = bins - 1
-        xCol = (np.take(scaledArray(dataSet, xFeature), objects) * tBins).astype(np.int16)
-        yCol = (np.take(scaledArray(dataSet, yFeature), objects) * tBins).astype(np.int16)
+        xCol = (np.take(scaledArray(dataSet, xFeature), objects) * tBins).astype(np.int)
+        yCol = (np.take(scaledArray(dataSet, yFeature), objects) * tBins).astype(np.int)
         digitized = (xCol * bins) + yCol
         counts = np.bincount(digitized, minlength=bins*bins)
         counts.shape = (bins, bins)
 
         # Scale histogram densities to base 10 logarithm levels.
-        levels = histoLog(counts).astype(np.int8)
+        levels = histoLog(counts)   #.astype(np.int8)
 
         # Level set outlines as contours (retain level as outline number).
-        eroded = grey_erosion(levels, footprint=kernel, mode='constant')
-        difference = np.sign(levels - eroded)
-        levelContours = np.multiply(difference, levels)
+        #eroded = grey_erosion(levels, footprint=kernel, mode='constant')
+        #difference = np.sign(levels - eroded)
+        #levelContours = np.multiply(difference, levels)
 
-        contours[str(cluster)] = levelContours
+        #contours[str(cluster)] = levelContours
+
+        contours[str(cluster)] = levels
 
     return xFeature, yFeature, contours
 
 def objectHistogramMatrix(dataSet, features, exemplars, bins):
-    pool = Pool()
     tasks = [(dataSet, features, exemplars, xFtr, yFtr, bins) for yFtr in features for xFtr in features if xFtr < yFtr]
+    if data.mdsColumnsPresent(dataSet):
+        tasks.append((dataSet, features, exemplars, data.mdsColumns[0], data.mdsColumns[1], bins))
+
+    pool = Pool()
     results = pool.imap(objectHistogram2D, tasks)
     pool.close()
     pool.join()
 
-    histograms = {ftr2: {ftr1: {} for ftr1 in features} for ftr2 in features}
+    recDict = lambda: defaultdict(recDict)
+    histograms = recDict()
     for xFeature, yFeature, contours in results:
         for c, lvlCnt in contours.iteritems():
             histograms[xFeature][yFeature][c] = lvlCnt.tolist()
-            histograms[yFeature][xFeature][c] = lvlCnt.transpose().tolist()     # Transpose for the inverse pair.
+            histograms[yFeature][xFeature][c] = lvlCnt.transpose().tolist()
 
-    return histograms
+    return dict(histograms)
 
 def forObjectFeatureValues(args):
     (dataSet, col, objects) = args
@@ -327,7 +396,7 @@ def forObjectFeatureValues(args):
 
 def objectFeatureValues(dataSet, column, row, plate, exemplars, probes):
     objects = allObjects(dataSet, column, row, plate, exemplars, probes)
-    cols = data.imageFeatures(dataSet)
+    cols = data.features(dataSet)
 
     pool = Pool()
     results = pool.imap(forObjectFeatureValues, [(dataSet, col, objects) for col in cols])

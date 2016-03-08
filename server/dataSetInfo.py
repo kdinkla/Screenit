@@ -5,4 +5,8 @@ import compute
 @tangelo.types(dataSet=compute.dataSet)
 def run(dataSet):
     config = compute.configuration(dataSet)
-    return {'plateLabels': config.plates, 'columnLabels': config.columns, 'rowLabels': config.rows}
+    return {'plateLabels': config.plates,
+            'columnLabels': config.columns,
+            'rowLabels': config.rows,
+            'wellTypes': compute.wellTypes(dataSet),
+            'imageDimensions': config.imageDimensions}

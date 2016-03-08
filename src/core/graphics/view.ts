@@ -102,7 +102,7 @@ export class View<M extends Model> {
             this.mouseDown,
             this.mouseUp,
             this.mouseDrag,
-            this.mouseMove,
+            //this.mouseMove, # Ignore mouse movements (hover over).
             this.keyPress]);
     }
 

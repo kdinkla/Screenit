@@ -38,8 +38,8 @@ else {
     var interactionState = new InteractionState();
     var interactionStates = new bacon.Bus<InteractionState>();
     var enrichedStates = interactionStates
+        .throttle(100)
         //.skipDuplicates((l, r) => _.isEqual(l, r))
-        .throttle(250)
         .map(s => new EnrichedState(s));
     var proxyService = new ProxyService<EnrichedState>(serverPath, enrichedStates);
 
@@ -51,8 +51,21 @@ else {
         event.onMouse(me => {
                 if (me.topHit && event.type in me.topHit.snippet)
                     me.topHit.snippet[event.type](event, me.topHit.local, oldState, newState)
-            }
-        );
+        });
+
+        // Alter annotation filter on key press.
+        event.onKey(ke => {
+            var key = ke.keyCode || ke.charCode;
+            var keyChar = String.fromCharCode(ke.which);
+            var oldFilter = oldState.selectedCoordinates.wellFilter;
+
+            // Backspace.
+            if(key === 8 || key === 46)
+                newState.selectedCoordinates.wellFilter = oldFilter.substring(0, oldFilter.length - 1);
+            // Normal character.
+            else if(!keyChar.match(/^[^A-Za-z0-9+#\.\-]+$/))
+                newState.selectedCoordinates.wellFilter = oldFilter + keyChar.toLowerCase();
+        });
 
         interactionState = newState;
         interactionStates.push(interactionState);

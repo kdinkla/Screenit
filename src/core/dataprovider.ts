@@ -154,6 +154,8 @@ export class ProxyService<M> {
 
     // Propagate model change to the outside world.
     private propagate() {
+        // Allow model to update its internal state if it is implemented.
+        if('update' in this.resolvingModel) this.resolvingModel['update']();
         this.expandBus.push(this.resolvingModel);
     }
 }

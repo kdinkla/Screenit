@@ -7,10 +7,9 @@ from collections import defaultdict
 
 # Required (non-image feature) columns.
 systemObjectColumns = ['plate', 'column', 'row', 'x', 'y']
-mdsColumns = ['mds0', 'mds1']
 
 # Data sets available at directory of dataPath, where data set name matches sub-directory name.
-dataPath = '../dataset/'
+dataPath = '../../dataset/'
 dataSetPaths = {o: os.path.join(dataPath, o) for o in os.listdir(dataPath) if os.path.isdir(os.path.join(dataPath, o))}
 numpyPaths = {o: path + '/columns/' for o, path in dataSetPaths.iteritems()}
 
@@ -23,20 +22,9 @@ def config(dataSet):
 def objectColumns(dataSet):
     return [os.path.splitext(os.path.basename(file))[0] for file in os.listdir(numpyPaths[dataSet]) if file.endswith(".npy")]
 
-def mdsColumnsPresent(dataSet):
-    cols = [numpyPaths[dataSet] + mdsCol + ".npy" for mdsCol in mdsColumns]
-    return all([os.path.isfile(colPath) for colPath in cols])
-
 # The image feature columns that are available for every object.
 def imageFeatures(dataSet):
-    return sorted(list((set(objectColumns(dataSet)) - set(systemObjectColumns)) - set(mdsColumns)))
-
-# Feature columns, that include MDS columns when available.
-def features(dataSet):
-    ftrs = imageFeatures(dataSet)
-    if mdsColumnsPresent(dataSet):
-        ftrs += mdsColumns
-    return ftrs
+    return sorted(list(set(objectColumns(dataSet)) - set(systemObjectColumns)))
 
 def numpyDump(dataSet, column):
     return np.load(numpyPaths[dataSet] + column + ".npy", mmap_mode="r")

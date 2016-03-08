@@ -68,6 +68,11 @@ export class Color {
         return new Color(this.r, this.g, this.b, mulAlpha * this.a);
     }
 
+    // Darken the color by the given factor.
+    darken(factor: number) {
+        return new Color(Math.floor(factor * this.r), Math.floor(factor * this.g), Math.floor(factor * this.b), this.a);
+    }
+
     toString() {
         return this.cssString;
     }
@@ -100,7 +105,7 @@ export class Color {
     }
 
     // Colorbrewer 12 nominal value color mapping.
-    static colorMapNominal12 =
+    /*static colorMapNominal12 =
         [new Color(190, 186, 218),
             new Color(251, 128, 114),
             new Color(128, 177, 211),
@@ -111,7 +116,26 @@ export class Color {
             new Color(204, 235, 197),
             new Color(255, 237, 111),
             new Color(141, 211, 199),
-            new Color(255, 255, 179)];
+            new Color(255, 255, 179)];*/
+    static colorMapNominal12 = [
+        new Color(27,158,119),
+        new Color(217,95,2),
+        new Color(117,112,179),
+        new Color(231,41,138),
+        new Color(102,166,30),
+        new Color(230,171,2),
+        new Color(166,118,29),
+        new Color(102,102,102),
+
+        new Color(228, 26, 28),
+        new Color(55, 126, 184),
+        new Color(77, 175, 74),
+        new Color(152, 78, 163),
+        new Color(255, 127, 0),
+        new Color(255, 255, 51),
+        new Color(166, 86, 40),
+        new Color(247, 129, 191)
+    ];
 
     static colorMapNominal8 =
         [new Color(228, 26, 28),

@@ -123,6 +123,9 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
         };
         // Propagate model change to the outside world.
         ProxyService.prototype.propagate = function () {
+            // Allow model to update its internal state if it is implemented.
+            if ('update' in this.resolvingModel)
+                this.resolvingModel['update']();
             this.expandBus.push(this.resolvingModel);
         };
         return ProxyService;

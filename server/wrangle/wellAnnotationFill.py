@@ -10,7 +10,7 @@ rowIndex = {tag: index for index, tag in enumerate(config.rows)}
 inputPath = "data/CellMorphWellAnnotation.tab"
 outputPath = "data/wells.tab"
 with open(outputPath, 'w') as outputFile:
-    writer = csv.DictWriter(outputFile, fieldnames=['plate', 'column', 'row', 'Gene'], delimiter='\t')
+    writer = csv.DictWriter(outputFile, fieldnames=['plate', 'column', 'row', 'Type', 'Target', 'Calculated'], delimiter='\t')
     writer.writeheader()
 
     for attributes in csv.DictReader(open(inputPath), delimiter='\t'):
@@ -21,13 +21,20 @@ with open(outputPath, 'w') as outputFile:
             plate = int(attributes['384plate']) - 1
             column = columnIndex[inputColumn]
             row = rowIndex[inputRow]
-            genes = "|".join(attributes['CalculatedGeneTarget'].split('&'))    # List notation as item1|item2|item3
+            empty = attributes['POOLID'] == 'empty'
+            wellType = 'Negative' if empty else 'Positive'
+            genes = "" if empty else "|".join(attributes['OriginalGeneTarget'].split('&'))    # List notation as item1|item2|item3
+            calcGenes = "" if empty else "|".join(attributes['CalculatedGeneTarget'].split('&'))
+            siRNAs = "" if empty else "|".join(attributes['siRNAIDs'].split('&'))
 
             writer.writerow({
                 'plate': plate,
                 'column': column,
                 'row': row,
-                'Gene': genes
+                'Type': wellType,
+                #'siRNAs': siRNAs,
+                'Target': genes,
+                'Calculated': calcGenes
             })
 
 

@@ -14,6 +14,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     var List = snippet.List;
     var Label = snippet.Label;
     var LabelStyle = snippet.LabelStyle;
+    var Polygon = snippet.Polygon;
+    var Line = snippet.Line;
     var BaseConfiguration = config.BaseConfiguration;
     var Vector = math.Vector;
     var Color = style.Color;
@@ -21,12 +23,12 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     var viewConstructors = function () {
         return {
             'features': FeatureHistogramTable,
-            'splom': Splom,
+            //'splom':      Splom,
             'exemplars': ExemplarTable,
             'datasets': DataSetList,
             'plates': PlateIndex,
-            'plate': JointWellPlates,
-            'well': WellDetailView
+            //'plate':      JointWellPlates,
+            'well': WellView
         };
     };
     var OverView = (function (_super) {
@@ -43,23 +45,19 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             //console.log("State:");
             //console.log(state);
         };
-        OverView.prototype.paint = function (c, iMod) {
-            var cfg = iMod.configuration;
-            var dim = this.dimensions();
-            //c.context.clearRect(0, 0, dim[0], dim[1]);
+        OverView.prototype.paint = function (c, state) {
+            var cfg = state.configuration;
+            c.translate([.5, .5]);
             // Center panels.
-            var topLeft = Vector.mul(Vector.subtract(this.dimensions(), this.panelColumns.dimensions), .5);
-            //this.panelColumns.setTopLeft(topLeft);
             this.panelColumns.setTopLeft([
                 Math.min(.5 * (this.dimensions()[0] - this.panelColumns.dimensions[0]), this.dimensions()[0] - this.panelColumns.dimensions[0] - cfg.windowMargin),
                 cfg.panelSpace
             ]);
             c.snippet(this.panelColumns);
-            // Show data loading text.
-            var isLoading = _.keys(iMod).filter(function (prp) { return iMod[prp] && _.isBoolean(iMod[prp]['converged']); }).some(function (prp) { return !iMod[prp].converged; });
+            // Show data loading text, or filtering text.
+            var isLoading = _.keys(state).filter(function (prp) { return state[prp] && _.isBoolean(state[prp]['converged']); }).some(function (prp) { return !state[prp].converged; });
             var secondsMod = Math.round(Date.now() / 1000) % 3;
             c.save();
-            c.fillStyle(isLoading ? cfg.baseEmphasis : Color.NONE);
             c.strokeStyle(isLoading ? cfg.backgroundColor : Color.NONE);
             c.lineWidth(3);
             c.font(cfg.bigGuideStyle.font.toString());
@@ -69,6 +67,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             c.transitioning = false;
             c.translate([.5 * this.dimensions()[0] - 20, this.dimensions()[1] - cfg.windowMargin]);
             c.transitioning = true;
+            // Show computation text.
+            c.fillStyle(isLoading ? cfg.baseEmphasis : Color.NONE);
             c.strokeText(compTxt);
             c.fillText(compTxt);
             c.restore();
@@ -80,7 +80,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         __extends(ColumnPanel, _super);
         function ColumnPanel(identifier, core, state, opened) {
             if (opened === void 0) { opened = false; }
-            _super.call(this, "cp_" + identifier, _.union([new ColumnLabel(identifier, core.toString(), opened, state)], opened ? [core] : []), [0, 0], [0, 0], 'vertical', state.configuration.panelSpace, 'middle');
+            _super.call(this, "cp_" + identifier, _.union([new ColumnLabel(identifier, core['toString'](opened), opened, state)], opened ? [core] : []), [0, 0], [0, 0], 'vertical', state.configuration.panelSpace, 'middle');
         }
         return ColumnPanel;
     })(List);
@@ -121,7 +121,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.state = state;
         }
         DataSetList.prototype.toString = function () {
-            return "Screen " + this.state.selectedCoordinates.dataSet;
+            return "Screen: " + this.state.selectedCoordinates.dataSet;
         };
         return DataSetList;
     })(List);
@@ -143,8 +143,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             _super.call(this, "ftrCols", [
                 new FeatureList("ftrLbls", state, FeatureLabel, 'right'),
                 new FeatureList("ftrHistos", state, FeatureHistogram),
-                new FeatureParallelCoordinates(state)
-            ], [0, 0], [0, 0], 'horizontal', state.configuration.featureCellSpace[0]);
+                new FeatureParallelCoordinates(state),
+                new Splom(state)
+            ], [0, 0], [0, 0], 'horizontal', state.configuration.featureCellSpace[0], 'left');
             this.state = state;
             if (this.state.populationSpace.features.length < 2) {
                 this.guide = new GuideLabel("ftr", "Click on a feature label to add it to the phenotype model space.", [0, 0], [-80, 0], 25, state);
@@ -180,7 +181,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         }
         FeatureLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             interaction.populationSpace.features = enriched.populationSpace.features.toggle(this.feature);
-            interaction.pushView('splom');
+            //interaction.pushView('splom');
         };
         return FeatureLabel;
     })(Label);
@@ -198,7 +199,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = state.configuration;
             var histograms = state.featureHistograms.value;
             var frames = histograms.histograms;
-            var populations = state.populationSpace.activeOrAll().elements.filter(function (p) { return p.identifier.toString() in frames; });
+            var populations = state.populationSpace.populations.elements.filter(function (p) { return p.identifier.toString() in frames; });
             var cacheTag = this.identifier + "_" + populations;
             var cachedImage = histograms[cacheTag];
             if (!cachedImage) {
@@ -258,7 +259,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var _this = this;
             var state = this.state;
             var cfg = state.configuration;
-            var populations = this.state.populationSpace.activeOrAll().elements;
+            var populations = this.state.populationSpace.populations.elements;
             context.save();
             context.translate(this.topLeft);
             context.transitioning = false;
@@ -304,23 +305,36 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.model = model;
             var cfg = model.configuration;
             var features = model.populationSpace.features.elements;
-            this.plots = features.map(function (f1, i1) { return features.map(function (f2, i2) { return i1 < i2 ? new ObjectFeaturePlot(f1, f2, [0, 0], model, cfg, cfg.splomInnerSize, i2 === features.length - 1, i1 === 0) : null; }); });
-            var size = cfg.sideFont.size + Math.max(0, this.model.populationSpace.features.length - 1) * cfg.splomSize;
-            this.setDimensions([Math.max(size, cfg.splomSize + cfg.splomInnerSize), size]);
+            // Model feature histograms.
+            this.plots = features.map(function (f1, i1) { return features.map(function (f2, i2) { return i1 < i2 ? new ObjectFeaturePlot(f1, f2, [0, 0], model, cfg, model.objectHistogramSize, i2 === features.length - 1, i1 === 0) : null; }); });
+            // Optional MDS plot.
+            if (model.objectHistograms.value.matricesFor("mds0", "mds1")) {
+                this.mdsPlot = new ObjectFeaturePlot("mds0", "mds1", [0, 0], model, cfg, model.objectHistogramSize, false, false, "Landscape");
+            }
+            var size = Math.max(1, features.length - 1) * model.objectHistogramSize;
+            this.setDimensions([cfg.sideFont.size + size, size]);
         }
         Splom.prototype.setTopLeft = function (topLeft) {
+            var _this = this;
             _super.prototype.setTopLeft.call(this, topLeft);
             if (this.plots) {
-                var configuration = this.model.configuration;
-                var marginTopLeft = Vector.add(this.topLeft, [configuration.sideFont.size, 0]);
+                var cfg = this.model.configuration;
+                var marginTopLeft = Vector.add(this.topLeft, [cfg.sideFont.size, 0]);
                 this.plots.forEach(function (pC, pCI) { return pC.forEach(function (p, pRI) {
+                    var tPCI = Math.max(0, pCI);
+                    var t2PRI = Math.max(0, pRI - 1);
                     if (p)
-                        p.topLeft = Vector.add(marginTopLeft, [pCI * configuration.splomSize, (pRI - 1) * configuration.splomSize]);
+                        p.topLeft = Vector.add(marginTopLeft, [pCI * _this.model.objectHistogramSize + tPCI * cfg.splomSpace, (pRI - 1) * _this.model.objectHistogramSize + t2PRI * cfg.splomSpace]);
                 }); });
+            }
+            if (this.mdsPlot) {
+                var cfg = this.model.configuration;
+                this.mdsPlot.topLeft = Vector.subtract(this.topRight, [this.model.objectHistogramSize - cfg.splomSpace, 0]);
             }
         };
         Splom.prototype.paint = function (context) {
             this.plots.map(function (plts) { return context.snippets(plts); });
+            context.snippet(this.mdsPlot);
         };
         Splom.prototype.toString = function () {
             return "Space";
@@ -329,11 +343,11 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
     })(PlacedSnippet);
     var ObjectFeaturePlot = (function (_super) {
         __extends(ObjectFeaturePlot, _super);
-        function ObjectFeaturePlot(feature1, feature2, topLeft, model, configuration, size, columnLabel, rowLabel, footerLabel) {
+        function ObjectFeaturePlot(feature1, feature2, topLeft, model, configuration, size, columnLabel, rowLabel, headerLabel) {
             var _this = this;
             if (columnLabel === void 0) { columnLabel = false; }
             if (rowLabel === void 0) { rowLabel = false; }
-            if (footerLabel === void 0) { footerLabel = null; }
+            if (headerLabel === void 0) { headerLabel = null; }
             _super.call(this, "objPlt_" + feature1 + ".." + feature2);
             this.feature1 = feature1;
             this.feature2 = feature2;
@@ -343,7 +357,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.size = size;
             this.columnLabel = columnLabel;
             this.rowLabel = rowLabel;
-            this.footerLabel = footerLabel;
+            this.headerLabel = headerLabel;
             // Cache for changing histograms and hovered population.
             var cachedBackgrounds = model.objectHistograms.value[this.identifier] || {};
             var focusPopulation = (model.focused().population || -1).toString();
@@ -359,28 +373,32 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var size = this.size;
             // Paint histograms, if available.
             var histograms = mod.objectHistograms.value.matricesFor(this.feature1, this.feature2) || [];
-            //var pairHistos = _.pairs(histograms);
-            //if(pairHistos) {
             context.save();
-            var populations = mod.populationSpace.activeOrAll().filter(function (p) { return p.identifier in histograms; });
-            //var focusedPopulation = mod.focused().population;
-            populations.forEach(function (p) {
-                //pairHistos.forEach(hP => {
-                //var cK = hP[0];
-                var matrix = histograms[p.identifier.toString()]; //hP[1];
-                //var population = mod.populationSpace.populations.byId(cK);
-                //var focused = Number(cK) == Population.POPULATION_ALL_NAME || focusedPopulation === Number(cK);
-                var coreColor = mod.populationColorTranslucent(p); //Number(cK) >= 2 ? mod.populationColorTranslucent(population) : cfg.base;
-                matrix.forEach(function (c, xI) { return c.forEach(function (cell, yI) {
-                    if (cell) {
-                        //if((focused && cell) || (!focused && (cell === 2 || cell === 3))) {
-                        context.fillStyle = coreColor;
-                        context.fillRect(xI, size - yI, 1, 1);
+            var populations = mod.populationSpace.populations.elements.filter(function (p) { return p.identifier in histograms; });
+            var popHistos = populations.map(function (p) { return histograms[p.identifier.toString()]; });
+            var firstHisto = popHistos[0];
+            if (firstHisto) {
+                firstHisto.forEach(function (c, xI) { return c.forEach(function (cell, yI) {
+                    var mPI = -1; // Maximum population index.
+                    var mPV = 0; // Maximum population value.
+                    popHistos.forEach(function (pH, pHI) {
+                        var pHV = pH[xI][yI];
+                        if (pHV > mPV) {
+                            mPI = pHI;
+                            mPV = pHV;
+                        }
+                    });
+                    if (mPV > 0) {
+                        var highestPop = populations[mPI];
+                        context.fillStyle = highestPop.color.darken(1 - 0.333 / mPV).toString();
+                        if (mPV < 2)
+                            context.fillRect(xI - .25, size - yI - .25, 1.5, 1.5);
+                        else
+                            context.fillRect(xI, size - yI, 1, 1);
                     }
                 }); });
-            });
+            }
             context.restore();
-            //}
         };
         ObjectFeaturePlot.prototype.paint = function (context) {
             var _this = this;
@@ -398,12 +416,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
             context.save();
             context.translate(this.topLeft);
-            // Background rectangle.
-            context.strokeStyle(cfg.baseVeryDim);
-            context.strokeRect(0, 0, size, size);
-            context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
             context.transitioning = false;
             //context.transitioning = false;
+            context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
             var objectFeatures = this.model.objectInfo.value;
             var x = objectFeatures.columnVector(this.feature1) || [];
             var y = objectFeatures.columnVector(this.feature2) || [];
@@ -422,16 +437,19 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 ObjectFeaturePlot.drawBigDot(context, cfg, cfg.baseSelected, x[oI] * size, (1 - y[oI]) * size, true);
             }
             context.transitioning = true;
+            // Bounding rectangle.
+            context.strokeStyle(cfg.baseVeryDim);
+            context.strokeRect(0, 0, size, size);
             // Labels.
             context.save();
             context.font(cfg.sideFont.string);
             context.textAlign('center');
-            // Footer label for special plots.
-            context.textBaseline('top');
+            // Header label for special plots.
+            context.textBaseline('bottom');
             context.save();
-            context.fillStyle(this.footerLabel ? cfg.base : style.Color.NONE);
-            context.translate([.5 * this.size, this.size]);
-            context.fillText(this.footerLabel, 0, 0);
+            context.fillStyle(this.headerLabel ? cfg.base : style.Color.NONE);
+            context.translate([.5 * this.size, 0]);
+            context.fillText(this.headerLabel, 0, 0);
             context.restore();
             // Column (bottom) label.
             context.textBaseline('top');
@@ -472,19 +490,37 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             _super.call(this, "ExemplarStack", [0, 0]);
             this.state = state;
             var cfg = state.configuration;
-            var activePopulations = this.state.populationSpace.populations.elements.filter(function (p) { return p.identifier > Population.POPULATION_ALL_NAME; });
+            //var activePopulations = this.state.populationSpace.populations.elements;
+            //.filter(p => p.identifier > Population.POPULATION_ALL_NAME);
+            var visiblePopulations = this.state.populationSpace.visiblePopulations().elements;
+            // Main Label.
+            var activeTypeLabel = new Label("ShownLbl", "Shown", [0, 0], state.configuration.subPanelHeaderLabel, true);
+            // Labels of active types.
+            var activeTypeLabels = new List("ActiveTypeLabels", visiblePopulations.map(function (p) { return new TypeLabel(p, state); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var exemplarSelected = state.isExemplarSelected();
             var exemplarLabel = new Label("ExemplarLbl", "Exemplars", [0, 0], state.configuration.subPanelHeaderLabel, true);
-            var activeExemplars = activePopulations.map(function (p) { return new ExemplarColumn(state, p); });
-            var inactiveExemplarStack = new List("InExemplarColumns", state.populationSpace.inactivePopulations.elements.map(function (ip) { return new ExemplarColumn(state, ip); }), [0, 0], [cfg.clusterTileInnerSize, 0], 'vertical', cfg.exemplarColumnSpace, 'middle');
-            var columns = new List("ExemplarColumns", _.union(activeExemplars, [inactiveExemplarStack]), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
-            var exemplarSelected = state.focused().object !== null && !state.hoveredObjectIsExemplar();
-            var mainPopulations = _.union(activePopulations, [state.populationSpace.populations.byId(Population.POPULATION_TOTAL_NAME)]);
-            var additionButtons = exemplarSelected ? new List("ExemplarAdditions", mainPopulations.map(function (p) { return new ExemplarAdditionButton(state.focused().object, p, state); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left') : null;
-            var transferLabel = new Label("PopulationTransfersLbl", "Well Score", [0, 0], state.configuration.subPanelHeaderLabel, true);
-            var transferButtons = new List("PopulationTransfers", mainPopulations.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var columns = new List("ExemplarColumns", visiblePopulations.map(function (p) { return new ExemplarColumn(state, p); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            //var mainPopulations = _.union(
+            //        activePopulations, [state.populationSpace.populations.byId(Population.POPULATION_TOTAL_NAME)]);
+            //var transferLabel = new Label("PopulationTransfersLbl", "Abundance Score",
+            //                                [0,0], state.configuration.subPanelHeaderLabel, true);
+            //var transferButtons = new List("PopulationTransfers",
+            //        mainPopulations.map((p, pI) => new PopulationTransferEdit(p, state, pI === 0)),
+            //        [0,0], [0,0], 'horizontal', cfg.exemplarColumnSpace, 'left');
             var selectedObjectDetailView = exemplarSelected ? new ObjectDetailView(state.focused().object, state, [0, 0]) : null;
-            var segSnippets = _.compact([transferLabel, transferButtons, exemplarLabel, columns, additionButtons, selectedObjectDetailView]);
-            this.segments = new List("ExemplarSegments", segSnippets, [0, 0], [0, 0], 'vertical', cfg.subPanelSpace);
+            var segSnippets = _.compact([activeTypeLabel, activeTypeLabels, exemplarLabel, selectedObjectDetailView, columns]);
+            var shownSegment = new List("ShownSegments", segSnippets, [0, 0], [0, 0], 'vertical', cfg.subPanelSpace);
+            // Hidden types.
+            var hiddenSegment = [];
+            if (state.populationSpace.inactivePopulations.length > 0) {
+                var hiddenTypeLabel = new Label("HiddenLbl", "Hidden", [0, 0], state.configuration.subPanelHeaderLabel, true);
+                var hiddenTypeStack = new List("HiddenTypeColumn", _.union(state.populationSpace.inactivePopulations.elements.map(function (ip) { return new TypeLabel(ip, state); }), state.isExemplarSelected() ? [
+                    new ExemplarAdditionButton(state.focused().object, state.populationSpace.allPopulations().byId(Population.POPULATION_UNCONFIDENT_NAME), state)
+                ] : []), [0, 0], [cfg.clusterTileInnerSize, 0], 'vertical', cfg.exemplarColumnSpace, 'middle');
+                hiddenSegment.push(new List("HiddenSegments", [hiddenTypeLabel, hiddenTypeStack], [0, 0], [0, 0], 'vertical', cfg.subPanelSpace));
+            }
+            // Combine shown and hidden segment columns.
+            this.segments = new List("TypeSegments", _.union([shownSegment], hiddenSegment), [0, 0], [0, 0], 'horizontal', cfg.subPanelSpace, 'left');
             this.setDimensions(this.segments.dimensions);
         }
         ExemplarTable.prototype.setTopLeft = function (topLeft) {
@@ -529,16 +565,16 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.fillStyle(cfg.baseDim);
             // Distinguish between regular phenotype and cell count phenotype.
             context.fillStyle(cfg.base);
-            if (this.population.identifier === Population.POPULATION_TOTAL_NAME) {
+            if (this.population.identifier === Population.POPULATION_UNCONFIDENT_NAME) {
                 context.font(cfg.sideFont.toString());
                 context.textBaseline('bottom');
                 context.fillText('New');
                 context.textBaseline('top');
-                context.fillText('Pheno.');
+                context.fillText('Type');
             }
             else {
                 context.font(this.labelStyle.font.toString());
-                context.fillText(this.population.identifier === -1 ? '*' : '+');
+                context.fillText('+');
             }
             context.restore();
         };
@@ -547,11 +583,22 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         return ExemplarAdditionButton;
     })(PlacedSnippet);
+    var ExemplarHeader = (function (_super) {
+        __extends(ExemplarHeader, _super);
+        function ExemplarHeader(state, population, topLeft) {
+            if (topLeft === void 0) { topLeft = [0, 0]; }
+            _super.call(this, "esc_" + population.identifier, _.union([new TypeLabel(population, state)]), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
+            this.state = state;
+            this.population = population;
+            this.topLeft = topLeft;
+        }
+        return ExemplarHeader;
+    })(List);
     var ExemplarColumn = (function (_super) {
         __extends(ExemplarColumn, _super);
         function ExemplarColumn(state, population, topLeft) {
             if (topLeft === void 0) { topLeft = [0, 0]; }
-            _super.call(this, "esc_" + population.identifier, _.union([new ExemplarLabel(population, state)], state.populationSpace.inactivePopulations.has(population) ? [new ObjectDetailView(population.exemplars.elements[0], state, [0, 0])] : population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
+            _super.call(this, "esc_" + population.identifier, _.union(state.isExemplarSelected() && (!population.predefined) ? [new ExemplarAdditionButton(state.focused().object, population, state)] : [], population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
             this.state = state;
             this.population = population;
             this.topLeft = topLeft;
@@ -571,7 +618,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.minZScoreLabel = (-state.configuration.activationZScoreRange).toString(); //minScore < 0 ? minScore.toFixed(0) : '?';
             this.maxZScoreLabel = state.configuration.activationZScoreRange.toString(); //maxScore > 0 ? maxScore.toFixed(0) : '?';
             var cfg = state.configuration;
-            this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + 2 * cfg.transferFont.size]);
+            this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + cfg.transferFont.size]);
         }
         PopulationTransferEdit.prototype.paint = function (context) {
             _super.prototype.paint.call(this, context);
@@ -595,21 +642,16 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 context.textAlign('right');
                 context.textBaseline('middle');
                 context.fillText('1  ', 0, 3);
-                context.fillText('0  ', 0, .5 * cfg.transferPlotSize);
+                //context.fillText('0  ', 0, .5 * cfg.transferPlotSize);
                 context.fillText('-1  ', 0, cfg.transferPlotSize - 3);
+                context.save();
+                context.font(cfg.sideFont.toString());
+                context.textAlign('right');
+                context.textBaseline('middle');
+                context.translate([-cfg.transferFont.size, .5 * cfg.transferPlotSize]);
+                context.fillText('score');
+                context.restore();
             }
-            // Bottom axis labels.
-            context.fillStyle(cfg.base);
-            context.font(cfg.transferFont.toString());
-            context.textBaseline('top');
-            context.textAlign('left');
-            context.fillText(this.minZScoreLabel, 0, cfg.transferPlotSize);
-            context.textAlign('center');
-            context.fillText('0', .5 * cfg.transferPlotSize, cfg.transferPlotSize);
-            context.textAlign('right');
-            context.fillText(this.maxZScoreLabel, cfg.transferPlotSize, cfg.transferPlotSize);
-            context.textAlign('center');
-            context.fillText('\u03C3', .5 * cfg.transferPlotSize, cfg.transferPlotSize + cfg.transferFont.size);
             context.transitioning = true;
             // Function curve.
             var funcPoint = function (cs) { return [.5 * (1 + cs[0]) * cfg.transferPlotSize, .5 * (1 - cs[1]) * cfg.transferPlotSize]; };
@@ -639,6 +681,29 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var wellInput = Math.max(-1, Math.min(1, wellShare / cfg.activationZScoreRange)); // Bound to shown range.
             var wellPnt = funcPoint([wellInput, this.population.activate(wellInput)]);
             context.fillEllipse(wellPnt[0], wellPnt[1], 2.5, 2.5);
+            // Selected well line down.
+            context.strokeStyle(cfg.baseSelected.alpha(.5));
+            context.lineWidth(1);
+            context.strokeLine(wellPnt, [wellPnt[0], cfg.transferPlotSize + 2]);
+            // Selected well value.
+            var absWellShare = this.state.wellClusterShares.value.share(this.population.identifier, focus.location()) || 0;
+            context.fillStyle(cfg.baseSelected);
+            context.font(cfg.transferFont.toString());
+            context.textBaseline('top');
+            context.textAlign('center');
+            context.fillText(this.population.identifier === Population.POPULATION_TOTAL_NAME ? absWellShare + " cells" : (100 * absWellShare).toFixed(0) + "%", wellPnt[0], cfg.transferPlotSize);
+            context.transitioning = false;
+            // Bottom axis labels.
+            context.fillStyle(cfg.base);
+            context.font(cfg.transferFont.toString());
+            context.textBaseline('bottom');
+            context.textAlign('left');
+            context.fillText(this.minZScoreLabel, 0, -cfg.exemplarSpace);
+            context.textAlign('right');
+            context.fillText(this.maxZScoreLabel, cfg.transferPlotSize, -cfg.exemplarSpace);
+            context.textAlign('center');
+            context.fillText('\u03C3', .5 * cfg.transferPlotSize, -cfg.exemplarSpace);
+            context.transitioning = true;
             // Picking area.
             context.picking = true;
             context.translate(Vector.mul([cfg.transferPlotSize, cfg.transferPlotSize], 0.5));
@@ -666,34 +731,105 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         return PopulationTransferEdit;
     })(PlacedSnippet);
-    var ExemplarLabel = (function (_super) {
-        __extends(ExemplarLabel, _super);
-        function ExemplarLabel(population, state) {
-            _super.call(this, "lbl_" + population.identifier, population.name, [0, 0], state.configuration.clusterLabel, true);
+    var TypeLabel = (function (_super) {
+        __extends(TypeLabel, _super);
+        function TypeLabel(population, state) {
+            _super.call(this, "lbl_" + population.identifier, [0, 0]);
             this.population = population;
             this.state = state;
-            this.setDimensions([state.configuration.clusterTileInnerSize, this.dimensions[1]]);
-        }
-        ExemplarLabel.prototype.paint = function (context) {
-            var state = this.state;
+            this.tagLines = this.population.name.split("\n");
             var cfg = state.configuration;
+            this.setDimensions([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize + cfg.sideFont.size + 4]);
+        }
+        TypeLabel.prototype.paint = function (context) {
+            _super.prototype.paint.call(this, context);
+            var cfg = this.state.configuration;
+            var canBeHidden = this.population.identifier !== Population.POPULATION_TOTAL_NAME;
             context.save();
             context.translate(this.topLeft);
-            context.picking = true;
-            context.fillStyle(state.populationColor(this.population));
-            context.fillRect(0, 0, state.configuration.clusterTileInnerSize, this.dimensions[1]);
-            /*context.font(cfg.sideFont.toString());
+            // Square colored inline and outline.
+            if (canBeHidden) {
+                context.strokeStyle(this.population.color);
+                context.lineWidth(4);
+                context.strokeRect(2, 2, cfg.clusterTileInnerSize - 4, cfg.clusterTileInnerSize - 4);
+            }
+            context.strokeStyle(cfg.baseDim);
+            context.lineWidth(1);
+            context.strokeRect(0, 0, cfg.clusterTileInnerSize, cfg.clusterTileInnerSize);
+            // Picking support.
+            if (canBeHidden) {
+                context.picking = true;
+                context.fillStyle(Color.NONE);
+                context.fillRect(0, 0, this.dimensions[0], this.dimensions[1]);
+                context.picking = false;
+            }
+            // Distinguish between regular phenotype and cell count phenotype.
             context.fillStyle(cfg.base);
-            context.textBaseline('top');
-            context.fillText(state.populationSpace.inactivePopulations.has(this.population) ? "+" : "-");*/
+            context.strokeStyle(cfg.backgroundColor);
+            context.textBaseline('middle');
+            context.textAlign('center');
+            context.font(this.state.configuration.sideFont.toString());
+            var fontHeight = cfg.sideFont.size + 1;
+            context.save();
+            context.translate(Vector.mul([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize], .5));
+            context.translate([0, -.5 * fontHeight * (this.tagLines.length - 1)]);
+            this.tagLines.forEach(function (line, i) {
+                context.strokeText(line, 0, i * fontHeight);
+                context.fillText(line, 0, i * fontHeight);
+            });
+            context.restore();
+            if (canBeHidden) {
+                var actionLbl = this.state.populationSpace.populations.has(this.population) ? 'hide \u25B6' : '\u25C0 show';
+                context.fillStyle(cfg.baseDim);
+                context.textBaseline('bottom');
+                context.fillText(actionLbl, .5 * this.dimensions[0], this.dimensions[1]);
+            }
             context.restore();
         };
-        ExemplarLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
+        TypeLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             //interaction.selectedCoordinates.population = this.population.identifier;
             interaction.populationSpace.toggle(this.population);
         };
-        return ExemplarLabel;
-    })(Label);
+        return TypeLabel;
+    })(PlacedSnippet);
+    /*class TypeLabel extends Label {
+        constructor(public population: Population,
+                    public state: EnrichedState) {
+            super("lbl_" + population.identifier,
+                population.name,
+                [0,0],
+                //state.focused().population === population.identifier ?
+                //    state.configuration.clusterSelectedLabel :
+                    state.configuration.clusterLabel,
+                true);
+    
+            this.setDimensions([state.configuration.clusterTileInnerSize, this.dimensions[1]]);
+        }
+    
+        paint(context: ViewContext) {
+            var state = this.state;
+            var cfg = state.configuration;
+    
+            context.save();
+            context.translate(this.topLeft);
+            context.picking = true;
+    
+            context.fillStyle(state.populationColor(this.population));
+            context.fillRect(0, 0, state.configuration.clusterTileInnerSize, this.dimensions[1]);
+    
+            context.font(cfg.sideFont.toString());
+            context.fillStyle(cfg.base);
+            context.textBaseline('top');
+            context.fillText(state.populationSpace.inactivePopulations.has(this.population) ? "+" : "-");
+    
+            context.restore();
+        }
+    
+        mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+            //interaction.selectedCoordinates.population = this.population.identifier;
+            interaction.populationSpace.toggle(this.population);
+        }
+    }*/
     var AbstractPlate = (function (_super) {
         __extends(AbstractPlate, _super);
         function AbstractPlate(id, topLeft, state, columnLabels, rowLabels, prune) {
@@ -712,20 +848,27 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var annotations = this.state.plateTargetAnnotations(plate);
             this.flatAnnotations = _.flatten(_.values(annotations).map(function (ann) { return _.values(ann); }));
             // Build up (pruned) column and row indices.
-            if (prune) {
+            /*if(prune) {
                 this.columnIndices = [];
                 this.rowIndices = [];
-                _.values(annotations).forEach(function (cat) { return _.values(cat).forEach(function (wS) { return wS.wells.forEach(function (w) {
-                    _this.columnIndices.push(w.column);
-                    _this.rowIndices.push(w.row);
-                }); }); });
-                this.columnIndices = _.uniq(this.columnIndices.sort(function (l, r) { return l - r; }), true);
-                this.rowIndices = _.uniq(this.rowIndices.sort(function (l, r) { return l - r; }), true);
+    
+                _.values(annotations).forEach(cat =>
+                    _.values(cat).forEach((wS: WellSelection) =>
+                        wS.wells.forEach(w => {
+                            this.columnIndices.push(w.column);
+                            this.rowIndices.push(w.row);
+                        })
+                    )
+                );
+    
+                this.columnIndices = _.uniq(this.columnIndices.sort((l, r) => l - r), true);
+                this.rowIndices = _.uniq(this.rowIndices.sort((l, r) => l - r), true);
             }
-            else {
-                this.columnIndices = _.range(0, info.columnCount);
-                this.rowIndices = _.range(0, info.rowCount);
-            }
+            // Otherwise, all indices.
+            else {*/
+            this.columnIndices = _.range(0, info.columnCount);
+            this.rowIndices = _.range(0, info.rowCount);
+            //}
             this.columnToIndex = [];
             this.columnIndices.forEach(function (cI, i) { return _this.columnToIndex[cI] = i; });
             this.rowToIndex = [];
@@ -755,7 +898,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var body = new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
                 return body; //body ? body.buffer(1, 3, 0) : null;
             });
-            this.setDimensions([this.columnIndices.length * this.wellDiameter + cfg.plateColLabelMargin + cfg.sideFont.width("000"), this.rowIndices.length * this.wellDiameter + cfg.plateRowLabelMargin + cfg.sideFont.size + 4]);
+            this.setDimensions([this.columnIndices.length * this.wellDiameter, this.rowIndices.length * this.wellDiameter]);
         }
         AbstractPlate.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             var xIndex = Math.round(coordinates[0] * (this.columnIndices.length - 1));
@@ -763,7 +906,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             if (xIndex in this.columnIndices && yIndex in this.rowIndices) {
                 var postPruneCoordinates = new WellCoordinates(this.columnIndices[xIndex], this.rowIndices[yIndex]);
                 interaction.selectedCoordinates.switchWell(postPruneCoordinates);
-                interaction.pushView('well');
+                interaction.pushView('plates');
             }
         };
         AbstractPlate.prototype.paint = function (context) {
@@ -772,6 +915,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.save();
             context.translate(this.topLeft);
             context.transitioning = false;
+            // Paint selection outline.
+            context.strokeStyle(cfg.baseSelected);
+            context.lineWidth(2);
+            context.strokeRect(-1.5, -1.5, this.dimensions[0] + 3, this.dimensions[1] + 3);
             //this.paintSelectionBody(ctx);
             this.paintWellLabels(context);
             this.paintSelectionOutlines(context);
@@ -788,22 +935,43 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var _this = this;
             var cfg = this.state.configuration;
             var info = this.state.dataSetInfo.value;
-            var lblX = this.columnIndices.length * this.wellDiameter + cfg.plateRowLabelMargin;
+            var lblX = -cfg.plateRowLabelMargin; //this.columnIndices.length * this.wellDiameter + cfg.plateRowLabelMargin;
             var lblY = this.rowIndices.length * this.wellDiameter + cfg.plateColLabelMargin;
             ctx.save();
-            ctx.font(cfg.sideFont.string);
-            ctx.fillStyle(cfg.base);
+            ctx.font(cfg.sideFont.toString());
+            var focused = this.state.focused();
             // Column labels at the top.
             if (this.columnLabels) {
                 ctx.textAlign('center');
+                ctx.fillStyle(cfg.baseSelected);
+                ctx.textBaseline('bottom');
+                ctx.fillText(info.plateLabels[focused.plate], .5 * this.dimensions[0], -cfg.plateColLabelMargin);
+                var columnColors = [];
+                columnColors[0] = cfg.base;
+                columnColors[info.columnCount - 1] = cfg.base;
+                columnColors[focused.well.column] = cfg.baseSelected;
+                var rowColors = [];
+                rowColors[0] = cfg.base;
+                rowColors[info.rowCount - 1] = cfg.base;
+                rowColors[focused.well.row] = cfg.baseSelected;
                 ctx.textBaseline('top');
-                this.columnIndices.forEach(function (cI) { return ctx.fillText(info.columnLabels[cI], (_this.columnToIndex[cI] + .5) * _this.wellDiameter, lblY); });
+                this.columnIndices.forEach(function (cI) {
+                    if (cI in columnColors) {
+                        ctx.fillStyle(columnColors[cI]);
+                        ctx.fillText(info.columnLabels[cI], (_this.columnToIndex[cI] + .5) * _this.wellDiameter, lblY);
+                    }
+                });
             }
             // Row labels at the right.
             if (this.rowLabels) {
-                ctx.textAlign('left');
+                ctx.textAlign('right');
                 ctx.textBaseline('middle');
-                this.rowIndices.forEach(function (rI) { return ctx.fillText(info.rowLabels[rI], lblX, (_this.rowToIndex[rI] + .5) * _this.wellDiameter); });
+                this.rowIndices.forEach(function (rI) {
+                    if (rI in rowColors) {
+                        ctx.fillStyle(rowColors[rI]);
+                        ctx.fillText(info.rowLabels[rI], lblX, (_this.rowToIndex[rI] + .5) * _this.wellDiameter);
+                    }
+                });
             }
             ctx.restore();
         };
@@ -821,15 +989,23 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var info = this.state.dataSetInfo.value;
             this.selectionOutlines.forEach(function (so, i) {
                 ctx.strokeStyle(cfg.backgroundColor);
-                ctx.lineWidth(3.5);
+                ctx.lineWidth(2);
                 ctx.beginPath();
-                TemplatePlate.geometryToPath(ctx, _this.selectionRims[i]);
+                TemplatePlate.geometryToPath(ctx, so); //this.selectionRims[i]);
                 ctx.stroke();
-                ctx.strokeStyle(_this.flatAnnotations[i].category === "Selected" ? cfg.baseSelected : cfg.base);
-                ctx.lineWidth(1.5);
-                ctx.beginPath();
-                TemplatePlate.geometryToPath(ctx, so);
-                ctx.stroke();
+                if (_this.flatAnnotations[i].category === "Selected") {
+                    ctx.fillStyle(cfg.baseSelected);
+                    ctx.beginPath();
+                    TemplatePlate.geometryToPath(ctx, so);
+                    ctx.fill();
+                }
+                else {
+                    ctx.strokeStyle(cfg.base);
+                    ctx.lineWidth(2);
+                    ctx.beginPath();
+                    TemplatePlate.geometryToPath(ctx, so);
+                    ctx.stroke();
+                }
             });
             /*ctx.strokeStyle(cfg.backgroundColor);
             ctx.lineWidth(3);
@@ -929,8 +1105,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = this.model.configuration;
             var info = this.model.dataSetInfo.value;
             var selection = this.model.focused();
-            var clusterShares = this.model.wellClusterShares.value.wellIndex[selection.populationOrTotal()] || [];
-            //var wellShares = clusterShares[selection.plate] || [];
             var wellShares = this.model.wellScores()[selection.plate] || [];
             // Well outlines.
             ctx.strokeStyle(cfg.baseDim);
@@ -938,7 +1112,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var x = c * cfg.wellDiameter;
                 for (var r = 0; r < info.rowCount; r++) {
                     var y = r * cfg.wellDiameter;
-                    ctx.strokeRect(x, y, this.wellDiameter, this.wellDiameter);
+                    //ctx.strokeRect(x, y, this.wellDiameter, this.wellDiameter);
                     if (wellShares[c] && wellShares[c][r] >= -1) {
                         ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
                         ctx.fillRect(x + .25, y + .25, this.wellDiameter - .5, this.wellDiameter - .5);
@@ -1030,33 +1204,167 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         return JointWellPlates;
     })(List);
+    var WellView = (function (_super) {
+        __extends(WellView, _super);
+        function WellView(state) {
+            _super.call(this, "WellView", [new WellListView(state), new WellDetailView(state)], [0, 0], [0, 0], 'horizontal', state.configuration.subPanelSpace, 'left');
+            this.state = state;
+        }
+        WellView.prototype.toString = function (opened) {
+            var wellFilter = this.state.selectedCoordinates.wellFilter;
+            return "Wells" + (opened ? ": " + (wellFilter.length > 0 ? wellFilter : "\<press key\>") : "");
+        };
+        return WellView;
+    })(List);
+    var WellListView = (function (_super) {
+        __extends(WellListView, _super);
+        function WellListView(state) {
+            _super.call(this, "WellDetailView", [WellListView.transferButtons(state), WellListView.tableColumns(state)], [0, 0], [0, 0], 'vertical', state.configuration.subPanelSpace, 'right');
+            this.state = state;
+        }
+        WellListView.tableColumns = function (state) {
+            var columns = ['plate', 'column', 'row'].map(function (field) { return new WellLocationList(field, WellListView.composeWells(state), state); }).concat(new WellAbundanceList(state, WellListView.composeWells(state), WellListView.buttonsWidth(state)));
+            return new List("WellDetailColumns", columns, [0, 0], [0, 0], 'horizontal', state.configuration.listColumnSpace, 'left');
+        };
+        WellListView.buttonsWidth = function (state) {
+            var cfg = state.configuration;
+            var pCnt = state.populationSpace.populations.length;
+            return pCnt * cfg.transferPlotSize + (pCnt - 1) * cfg.exemplarColumnSpace;
+        };
+        WellListView.transferButtons = function (state) {
+            var cfg = state.configuration;
+            var mainPopulations = _.union(state.populationSpace.visiblePopulations().elements, [state.populationSpace.populations.byId(Population.POPULATION_TOTAL_NAME)]);
+            //var transferLabel = new Label("PopulationTransfersLbl", "Score", [0,0], cfg.subPanelHeaderLabel, true);
+            var transferButtons = new List("PopulationTransfers", mainPopulations.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            return transferButtons;
+        };
+        WellListView.composeWells = function (state) {
+            return state.topWells();
+        };
+        return WellListView;
+    })(List);
+    var WellLocationList = (function (_super) {
+        __extends(WellLocationList, _super);
+        function WellLocationList(field, wells, state) {
+            _super.call(this, "WL_" + field, wells.map(function (well) { return new WellLocationLabel(well.location, field, state); }), [0, 0], [0, 0], 'vertical', state.configuration.listWellSpace, 'middle');
+            this.state = state;
+        }
+        return WellLocationList;
+    })(List);
+    var WellLocationLabel = (function (_super) {
+        __extends(WellLocationLabel, _super);
+        function WellLocationLabel(location, field, state) {
+            _super.call(this, "WL_" + field + "_" + location.toString(), state.dataSetInfo.value[field + "Labels"][location[field]], [0, 0], location.equals(state.selectedCoordinates.location()) ? state.configuration.selectedSideLabel : state.configuration.sideLabel, true);
+            this.location = location;
+        }
+        WellLocationLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
+            interaction.selectedCoordinates.switchLocation(this.location);
+        };
+        return WellLocationLabel;
+    })(Label);
+    var WellAbundanceList = (function (_super) {
+        __extends(WellAbundanceList, _super);
+        function WellAbundanceList(state, wells, width) {
+            _super.call(this, "WellAbundances");
+            this.state = state;
+            this.wells = wells;
+            var cfg = state.configuration;
+            this.wellHeight = cfg.listWellLabel.font.size + cfg.listWellSpace;
+            this.setDimensions([
+                width,
+                wells.length * this.wellHeight
+            ]);
+            this.createPopulationAreas();
+        }
+        WellAbundanceList.prototype.createPopulationAreas = function () {
+            var _this = this;
+            var cfg = this.state.configuration;
+            var clusterShares = this.state.wellClusterShares.value;
+            var populations = this.state.populationSpace.visiblePopulations().elements;
+            // Per well, population.
+            var shares = populations.map(function (p) { return _this.wells.map(function (well) { return clusterShares.share(p.identifier, well.location); }); });
+            // Cumulative share, first column is padding.
+            var cumulativeShares = [this.wells.map(function (w) { return 0; })];
+            populations.forEach(function (p, i) { return cumulativeShares.push(Vector.add(cumulativeShares[i], shares[i])); });
+            this.populationAreaWidth = this.dimensions[0] - cfg.transferPlotSize - cfg.exemplarColumnSpace;
+            this.populationAreas = populations.map(function (p, pI) {
+                var listCs = function (cI) {
+                    var midCoordinates = cumulativeShares[cI].map(function (wShs, wI) {
+                        var y = (wI + .5) * _this.wellHeight;
+                        var x = wShs * _this.populationAreaWidth;
+                        return [x, y];
+                    });
+                    // Extend ends to close list.
+                    if (midCoordinates.length > 0)
+                        midCoordinates = [[midCoordinates[0][0], 0]].concat(midCoordinates).concat([[midCoordinates[midCoordinates.length - 1][0], midCoordinates.length * _this.wellHeight]]);
+                    return midCoordinates;
+                };
+                var preList = listCs(pI);
+                var postList = listCs(pI + 1).reverse();
+                var totalList = preList.concat(postList);
+                return new Polygon("WellListArea_" + p.identifier, totalList, p.color, cfg.backgroundColor, false);
+            });
+            // Object count (total population).
+            var counts = this.wells.map(function (w) { return clusterShares.share(Population.POPULATION_TOTAL_NAME, w.location); });
+            if (counts) {
+                var cntMin = 0;
+                var cntMax = clusterShares.maxObjectCount;
+                var cntDelta = (cntMax - cntMin);
+                var cntWidth = cfg.transferPlotSize;
+                var cntListCs = counts.map(function (cnt, wI) {
+                    var y = (wI + .5) * _this.wellHeight;
+                    var x = cntWidth * (cnt - cntMin) / cntDelta;
+                    return [x, y];
+                });
+                // Extend ends to close list.
+                if (cntListCs.length > 0)
+                    cntListCs = [[cntListCs[0][0], 0]].concat(cntListCs).concat([[cntListCs[cntListCs.length - 1][0], cntListCs.length * this.wellHeight]]);
+                this.cntLine = new Line("WellCountLine", cntListCs, Population.POPULATION_TOTAL_COLOR, false);
+            }
+        };
+        WellAbundanceList.prototype.paint = function (context) {
+            var cfg = this.state.configuration;
+            context.save();
+            context.translate(this.topLeft);
+            context.snippets(this.populationAreas);
+            context.translate([this.populationAreaWidth + cfg.exemplarColumnSpace, 0]);
+            context.snippet(this.cntLine);
+            context.restore();
+        };
+        return WellAbundanceList;
+    })(PlacedSnippet);
     var WellDetailView = (function (_super) {
         __extends(WellDetailView, _super);
         function WellDetailView(state) {
-            _super.call(this, "WellDetailView", []);
+            _super.call(this, "WellDetailView", [0, 0]);
             this.state = state;
             var cfg = state.configuration;
-            this.setDimensions([cfg.wellViewMaxWidth, cfg.wellViewMaxWidth]);
+            this.imgDim = state.dataSetInfo.value.imageDimensions;
+            this.wellScale = Math.min(1, cfg.wellViewMaxWidth / this.imgDim[0]);
+            this.imgScaledDim = Vector.mul(this.imgDim, this.wellScale);
+            this.setDimensions(this.imgScaledDim);
             var availableTypes = _.keys(state.availableImageTypes());
             var wellOptions = {};
             availableTypes.forEach(function (t) { return wellOptions[t] = t; });
+            this.overlayOption = new ConfigurationOptions("WellOverlayOptions", [0, 0], state, "imagePopulationOverlay", { None: "None", Phenotypes: "Phenotypes" });
             this.imageTypeOption = new ConfigurationOptions("WellDetailOptions", [0, 0], state, "imageType", wellOptions);
+            var options = new List("wellOptions", [this.overlayOption, this.imageTypeOption], [0, 0], [0, 0], 'vertical', cfg.annotationColumnSpace, 'left');
+            var optionLabels = new List("wellOptionLabels", ["overlay", "image"].map(function (lbl) { return new Label("opt_" + lbl, lbl, [0, 0], cfg.annotationCategoryLabel); }), [0, 0], [0, 0], 'vertical', cfg.annotationColumnSpace, 'right');
+            this.optionTable = new List("wellOptionTable", [optionLabels, options], [0, 0], [0, 0], 'horizontal', 2 * cfg.annotationColumnSpace);
             var focused = state.focused();
-            if (focused.object === null) {
-                this.guide = new GuideLabel("well", "Hover over a cell to inspect it.", [0, 0], [0, -75], 20, state);
-            }
             this.annotationTable = new WellAnnotationTable("focusedAnnotations", state.wellAnnotations.value.annotationsAt(focused.plate, focused.well), state);
             // Generate predicted population outlines.
             this.computePopulationOutlines();
         }
         WellDetailView.prototype.setTopLeft = function (topLeft) {
             _super.prototype.setTopLeft.call(this, topLeft);
-            if (this.imageTypeOption)
-                this.imageTypeOption.setTopLeft(Vector.add(this.topRight, [-this.imageTypeOption.dimensions[0], .75 * this.dimensions[1] + 10]));
-            if (this.guide)
-                this.guide.setTopLeft(Vector.add(this.bottomRight, [-200, 25]));
-            if (this.annotationTable)
-                this.annotationTable.setTopLeft(Vector.add(this.topLeft, [0, .75 * this.dimensions[1] + 10]));
+            if (this.optionTable && this.annotationTable) {
+                var annotationHeight = this.annotationTable.dimensions[1];
+                var optionsHeight = this.optionTable.dimensions[1];
+                var maxHeight = Math.max(annotationHeight, optionsHeight);
+                this.annotationTable.setTopLeft(Vector.add(this.topLeft, [0, maxHeight - annotationHeight]));
+                this.optionTable.setTopLeft(Vector.add(this.topRight, [-this.optionTable.dimensions[0], maxHeight - optionsHeight]));
+            }
         };
         WellDetailView.prototype.computePopulationOutlines = function () {
             var _this = this;
@@ -1070,161 +1378,143 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     Math.min(_this.state.configuration.wellViewMaxObjectRadius, 0.5 * _.min(_.pairs(objectCoordinates).map(function (sp) { return p[0] === sp[0] ? Number.POSITIVE_INFINITY : Vector.distance(p[1], sp[1]); }))) - 5,
                     _this.state.objectInfo.value.cell("population", p[0])
                 ]; });
-                /*var gf = new jsts.geom.GeometryFactory();
-    
-                var circleOf = (object: string) => {
-                    var cs = objectCoordinates[object];
-                    var pnt = gf.createPoint(new jsts.geom.Coordinate(cs[0], cs[1]));
-                    return pnt.buffer(objectMaxRadi[object] - 3);
-                };*/
-                /*this.outlineCircles: StringMap<jsts.geom.Geometry[]> = {};
-                this.state.populationSpace.allPopulations().forEach((pop, pI) => outlineCircles[pop.identifier] = []);
-                _.keys(objectMaxRadi).forEach(obj => {
-                    var population = this.state.objectInfo.value.cell("population", obj.toString());
-                    if (population in outlineCircles) outlineCircles[population].push(circleOf(obj));
-                });*/
-                /*this.outlines = [];
-                _.pairs(outlineCircles).forEach(p => {
-                    var joined = new jsts.operation.union.CascadedPolygonUnion(p[1]).union();
-                    if (joined) this.outlines[p[0]] = joined; //.buffer(-.5 * this.state.configuration.wellViewMaxObjectRadius);
-                });*/
                 this.state.objectInfo.value["wellOutlines"] = this.objectMaxRadi; //this.outlines;
             }
         };
         WellDetailView.prototype.paint = function (ctx) {
+            var _this = this;
             var state = this.state;
             var cfg = state.configuration;
             //ctx.transitioning = false;
             ctx.save();
             ctx.translate(this.topLeft);
+            ctx.translate([0, 2 * cfg.annotationColumnSpace + Math.max(this.annotationTable.dimensions[1], this.optionTable.dimensions[1])]);
             var well = state.selectionWell(state.focused());
             if (well) {
                 var img = well.image(cfg.imageType);
+                ctx.transitioning = false;
+                ctx.context.beginPath();
+                ctx.context.rect(0, 0, this.imgScaledDim[0], this.imgScaledDim[1]);
+                ctx.context.clip();
                 if (img) {
-                    ctx.transitioning = false;
-                    var wellScale = Math.min(1, cfg.wellViewMaxWidth / img.width);
                     ctx.picking = true;
-                    ctx.drawImageClipped(img, [0, 0], [img.width, 0.5 * img.height], [0, 0], [wellScale * img.width, wellScale * 0.5 * img.height]);
+                    ctx.drawImageClipped(img, [0, 0], [img.width, 0.5 * img.height], [0, 0], [this.wellScale * img.width, this.wellScale * 0.5 * img.height]);
                     ctx.picking = false;
-                    // Population outline overlay.
+                }
+                // Population outline overlay.
+                if (cfg.imagePopulationOverlay === "Phenotypes") {
                     ctx.save();
-                    /*var allPopulations = this.state.populationSpace.allPopulations();
-                    _.pairs(this.objectMaxRadi).forEach(p => {
+                    var allPopulations = this.state.populationSpace.allPopulations();
+                    _.pairs(this.objectMaxRadi).forEach(function (p) {
                         //var obj = p[0];
                         var cs = p[1];
                         if (cs[3] >= 0) {
-                            var x = wellScale * cs[0];
-                            var y = wellScale * cs[1];
-                            var rad = wellScale * cs[2];
+                            var x = _this.wellScale * cs[0];
+                            var y = _this.wellScale * cs[1];
+                            var rad = _this.wellScale * cs[2];
                             var population = allPopulations.byId(cs[3]);
-    
-                            if(population) {
-                                ctx.strokeStyle(Color.BLACK);
+                            if (population && rad > 1) {
+                                ctx.strokeStyle(cfg.backgroundColor);
                                 ctx.lineWidth(4);
                                 ctx.strokeEllipse(x, y, rad, rad);
-    
                                 ctx.strokeStyle(population.color);
                                 ctx.lineWidth(4);
                                 ctx.strokeEllipse(x, y, rad - 1, rad - 1);
                             }
                         }
-                    });*/
-                    /*_.pairs(this.objectMaxRadi).forEach(p => {
-                        var population = this.state.populationSpace.allPopulations().byId(p[0]);
-                        if(population) {
-                            //AbstractPlate.geometryToPath(ctx, p[1]);
-    
-    
-                            ctx.strokeStyle(Color.BLACK);
-                            ctx.lineWidth(6);
-                            ctx.stroke();
-    
-                            ctx.strokeStyle(population.colorTrans);
-                            ctx.lineWidth(4);
-                            ctx.stroke();
-                        }
-                    });*/
+                    });
                     ctx.restore();
-                    // Test object coordinates.
-                    var objects = state.objectInfo.value;
-                    var x = objects.columnVector("x");
-                    var y = objects.columnVector("y");
-                    var xRad = wellScale * cfg.objectViewImageRadius;
-                    var yRad = wellScale * cfg.objectViewImageRadius;
-                    var rI = state.focused().object === null ? -1 : objects.rowIndex[state.focused().object];
-                    var rX = rI >= 0 ? x[rI] : .5 * this.dimensions[0];
-                    var rY = rI >= 0 ? y[rI] : .5 * this.dimensions[1];
-                    ctx.strokeStyle(rI >= 0 ? cfg.backgroundColor : Color.NONE);
-                    ctx.lineWidth(4);
-                    ctx.strokeRect(wellScale * rX - xRad, wellScale * rY - yRad, 2 * xRad, 2 * yRad);
-                    ctx.strokeStyle(rI >= 0 ? cfg.baseSelected : Color.NONE);
-                    ctx.lineWidth(2);
-                    ctx.strokeRect(wellScale * rX - xRad, wellScale * rY - yRad, 2 * xRad, 2 * yRad);
-                    ctx.transitioning = true;
                 }
+                // Test object coordinates.
+                var objects = state.objectInfo.value;
+                var x = objects.columnVector("x");
+                var y = objects.columnVector("y");
+                var xRad = this.wellScale * cfg.objectViewImageRadius;
+                var yRad = this.wellScale * cfg.objectViewImageRadius;
+                var rI = state.focused().object === null ? -1 : objects.rowIndex[state.focused().object];
+                var rX = rI >= 0 ? x[rI] : .5 * this.dimensions[0];
+                var rY = rI >= 0 ? y[rI] : .5 * this.dimensions[1];
+                ctx.strokeStyle(rI >= 0 ? cfg.backgroundColor : Color.NONE);
+                ctx.lineWidth(4);
+                ctx.strokeRect(this.wellScale * rX - xRad, this.wellScale * rY - yRad, 2 * xRad, 2 * yRad);
+                ctx.strokeStyle(rI >= 0 ? cfg.baseSelected : Color.NONE);
+                ctx.lineWidth(2);
+                ctx.strokeRect(this.wellScale * rX - xRad, this.wellScale * rY - yRad, 2 * xRad, 2 * yRad);
+                ctx.strokeStyle(cfg.baseDim);
+                ctx.strokeRect(0, 0, this.imgScaledDim[0], this.imgScaledDim[1]);
+                ctx.transitioning = true;
             }
             ctx.restore();
             //ctx.transitioning = true;
             // Well type button.
-            ctx.snippet(this.imageTypeOption);
-            ctx.snippet(this.guide);
+            //ctx.snippet(this.imageTypeOption);
+            //ctx.snippet(this.overlayOption);
+            ctx.snippet(this.optionTable);
             ctx.snippet(this.annotationTable);
         };
         WellDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             var object = enriched.closestWellObject(coordinates);
             interaction.selectedCoordinates.switchObject(object);
-            //interaction.selectedCoordinates.object = object;
             enriched.conformSelectedCoordinates(interaction);
-            // Toggle given exemplar for the focused population.
-            // If no population is focused, create a new population for the exemplar, and focus the population.
-            /*var popSpace = interaction.populationSpace;
-            var population = popSpace.populations.byId(interaction.hoveredCoordinates.population);
-    
-            // Create and focus a new population if one is lacking.
-            if(!population) {
-                population = popSpace.createPopulation();
-                interaction.hoveredCoordinates.population = population.identifier;
-            }
-    
-            population.exemplars = population.exemplars.toggle(object);*/
-            //interaction.pushView('exemplars');
-            //interaction.pushView('features');
-        };
-        /*mouseMove(event: ViewMouseEvent, coordinates: number[],
-                  enriched: EnrichedState, interaction: InteractionState) {
-            interaction.hoveredCoordinates.object = enriched.closestWellObject(coordinates);
-            enriched.conformHoveredCoordinates(interaction);
-        }*/
-        WellDetailView.prototype.toString = function () {
-            var info = this.state.dataSetInfo.value;
-            var focusedWell = this.state.focused().well;
-            return "Well " + info.columnLabels[focusedWell.column] + info.rowLabels[focusedWell.row];
+            interaction.pushView('well');
         };
         return WellDetailView;
     })(PlacedSnippet);
+    /*class WellAnnotationTable extends List<List<Label>> {
+        constructor(identifier: string, annotations: StringMap<string[]>, state: EnrichedState) {
+            super(identifier,
+                _.keys(annotations).sort().map(k => new WellAnnotationRow(identifier, k, annotations[k], state)),
+                [0,0],
+                [0,0],
+                'vertical',
+                state.configuration.annotationColumnSpace,
+                'left');
+        }
+    }
+    
+    class WellAnnotationRow extends List<Label> {
+        constructor(tableId: string, category: string, tags: string[], state: EnrichedState) {
+            super(tableId + "_" + category,
+                _.union(
+                    [new Label(tableId + "_" + category + "_lbl", category, [0,0], state.configuration.annotationCategoryLabel, true)],
+                    tags.map(tag => new AnnotationButton(category, tag, state))),
+                [0,0],
+                [0,0],
+                'horizontal',
+                state.configuration.annotationTagSpace,
+                'left'
+            );
+        }
+    }*/
     var WellAnnotationTable = (function (_super) {
         __extends(WellAnnotationTable, _super);
         function WellAnnotationTable(identifier, annotations, state) {
-            _super.call(this, identifier, _.keys(annotations).map(function (k) { return new WellAnnotationRow(identifier, k, annotations[k], state); }), [0, 0], [0, 0], 'horizontal', state.configuration.annotationTagSpace, 'left');
+            _super.call(this, identifier, [
+                new List("annTableLbls", WellAnnotationTable.annotationKeys(annotations).map(function (k) { return new Label("annTableLbl" + k, k.toLowerCase(), [0, 0], state.configuration.annotationCategoryLabel, false); }), [0, 0], [0, 0], 'vertical', state.configuration.annotationColumnSpace, 'right'),
+                new List("annTableRows", WellAnnotationTable.annotationKeys(annotations).map(function (k) { return new WellAnnotationRow(identifier, k, annotations[k], state); }), [0, 0], [0, 0], 'vertical', state.configuration.annotationColumnSpace, 'left')
+            ], [0, 0], [0, 0], 'horizontal', 2 * state.configuration.annotationColumnSpace);
         }
+        WellAnnotationTable.annotationKeys = function (annotations) {
+            return _.keys(annotations).sort(function (l, r) { return l.length - r.length; });
+        };
         return WellAnnotationTable;
     })(List);
     var WellAnnotationRow = (function (_super) {
         __extends(WellAnnotationRow, _super);
         function WellAnnotationRow(tableId, category, tags, state) {
-            _super.call(this, tableId + "_" + category, _.union([new Label(tableId + "_" + category + "_lbl", category, [0, 0], state.configuration.annotationCategoryLabel, true)], tags.map(function (tag) { return new AnnotationButton(category, tag, state); })), [0, 0], [0, 0], 'vertical', state.configuration.annotationTagSpace, 'left');
+            _super.call(this, tableId + "_" + category, tags.map(function (tag) { return new AnnotationButton(category, tag, state); }), [0, 0], [0, 0], 'horizontal', state.configuration.annotationTagSpace, 'left');
         }
         return WellAnnotationRow;
     })(List);
     var AnnotationButton = (function (_super) {
         __extends(AnnotationButton, _super);
         function AnnotationButton(category, tag, state) {
-            _super.call(this, "annBut_" + (category || "") + "_" + tag, tag, [0, 0], !category || _.contains(state.focused().wellAnnotations[category], tag) ? state.configuration.annotationSelectedLabel : state.configuration.annotationLabel, true);
+            _super.call(this, "annBut_" + (category || "") + "_" + tag, tag, [0, 0], !category || state.isTagActive(tag) ? state.configuration.annotationSelectedLabel : state.configuration.annotationLabel, true);
             this.category = category;
             this.tag = tag;
         }
         AnnotationButton.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
-            interaction.toggleAnnotation(this.category, this.tag);
+            interaction.selectedCoordinates.wellFilter = this.tag;
         };
         return AnnotationButton;
     })(Label);
@@ -1255,7 +1545,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var wellInfo = mod.objectWellInfo(this.object);
             //var well = mod.wellLocation()//objectWells.location(this.object);
             if (wellInfo) {
-                var img = wellInfo.location.image(cfg.imageType);
+                var img = wellInfo.location.image(cfg.imageType === "None" ? null : cfg.imageType);
                 var coordinates = wellInfo.coordinates; //objectWells.coordinates(this.object);
                 //console.log("Object well location:");
                 //console.log(wellInfo.location);
@@ -1325,89 +1615,168 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.state = state;
             var cfg = state.configuration;
             var datInfo = state.dataSetInfo.value;
+            var focusPlateWidth = cfg.largeHeatMultiplier;
+            var focusPlateHeight = focusPlateWidth + 1;
+            var addedPlates = _.range(datInfo.plateCount);
+            var initialStackCnt = Math.ceil(addedPlates.length / cfg.miniHeatColumnMax);
+            var regularPlates = (initialStackCnt - focusPlateWidth) * cfg.miniHeatColumnMax;
+            var plateStacks = []; //_.range(0, Math.ceil(addedPlates.length / cfg.miniHeatColumnMax)).map(c => []);
+            addedPlates.forEach(function (p, pI) {
+                // Regular plate goes to regular stack.
+                var targetStack = -1;
+                if (pI < regularPlates) {
+                    targetStack = Math.floor(pI / cfg.miniHeatColumnMax);
+                }
+                else {
+                    var pRI = pI - regularPlates;
+                    var relStack = Math.floor((regularPlates + 1) / cfg.miniHeatColumnMax);
+                    targetStack = relStack + Math.floor(pRI / (cfg.miniHeatColumnMax - focusPlateHeight));
+                }
+                var stack = plateStacks[targetStack];
+                if (!stack) {
+                    stack = [];
+                    plateStacks[targetStack] = stack;
+                }
+                stack.push(p);
+            });
+            var stackLists = plateStacks.map(function (ps, psI) {
+                var snippetStack = [];
+                for (var i = 0; i < ps.length; i++) {
+                    if (ps[i] === null) {
+                        if (snippetStack[1]) {
+                            var firstHeatmap = snippetStack[1];
+                            snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...", Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
+                        }
+                    }
+                    else {
+                        var prevP = ps[i - 1];
+                        var p = ps[i];
+                        var nextP = ps[i + 1];
+                        var miniHeatMap = new PlateMiniHeatmap(p, state);
+                        // Add top plate label.
+                        if (prevP === null || !((i - 1) in ps)) {
+                            snippetStack.push(new Label("plateLblTop_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
+                        }
+                        // Add heat map label.
+                        snippetStack.push(miniHeatMap);
+                        // Add bottom plate label.
+                        if (nextP === null || !((i + 1) in ps)) {
+                            snippetStack.push(new Label("plateLblBottom_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
+                        }
+                    }
+                }
+                return new List("pic_" + psI, snippetStack, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
+            });
+            var colLists = new List("pic_", stackLists, [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'right');
             //var heatMaps = _.range(0, datInfo.plateCount).map(pI => new PlateMiniHeatmap(pI, state));
             //var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
             //var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
             //    _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
             //var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
-            var colPartitions = state.plateAnnotationPartition();
-            var colLists = colPartitions.map(function (cP, cI) {
-                var addedPlates = [];
-                for (var i = 0; i < cP.plates.length; i++) {
-                    var prevP = cP.plates[i - 1];
+            /*var colPartitions = state.plateAnnotationPartition();
+    
+            var colLists = colPartitions.map((cP, cI) => {
+                var addedPlates: number[] = [];
+                for(var i = 0; i < cP.plates.length; i++) {
+                    var prevP = cP.plates[i-1];
                     var p = cP.plates[i];
-                    if (prevP < p - 1)
-                        addedPlates.push(null); // Insert additional plate.
+    
+                    if(prevP < p - 1) addedPlates.push(null);   // Insert additional plate.
+    
                     addedPlates.push(p);
                 }
-                var plateStacks = _.range(0, Math.ceil(addedPlates.length / cfg.miniHeatColumnMax)).map(function (c) { return []; });
-                addedPlates.forEach(function (p, pI) { return plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p); });
-                var stackLists = plateStacks.map(function (ps, psI) {
-                    var snippetStack = [];
-                    for (var i = 0; i < ps.length; i++) {
-                        if (ps[i] === null) {
-                            if (snippetStack[1]) {
+    
+                var plateStacks = _.range(0, Math.ceil(addedPlates.length / cfg.miniHeatColumnMax)).map(c => []);
+                addedPlates.forEach((p, pI) => plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p));
+    
+                var stackLists = plateStacks.map((ps, psI) => {
+                    var snippetStack: PlacedSnippet[] = [];
+                    for(var i = 0; i < ps.length; i++) {
+                        if(ps[i] === null) {
+                            if(snippetStack[1]) { // Temporary fix.
                                 var firstHeatmap = snippetStack[1];
-                                snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...", Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
+                                snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...",
+                                    Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
                             }
-                        }
-                        else {
+                        } else {
                             var prevP = ps[i - 1];
                             var p = ps[i];
                             var nextP = ps[i + 1];
+    
                             var miniHeatMap = new PlateMiniHeatmap(p, state);
+    
                             // Add top plate label.
-                            if (prevP === null || !((i - 1) in ps)) {
+                            if (prevP === null || !((i-1) in ps)) {
                                 snippetStack.push(new Label("plateLblTop_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
                             }
+    
                             // Add heat map label.
                             snippetStack.push(miniHeatMap);
+    
                             // Add bottom plate label.
-                            if (nextP === null || !((i + 1) in ps)) {
+                            if (nextP === null || !((i+1) in ps)) {
                                 snippetStack.push(new Label("plateLblBottom_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
                             }
                         }
                     }
-                    return new List("pic_" + cI + "_" + psI, snippetStack, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
+    
+                    return new List(
+                        "pic_" + cI + "_" + psI,
+                        snippetStack,   //ps.map(p => new PlateMiniHeatmap(p, state)),
+                        [0, 0], [0, 0],
+                        'vertical',
+                        cfg.miniHeatSpace,
+                        'middle');
                 });
-                var stackWrappedLists = new List("pic_" + cI, stackLists, [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'left');
-                var stackFooter = new List("picf_" + cI, cP.tags.map(function (t) { return new AnnotationButton(null, t, state); }), [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
-                return new List("tpic_" + cI, [stackWrappedLists, stackFooter], [0, 0], [0, 0], 'vertical', 2 * cfg.miniHeatSpace, 'middle');
-            });
-            this.heatmapColumns = new List("pics", colLists, [0, 0], [0, 0], 'horizontal', cfg.splomSpace, 'left');
-            /*this.heatmapColumns = new List("pics",
-                colMaps.map((c, cI) => new List("pic_" + cI, c, [0,0], [0,0], 'vertical', cfg.miniHeatSpace)),
-                [0,0], [0,0], 'horizontal', cfg.miniHeatSpace, 'left'
-            );*/
+    
+                var stackWrappedLists = new List(
+                    "pic_" + cI,
+                    stackLists,
+                    [0, 0], [0, 0],
+                    'horizontal',
+                    cfg.miniHeatSpace,
+                    'left');
+    
+                var stackFooter = new List(
+                    "picf_" + cI,
+                    cP.tags.map(t => new AnnotationButton(null, t, state)),
+                    [0,0], [0,0],
+                    'vertical',
+                    cfg.miniHeatSpace,
+                    'middle'
+                );
+    
+                return new List(
+                    "tpic_" + cI,
+                    [stackWrappedLists, stackFooter],
+                    [0,0], [0,0],
+                    'vertical',
+                    2 * cfg.miniHeatSpace,
+                    'middle'
+                );
+            });*/
+            this.heatmapColumns = colLists; //new List("pics", colLists, [0,0], [0,0], 'horizontal', cfg.splomSpace, 'left');
+            var focusedPlate = state.focused().plate;
+            if (focusedPlate >= 0)
+                this.selectedHeatmap = new TemplatePlate([0, 0], state);
             this.dimensions = this.heatmapColumns.dimensions;
             this.updatePositions();
-            if (state.focused().plate === null) {
-                this.guide = new GuideLabel("plate", "Hover over a plate to inspect it and click to select it.", [0, 0], [-20, 0], 5, state);
-            }
         }
         PlateIndex.prototype.setTopLeft = function (topLeft) {
             _super.prototype.setTopLeft.call(this, topLeft);
             if (this.heatmapColumns)
                 this.heatmapColumns.setTopLeft(topLeft);
-            if (this.guide)
-                this.guide.setTopLeft(Vector.add(this.topRight, [10, 60]));
+            if (this.selectedHeatmap) {
+                var cfg = this.state.configuration;
+                this.selectedHeatmap.setTopLeft(Vector.add(this.topRight, [-this.selectedHeatmap.dimensions[0], cfg.sideLabel.font.size + cfg.miniHeatSpace]));
+            }
         };
         PlateIndex.prototype.paint = function (context) {
             var state = this.state;
             var cfg = state.configuration;
-            var focusedPopulation = state.focused().population;
-            // Header.
-            /*context.save();
-            context.translate(this.topLeft);
-            context.translate([0.5 * this.dimensions[0], 0]);
-            panelHeader(context, cfg, focusedPopulation === null ?
-                "Cell Counts" :
-                "Cell Ratio of " + state.populationSpace.populations.byId(focusedPopulation).name,
-                focusedPopulation === null ? null : state.populationSpace.populations.byId(focusedPopulation).color);
-            context.restore();*/
             // Heat maps.
             context.snippet(this.heatmapColumns);
-            context.snippet(this.guide);
+            context.snippet(this.selectedHeatmap);
         };
         PlateIndex.prototype.toString = function () {
             return "Plates";
@@ -1474,7 +1843,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
         };
         PlateMiniHeatmap.plateShareImage = function (model, clusterObject, plate) {
-            var tag = "cimg_" + plate + "_" + model.populationSpace.activationString(); //"cimg_" + clusterObject + "_" + plate;
+            var tag = "cimg_" + plate + "_" + model.populationSpace.activationString() + "_" + model.focused().wellFilter; //"cimg_" + clusterObject + "_" + plate;
             var wellClusterShares = model.wellClusterShares.value;
             var plateShareImage = wellClusterShares[tag];
             if (!plateShareImage) {
@@ -1504,8 +1873,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         PlateMiniHeatmap.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             interaction.selectedCoordinates.switchPlate(this.plateNumber);
             //interaction.selectedCoordinates.plate = this.plateNumber;
-            //interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
-            interaction.pushView('plate');
+            interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
+            interaction.pushView('plates');
+            //interaction.pushView('plate');
         };
         /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
             interaction.hoveredCoordinates.plate = this.plateNumber;

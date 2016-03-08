@@ -57,7 +57,6 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
                 this.mouseDown,
                 this.mouseUp,
                 this.mouseDrag,
-                this.mouseMove,
                 this.keyPress
             ]);
         }

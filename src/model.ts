@@ -29,11 +29,11 @@ import controller = require('./core/graphics/controller');
 import config = require('./configuration');
 import BaseConfiguration = config.BaseConfiguration;
 
-export var viewCycle = ['datasets', 'plates', 'plate', 'well', 'features', 'splom', 'exemplars'];
+export var viewCycle = ['datasets', 'plates', /*'plate',*/ 'well', 'exemplars', 'features'];    //, 'splom'];
 
 export class InteractionState implements AbstractModel {
     constructor(public populationSpace: PopulationSpace = null,
-                public hoveredCoordinates: SelectionCoordinates = null,
+                //public hoveredCoordinates: SelectionCoordinates = null,
                 public selectedCoordinates: SelectionCoordinates = null,
                 public openViews: Chain<string> = null,
                 public configuration: BaseConfiguration = null) {
@@ -42,9 +42,9 @@ export class InteractionState implements AbstractModel {
 
     switchToDataSet(dataSet: string) {
         this.populationSpace = new PopulationSpace();
-        this.hoveredCoordinates = new SelectionCoordinates();
+        //this.hoveredCoordinates = new SelectionCoordinates();
         this.selectedCoordinates = new SelectionCoordinates();
-        this.openViews = new Chain(['plates', 'exemplars']);
+        this.openViews = new Chain(['plates']); //, 'exemplars']);
         this.configuration = new BaseConfiguration();
         this.selectedCoordinates.dataSet = dataSet;
 
@@ -53,15 +53,16 @@ export class InteractionState implements AbstractModel {
     removeExemplar(object: number) {
         // Remove given exemplar from any population (should be a single population).
         this.populationSpace.removeExemplar(object);
-        if(this.hoveredCoordinates.object === object) this.hoveredCoordinates.object = null;
+        //if(this.hoveredCoordinates.object === object) this.hoveredCoordinates.object = null;
     }
 
     pushView(identifier: string) {
         var index = viewCycle.indexOf(identifier);
-        this.openViews = new Chain([viewCycle[Math.max(0, index - 1)], viewCycle[index], 'exemplars']);
+        index = Math.min(viewCycle.length - 2, index);
+        this.openViews = new Chain([viewCycle[index], viewCycle[index + 1]]);
     }
 
-    toggleAnnotation(category: string, tag: string) {
+    /*toggleAnnotation(category: string, tag: string) {
         var annotations = this.selectedCoordinates.wellAnnotations;
         // Specific category is targeted; toggle its tag.
         if(category) {
@@ -73,7 +74,7 @@ export class InteractionState implements AbstractModel {
         else {
             _.keys(annotations).forEach(k => annotations[k] = annotations[k].filter(annTag => annTag !== tag));
         }
-    }
+    }*/
 
     toJSON() {
         return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
@@ -82,7 +83,7 @@ export class InteractionState implements AbstractModel {
     static fromJSON(data: {}) {
         return new InteractionState(
             PopulationSpace.fromJSON(data['populationSpace']),
-            SelectionCoordinates.fromJSON(data['hoveredCoordinates']),
+            //SelectionCoordinates.fromJSON(data['hoveredCoordinates']),
             SelectionCoordinates.fromJSON(data['selectedCoordinates']),
             Chain.fromJSON<string>(data['openViews']),
             new BaseConfiguration()
@@ -103,18 +104,31 @@ export class EnrichedState extends InteractionState {
     featureHistograms: ProxyValue<FeatureHistograms>;
     objectFeatureValues: ProxyValue<NumberFrame>;       // All features of active objects.
 
+    objectHistogramSize: number;
+
     constructor(state: InteractionState) {
         super(state.populationSpace,
-            state.hoveredCoordinates,
             state.selectedCoordinates,
             state.openViews,
             state.configuration);
 
+        var cfg = this.configuration;
+
         this.allExemplars = this.populationSpace.allExemplars();
 
         var dataSet = this.selectedCoordinates.dataSet;
+
         var populationDict = this.populationSpace.toDict();
         populationDict['dataSet'] = dataSet;
+
+        var objectHistogramDict = this.populationSpace.toDict();
+        objectHistogramDict['dataSet'] = dataSet;
+        this.objectHistogramSize = Math.floor(
+            ((cfg.splomTotalSize - Math.max(0, this.populationSpace.features.length - 2) * cfg.splomSpace) /
+            Math.max(2, this.populationSpace.features.length)) - cfg.splomSpace
+        );
+        objectHistogramDict['bins'] = this.objectHistogramSize; //state.configuration.splomInnerSize;
+
         var histogramDict = this.populationSpace.toDict();
         histogramDict['dataSet'] = dataSet;
         histogramDict['bins'] = state.configuration.splomInnerSize;
@@ -143,7 +157,7 @@ export class EnrichedState extends InteractionState {
         this.dataSetInfo = new ProxyValue(
             "dataSetInfo",
             {dataSet: dataSet},
-            new DataSetInfo(), ds => new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels)
+            new DataSetInfo(), ds => new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels, ds.wellTypes, ds.imageDimensions)
         );
         this.wellAnnotations = new ProxyValue(
             "wellAnnotations",
@@ -162,7 +176,7 @@ export class EnrichedState extends InteractionState {
         );
         this.objectHistograms = new ProxyValue(
             "objectHistograms2D",
-            histogramDict,
+            objectHistogramDict,
             new HistogramMatrix(), m => new HistogramMatrix(m)
         );
         this.wellClusterShares = new ProxyValue(
@@ -182,10 +196,39 @@ export class EnrichedState extends InteractionState {
         );
     }
 
+    // Update state on server-based value update.
+    update() {
+        // Incorporate well types into population space.
+        this.populationSpace.conformPopulations(this.dataSetInfo.value.wellTypes);
+
+        // Focus probed object if no other object is selected, if available.
+        if(this.selectedCoordinates.object === null &&
+            this.selectedCoordinates.probeColumns.length > 0 &&
+            this.objectInfo &&
+            this.objectInfo.converged) {
+            var objInfo = this.objectInfo.value;
+
+            var probeCandidates = objInfo.rows.filter(obj => {
+                var objNr = Number(obj);
+                return !(objInfo.cell("plate", obj) === this.selectedCoordinates.plate &&
+                         objInfo.cell("column", obj) === this.selectedCoordinates.well.column &&
+                        objInfo.cell("row", obj) === this.selectedCoordinates.well.row) &&
+                        !this.allExemplars.has(Number(objNr));
+            });
+
+            // Found a probe candidate.
+            if(probeCandidates.length > 0) {
+                this.selectedCoordinates.object = Number(probeCandidates[0]);
+
+                // Conform rest of selection (plate, etc.) to newly selected object.
+                this.conformSelectedCoordinates(this);
+            }
+        }
+    }
+
     cloneInteractionState() {
         return new InteractionState(
             collection.snapshot(this.populationSpace),
-            collection.snapshot(this.hoveredCoordinates),
             collection.snapshot(this.selectedCoordinates),
             collection.snapshot(this.openViews),
             collection.snapshot(this.configuration)
@@ -246,50 +289,32 @@ export class EnrichedState extends InteractionState {
 
     // Focused coordinates.
     focused() {
-        // Focus probed object if no other object is selected, if available.
-        if(this.selectedCoordinates.object === null &&
-            this.selectedCoordinates.probeColumns.length > 0 &&
-            this.objectInfo &&
-            this.objectInfo.converged) {
-            var objInfo = this.objectInfo.value;
-
-            var probeCandidates = objInfo.rows.filter(obj => {
-                var objNr = Number(obj);
-                return !(objInfo.cell("plate", obj) === this.selectedCoordinates.plate &&
-                         objInfo.cell("column", obj) === this.selectedCoordinates.well.column &&
-                        objInfo.cell("row", obj) === this.selectedCoordinates.well.row) &&
-                        !this.allExemplars.has(Number(objNr));
-            });
-
-            // Found a probe candidate.
-            if(probeCandidates.length > 0) {
-                this.selectedCoordinates.object = Number(probeCandidates[0]);
-
-                // Conform rest of selection (plate, etc.) to newly selected object.
-                this.conformSelectedCoordinates(this);
-            }
-        }
-
         return this.selectedCoordinates;
+    }
+
+    filterExp() {
+        var searchString = this.focused().wellFilter.toLowerCase().replace(/[|&;$%@"<>()+,]/g, "");
+        return new RegExp(".*" + searchString + ".*");
+    }
+
+    isTagActive(tag: string) {
+        return this.focused().wellFilter.length > 0 && this.filterExp().test(tag.toLowerCase());
+    }
+
+    // Well filter by tag result.
+    filterWell(plate: number, coordinates: WellCoordinates) {
+        var annotations = this.wellAnnotations.value.annotationsAt(plate, coordinates);
+        var exp = this.filterExp();
+        return _.values(annotations).some((cat: string[]) => cat.some(ann => exp.test(ann.toLowerCase())));
     }
 
     // Population color, includes focused population highlight.
     populationColor(population: Population) {
-        //var focus = this.focused();
-        return population.color;    //this.populationSpace.inactivePopulations.has(population) ?
-            //population.colorTrans :
-            //population.color;
-
-        //return !population || (focus && focus.population === population.identifier) ?
-        //    this.configuration.highlight :
-        //    population.color;
+        return population.color;
     }
 
     // Translucent population color, includes population highlight.
     populationColorTranslucent(population: Population) {
-        //var focus = this.focused();
-        //return !population || (focus && focus.population === population.identifier) ?
-        //    this.configuration.highlight :
         return population.colorTrans;
     }
 
@@ -353,8 +378,8 @@ export class EnrichedState extends InteractionState {
                     var rowObj = rowVec[i];
 
                     var imgMap:StringMap<string> = {};
-                    _.pairs(imageURLs).forEach((p, cnI) => {
-                        if(p[1] !== null) imgMap[p[0]] = <any>objectTable.columnVector(p[1])[i];
+                    _.pairs(imageURLs).forEach(p => {
+                        if(p[1] !== null && p[1] !== "null") imgMap[p[0]] = <any>objectTable.columnVector(p[1])[i];
                     });
                     locationMap[columnObj + "_" + rowObj + "_" + plateObj] = new WellLocation(columnObj, rowObj, plateObj, imgMap);
                 }
@@ -372,7 +397,7 @@ export class EnrichedState extends InteractionState {
         columns.forEach(c => result[c.slice(4)] = c);
 
         // Add the none type; to hide image for better view of overlays.
-        //result["None"] = null;
+        result["None"] = "null";
 
         return result;
     }
@@ -391,6 +416,7 @@ export class EnrichedState extends InteractionState {
 
             var populations = this.populationSpace.populations.elements.filter(p => p.identifier in shares.zScores);
             if(populations.length > 0) {
+
                 // Initialize empty score arrays.
                 this.wellScs = shares.zScores[populations[0].identifier].map(plt => plt.map(col => col.map(v => 0)));
 
@@ -409,15 +435,55 @@ export class EnrichedState extends InteractionState {
                 var maxScore = _.max(flatScores);
 
                 var delta = maxScore - minScore;
-                this.wellScs = this.wellScs.map(plt => plt.map(col => col.map(val => (val - minScore) / delta)));
+
+                // Include well tag filter to scores.
+                this.wellScs = this.wellScs.map((plt, pI) =>
+                    plt.map((col, cI) => col.map((val, rI) =>
+                            this.filterWell(pI, new WellCoordinates(cI, rI)) ?
+                                (val - minScore) / delta :
+                                -Number.MAX_VALUE)
+                    ));
             }
         }
 
         return this.wellScs || [];
     }
 
+    // Ranking of wells, by score. Selected wells are prioritized in ordering.
+    private rnkWls: WellScore[] = null;
+    rankedWells() {
+        if(!this.rnkWls) {
+            this.rnkWls = [];
+
+            var selectedLocation = this.selectedCoordinates.location();
+            var selElement: WellScore;
+            this.wellScores().forEach((plt, pI) =>
+                plt.forEach((col, cI) =>
+                    col.forEach((wellScore, rI) => {
+                        var location = new WellLocation(cI, rI, pI);
+                        var wS = {location: location, score: wellScore};
+
+                        if(location.equals(selectedLocation)) selElement = wS;
+
+                        this.rnkWls.push(wS);
+            })));
+            this.rnkWls.sort((l, r) => r.score - l.score);
+
+            if(selElement) this.rnkWls = _.union(
+                [selElement],
+                this.rnkWls.filter(wS => !selElement || !wS.location.equals(selElement.location))
+            );
+        }
+
+        return this.rnkWls;
+    }
+
+    topWells() {
+        return this.rankedWells().slice(0, this.configuration.listWellsCount);
+    }
+
     // Column partition ordering of plates by score (TODO: by population/count vector.)
-    platePartition() {
+    /*platePartition() {
         // Compute score from total cell count, for now.
         var datasetInfo = this.dataSetInfo.value;
         var wellShares = this.wellClusterShares.value;
@@ -458,9 +524,9 @@ export class EnrichedState extends InteractionState {
             _.compact(_.range(0, colCapacity).map(rI => platesOrdered[cI * colCapacity + rI])).sort((p1, p2) => p1 - p2));
 
         return colMaps;
-    }
+    }*/
 
-    plateAnnotationPartition(): { tags: string[]; plates: number[] }[] {
+    /*plateAnnotationPartition(): { tags: string[]; plates: number[] }[] {
         // Plate score by id.
         var plateRange = this.plates();
         //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
@@ -481,7 +547,7 @@ export class EnrichedState extends InteractionState {
 
         return <any>_.values(bins);*/
 
-        var focusTags = new Chain<string>(<any>_.flatten(_.values(this.focused().wellAnnotations)));
+        /*var focusTags = new Chain<string>(<any>_.flatten(_.values(this.focused().wellAnnotations)));
         var plateTags = this.wellAnnotations.value.plateTags;
         var bins: StringMap<{ tags: string[]; plates: number[] }> = {};
         plateRange.forEach(p => {
@@ -493,16 +559,16 @@ export class EnrichedState extends InteractionState {
         });
 
         return <any> _.values(bins);
-    }
+    }*/
 
     // Plate annotations as well selections, returned as a map of annotation category and tag.
     plateTargetAnnotations(plate: number) {
-        var dataInfo = this.dataSetInfo.value;
-        var wellAnnotations = this.wellAnnotations.value;
-        var focusAnnotations = this.focused().wellAnnotations;
+        //var dataInfo = this.dataSetInfo.value;
+        //var wellAnnotations = this.wellAnnotations.value;
+        //var focusAnnotations = this.focused().wellAnnotations;
 
         var selections: StringMap<StringMap<WellSelection>> = {};
-        _.keys(focusAnnotations).forEach(cat => {
+        /*_.keys(focusAnnotations).forEach(cat => {
             selections[cat] = {};
             focusAnnotations[cat].forEach(tag =>
                     selections[cat][tag] = new WellSelection(cat, tag, plate, [])
@@ -518,13 +584,22 @@ export class EnrichedState extends InteractionState {
                         selections[cat][tag].wells.push(wellCoordinates);
                 }));
             })
-        );
+        );*/
 
         // Add focused well.
         selections["Selected"] = {};
         selections["Selected"]["Selected"] = new WellSelection("Selected", "Selected", plate, [this.focused().well]);
 
         return selections;
+    }
+
+    isExemplarSelected() {
+        return this.focused().object !== null && !this.hoveredObjectIsExemplar()
+    }
+}
+
+export class WellScore {
+    constructor(public location: WellLocation, public score: number) {
     }
 }
 
@@ -534,24 +609,39 @@ export class PopulationSpace {
                 public populations: Chain<Population> = new Chain<Population>(),
                 public inactivePopulations: Chain<Population> = new Chain<Population>()) {
         // Total cell count population.
-        var totalPop = new Population(Population.POPULATION_TOTAL_NAME, "Cell Count",
-                            new Chain<number>(), Population.POPULATION_TOTAL_COLOR);
+        var totalPop = new Population(Population.POPULATION_TOTAL_NAME, "Cell\nCount",
+                            new Chain<number>(), Population.POPULATION_TOTAL_COLOR, true);
         totalPop.activation = [[-1, 0], [0, 1], [1, 1]];
-        this.populations = this.populations.push(totalPop);
+
+        // Unconfident population.
+        var unconfPop = new Population(Population.POPULATION_UNCONFIDENT_NAME, "Not\nSure",
+                            new Chain<number>(), Population.POPULATION_UNCONFIDENT_COLOR, true);
+
+        this.populations = this.populations.pushAll([totalPop, unconfPop]);
         this.conformPopulations();
     }
 
-    private conformPopulations() {
-        this.populations = this.populations.filter(p => p.exemplars.length > 0 ||
-                                                    p.identifier === Population.POPULATION_TOTAL_NAME);   // Remove any empty populations.
+    visiblePopulations() {
+        return this.populations.filter(p => p.identifier !== Population.POPULATION_TOTAL_NAME);
+    }
 
-        // If an exemplar has been added to total cell population, then transfer to new population.
-        var totalPopulation = this.populations.byId(Population.POPULATION_TOTAL_NAME);
-        if(totalPopulation.exemplars.length > 0) {
-            this.createPopulation().exemplars = totalPopulation.exemplars.clone();
-            totalPopulation.exemplars = new Chain<number>();
+    conformPopulations(wellTypes: string[] = []) {
+        // Remove empty populations.
+        this.populations = this.populations.filter(p => p.exemplars.length > 0 || p.predefined);
+
+        // Add well type populations.
+        wellTypes.forEach((typeTag, typeIndex) => {
+            var allPop = this.allPopulations();
+            var id = Population.POPULATION_WELL_TYPE_FIRST_NAME + typeIndex;
+            if(!(id in allPop.index)) this.createPopulation(id, typeTag + "\nWell", true);
+        });
+
+        // If an exemplar has been added to unconfident cell population, then transfer to new population.
+        var unconfPopulation = this.populations.byId(Population.POPULATION_UNCONFIDENT_NAME);
+        if(unconfPopulation && unconfPopulation.exemplars.length > 0) {
+            this.createPopulation().exemplars = unconfPopulation.exemplars.clone();
+            unconfPopulation.exemplars = new Chain<number>();
         }
-        //this.createPopulation();    // Add one empty population at end.
     }
 
     // Active and inactive populations.
@@ -561,10 +651,10 @@ export class PopulationSpace {
         return allPops;
     }
 
-    // Active populations, or all population as fallback.
-    activeOrAll() {
-        return this.populations.length > 1 ? this.populations : new Chain([Population.ALL]);
-    }
+    // Active populations, or all population as fallback. TODO: get rid of this by going unconfident for all.
+    //activeOrAll() {
+    //    return this.populations.length > 1 ? this.populations : new Chain([Population.ALL]);
+    //}
 
     // Toggle activation of population.
     toggle(population: Population) {
@@ -591,14 +681,14 @@ export class PopulationSpace {
     }
 
     // Create a new population.
-    createPopulation() {
+    createPopulation(id: number = null, tag: string = "Picked", predefined: boolean = false) {
         // Choose an available nominal color.
         var takenColors = this.allPopulations().map(p => p.color);
         var availableColors = new Chain(Color.colorMapNominal12);
         var freeColors = Chain.difference(availableColors, takenColors);
         var color = freeColors.length > 0 ? freeColors.elements[0] : Color.WHITE;
 
-        var population = new Population(null, "Tag", new Chain<number>(), color);
+        var population = new Population(id, tag, new Chain<number>(), color, predefined);
         this.populations = this.populations.push(population);
 
         return population;
@@ -647,13 +737,15 @@ export class PopulationSpace {
 // Population.
 export class Population {
     public static POPULATION_TOTAL_NAME = 0;    // All cell population (for cell count purposes).
+    public static POPULATION_TOTAL_COLOR = new Color(75, 75, 75);
     public static POPULATION_ALL_NAME = 1;      // Population code in case of no known phenotypes.
-    public static POPULATION_TOTAL_COLOR = new Color(150, 150, 150);
-
     static ALL = new Population(Population.POPULATION_ALL_NAME, "All",
-                                new Chain<number>(), Population.POPULATION_TOTAL_COLOR);
+                                new Chain<number>(), Population.POPULATION_TOTAL_COLOR, true);
+    public static POPULATION_UNCONFIDENT_NAME = 2;
+    public static POPULATION_UNCONFIDENT_COLOR = new Color(175, 175, 175);
+    public static POPULATION_WELL_TYPE_FIRST_NAME = 3;
 
-    private static POPULATION_ID_COUNTER = 2;   // 0 and 1 are reserved for above population identifiers
+    private static POPULATION_ID_COUNTER = 100;   // 0 and 1 are reserved for above population identifiers
 
     colorTrans: Color;
 
@@ -661,7 +753,9 @@ export class Population {
                 public name: string = null,
                 public exemplars = new Chain<number>(),
                 public color = Color.NONE,
-                public activation: number[][] = [[-1, 0], [0, 0], [1, 0]]) {
+                public predefined: boolean = false,  // Whether the population is user-modeled, or imposed by other data.
+                public activation: number[][] = [[-1, 0], [0, 0], [1, 0]]
+    ) {
         if(identifier === null) this.identifier = Population.POPULATION_ID_COUNTER++;
         if(name === null) this.name = this.identifier.toString();
 
@@ -705,6 +799,7 @@ export class Population {
             data['name'],
             Chain.fromJSON<number>(data['exemplars']),
             Color.fromJSON(data['color']),
+            data['predefined'],
             data['activation']
         );
     }
@@ -719,7 +814,7 @@ export class SelectionCoordinates {
                 public plate: number = 0,                                   // Plate id.
                 public probeColumns: string[] = [],                         // Object query by coordinate columns.
                 public probeCoordinates: number[] = [],                     // Object query by coordinates.
-                public wellAnnotations: StringMap<string[]> = {}) {         // Selected well annotations.
+                public wellFilter: string = "") {                           // Selected well annotations.
     }
 
     // Correct for missing values with given coordinates.
@@ -762,6 +857,15 @@ export class SelectionCoordinates {
         this.probeCoordinates = [];
     }
 
+    switchLocation(location: WellLocation) {
+        this.switchPlate(location.plate);
+        this.well = location.coordinates();
+    }
+
+    location() {
+        return this.well !== null ? new WellLocation(this.well.column, this.well.row, this.plate) : null;
+    }
+
     static fromJSON(data: {}) {
         return new SelectionCoordinates(
             data['dataSet'],
@@ -771,7 +875,7 @@ export class SelectionCoordinates {
             data['plate'],
             data['probeColumns'],
             data['probeCoordinates'],
-            data['wellAnnotations']
+            data['wellFilter']
         );
     }
 }
@@ -785,7 +889,9 @@ export class DataSetInfo {
 
     constructor(public plateLabels: string[] = [],
                 public columnLabels: string[] = [],
-                public rowLabels: string[] = []) {
+                public rowLabels: string[] = [],
+                public wellTypes: string[] = [],
+                public imageDimensions: number[] = [0, 0]) {
         this.plateCount = plateLabels.length;
         this.columnCount = columnLabels.length;
         this.rowCount = rowLabels.length;
@@ -840,6 +946,7 @@ export class WellClusterShares extends NumberFrame {
         this.wellIndex.forEach((pS, pI) => this.zScores[pI] = pS.map(plS => plS.map(cS =>
                                         cS.map(s => (s - this.shareStatistics[pI].mean) /
                                                     this.shareStatistics[pI].standardDeviation))));
+
         this.zScoresMin = [];
         this.zScoresMax = [];
         this.zScores.forEach((p, pI) => {
@@ -865,6 +972,11 @@ export class WellClusterShares extends NumberFrame {
         }
     }
 
+    // Retrieve share, returns null if not available.
+    share(population: number, well: WellLocation) {
+        return (((this.wellIndex[population] || [])[well.plate] || [])[well.column] || [])[well.row] || null;
+    }
+
     // Retrieve zScore, returns null if not available.
     zScore(population: number, plate: number, well: WellCoordinates) {
         return (((this.zScores[population] || [])[plate] || [])[well.column] || [])[well.row] || null;
@@ -879,7 +991,7 @@ export class WellAnnotations extends DataFrame<string[]> {
     constructor(dictionary: any = {}) {
         super(dictionary);
 
-        this.computePlateAnnotations();
+        //this.computePlateAnnotations();
     }
 
     // Return dictionary of annotations for given plate and well coordinates.
@@ -947,7 +1059,7 @@ export class FeatureHistograms {
 
     constructor(dict: {} = {}) {
         this.histograms = {};
-        _.keys(dict).map(k => this.histograms[k] = new DataFrame(dict[k]).normalize()); //.transpose().normalize(false, true));
+        _.keys(dict).map(k => this.histograms[k] = new DataFrame(dict[k]).normalize(false, true));
     }
 }
 
@@ -991,7 +1103,7 @@ export class WellLocation extends WellCoordinates {
     }
 
     equals(that: WellLocation) {
-        return this.column === that.column && this.row === that.row && this.plate === that.plate;
+        return that !== null && this.column === that.column && this.row === that.row && this.plate === that.plate;
     }
 
     // This (singular) location as a well selection.
@@ -1009,7 +1121,10 @@ export class WellLocation extends WellCoordinates {
         // Default to first image type.
         if(type === null) type = _.keys(this.imageURLs)[0];
 
-        if(this.imgArrived !== type && this.imageURLs[type]) {
+        if(type === "None") {
+            this.imgArrived = null;
+            this.img = null;
+        } else if(this.imgArrived !== type && this.imageURLs[type]) {
             this.img = new Image();
             this.img.onload = () => this.imgArrived = type;
             this.img.src = this.imageURLs[type];
