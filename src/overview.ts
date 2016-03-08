@@ -706,7 +706,7 @@ class ExemplarTable extends PlacedSnippet {
 
         // Hidden types.
         var hiddenSegment: PlacedSnippet[] = [];
-        if(state.populationSpace.inactivePopulations.length > 0) {
+        //if(state.populationSpace.inactivePopulations.length > 0) {
             var hiddenTypeLabel = new Label("HiddenLbl", "Hidden", [0, 0], state.configuration.subPanelHeaderLabel, true);
             var hiddenTypeStack = new List(
                 "HiddenTypeColumn",
@@ -730,7 +730,7 @@ class ExemplarTable extends PlacedSnippet {
                 [0, 0], [0, 0],
                 'vertical', cfg.subPanelSpace)
             );
-        }
+        //}
 
         // Combine shown and hidden segment columns.
         this.segments = new List(

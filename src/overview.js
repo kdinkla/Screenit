@@ -512,13 +512,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var shownSegment = new List("ShownSegments", segSnippets, [0, 0], [0, 0], 'vertical', cfg.subPanelSpace);
             // Hidden types.
             var hiddenSegment = [];
-            if (state.populationSpace.inactivePopulations.length > 0) {
-                var hiddenTypeLabel = new Label("HiddenLbl", "Hidden", [0, 0], state.configuration.subPanelHeaderLabel, true);
-                var hiddenTypeStack = new List("HiddenTypeColumn", _.union(state.populationSpace.inactivePopulations.elements.map(function (ip) { return new TypeLabel(ip, state); }), state.isExemplarSelected() ? [
-                    new ExemplarAdditionButton(state.focused().object, state.populationSpace.allPopulations().byId(Population.POPULATION_UNCONFIDENT_NAME), state)
-                ] : []), [0, 0], [cfg.clusterTileInnerSize, 0], 'vertical', cfg.exemplarColumnSpace, 'middle');
-                hiddenSegment.push(new List("HiddenSegments", [hiddenTypeLabel, hiddenTypeStack], [0, 0], [0, 0], 'vertical', cfg.subPanelSpace));
-            }
+            //if(state.populationSpace.inactivePopulations.length > 0) {
+            var hiddenTypeLabel = new Label("HiddenLbl", "Hidden", [0, 0], state.configuration.subPanelHeaderLabel, true);
+            var hiddenTypeStack = new List("HiddenTypeColumn", _.union(state.populationSpace.inactivePopulations.elements.map(function (ip) { return new TypeLabel(ip, state); }), state.isExemplarSelected() ? [
+                new ExemplarAdditionButton(state.focused().object, state.populationSpace.allPopulations().byId(Population.POPULATION_UNCONFIDENT_NAME), state)
+            ] : []), [0, 0], [cfg.clusterTileInnerSize, 0], 'vertical', cfg.exemplarColumnSpace, 'middle');
+            hiddenSegment.push(new List("HiddenSegments", [hiddenTypeLabel, hiddenTypeStack], [0, 0], [0, 0], 'vertical', cfg.subPanelSpace));
+            //}
             // Combine shown and hidden segment columns.
             this.segments = new List("TypeSegments", _.union([shownSegment], hiddenSegment), [0, 0], [0, 0], 'horizontal', cfg.subPanelSpace, 'left');
             this.setDimensions(this.segments.dimensions);
