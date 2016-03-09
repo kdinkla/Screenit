@@ -27,7 +27,8 @@ export class BaseConfiguration {
     baseMuted = Color.grey(140);
     baseDim = Color.grey(200);
     baseVeryDim = Color.grey(225);
-    baseSelected = new Color(25, 50, 255);    //new Color(185, 28, 48);  //Color.CRIMSON;
+    baseSelected = new Color(25, 50, 255);
+    lightSelected = new Color(240, 240, 255);
     highlight = Color.grey(50);     // Focused highlight color.
     highlightTrans = Color.grey(50, 0.75);
 

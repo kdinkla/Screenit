@@ -205,26 +205,37 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             if (!cachedImage) {
                 cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], function (plainContext) {
                     // Per population frame.
-                    populations.forEach(function (population) {
-                        var frame = frames[population.identifier];
-                        var normFrequencies = frame.matrix[frame.columnIndex[_this.feature]];
-                        var fontColor = population.colorTrans;
-                        plainContext.fillStyle = fontColor.toString();
-                        plainContext.beginPath();
-                        var len = normFrequencies.length - 1;
-                        var spanWidth = _this.dimensions[0];
-                        var spanHeight = _this.dimensions[1] - 1;
-                        plainContext.moveTo(0, _this.dimensions[1]);
-                        for (var i = 0; i <= len; i++) {
-                            var x1 = i * spanWidth / len;
-                            var f1 = normFrequencies[i];
-                            var y1 = (1 - f1) * spanHeight;
-                            //plainContext.fillRect(x1, y1, 1, 1);
-                            plainContext.lineTo(x1, y1);
-                        }
-                        plainContext.lineTo(_this.dimensions[0], _this.dimensions[1]);
-                        plainContext.fill();
-                    });
+                    var draw = function (fill) {
+                        populations.forEach(function (population) {
+                            var frame = frames[population.identifier];
+                            var normFrequencies = frame.matrix[frame.columnIndex[_this.feature]];
+                            plainContext.beginPath();
+                            var len = normFrequencies.length - 1;
+                            var spanWidth = _this.dimensions[0];
+                            var spanHeight = _this.dimensions[1] - 1;
+                            plainContext.moveTo(0, _this.dimensions[1]);
+                            for (var i = 0; i <= len; i++) {
+                                var x1 = i * spanWidth / len;
+                                var f1 = normFrequencies[i];
+                                var y1 = (1 - f1) * spanHeight;
+                                //plainContext.fillRect(x1, y1, 1, 1);
+                                plainContext.lineTo(x1, y1);
+                            }
+                            plainContext.lineTo(_this.dimensions[0], _this.dimensions[1]);
+                            if (fill) {
+                                var fontColor = population.colorTrans; //population.colorTrans;
+                                plainContext.fillStyle = fontColor.toString();
+                                plainContext.fill();
+                            }
+                            else {
+                                plainContext.lineWidth = .5;
+                                plainContext.strokeStyle = cfg.backgroundColor.toString();
+                                plainContext.stroke();
+                            }
+                        });
+                    };
+                    draw(true);
+                    draw(false);
                 });
                 histograms[cacheTag] = cachedImage;
             }
@@ -1800,8 +1811,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.state = state;
             var cfg = state.configuration;
             var info = state.dataSetInfo.value;
-            var targetPopulation = state.focused().populationOrTotal();
-            this.shareImg = PlateMiniHeatmap.plateShareImage(state, targetPopulation, plateNumber);
+            var image = PlateMiniHeatmap.plateShareImage(state, plateNumber);
+            this.shareImg = image.image;
+            this.wellFilled = image.wellFilled;
             this.dimensions = [info.columnCount * cfg.miniHeatWellDiameter, info.rowCount * cfg.miniHeatWellDiameter];
             this.updatePositions();
         }
@@ -1810,12 +1822,17 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = state.configuration;
             context.save();
             context.translate(this.topLeft);
-            // Outline, in case of no share data.
+            context.transitioning = false;
+            // Highlight background of a plate when it has a filled well.
+            if (this.wellFilled) {
+                context.fillStyle(cfg.lightSelected);
+                context.fillRect(0, 0, this.dimensions[0], this.dimensions[1]);
+            }
+            // Outline.
             context.strokeStyle(cfg.baseDim);
             context.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
             // Heat map image.
             context.drawImage(this.shareImg);
-            context.transitioning = false;
             // Plate highlight outline.
             if (state.focused().plate === this.plateNumber) {
                 context.strokeStyle(cfg.backgroundColor);
@@ -1842,45 +1859,44 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.picking = false;
             context.restore();
         };
-        PlateMiniHeatmap.plateShareImage = function (model, clusterObject, plate) {
-            var tag = "cimg_" + plate + "_" + model.populationSpace.activationString() + "_" + model.focused().wellFilter; //"cimg_" + clusterObject + "_" + plate;
+        PlateMiniHeatmap.plateShareImage = function (model, plate) {
+            var tag = "cimg_" + plate + "_" + model.populationSpace.activationString() + "_" + model.focused().wellFilter;
             var wellClusterShares = model.wellClusterShares.value;
             var plateShareImage = wellClusterShares[tag];
             if (!plateShareImage) {
                 var cfg = model.configuration;
                 var datInfo = model.dataSetInfo.value;
-                //var clusterShares = wellClusterShares.wellIndex[clusterObject] || [];
-                //var plateShares = clusterShares[plate] || [];
                 var plateShares = model.wellScores()[plate] || [];
+                var wellFilled = false;
                 var imgWidth = datInfo.columnCount * cfg.miniHeatWellDiameter;
                 var imgHeight = datInfo.rowCount * cfg.miniHeatWellDiameter;
-                plateShareImage = view.View.renderToCanvas(imgWidth, imgHeight, function (ctx) {
+                var image = view.View.renderToCanvas(imgWidth, imgHeight, function (ctx) {
                     for (var c = 0; c < datInfo.columnCount; c++) {
                         var cVals = plateShares[c] || [];
                         var cX = c * cfg.miniHeatWellDiameter;
                         for (var r = 0; r < datInfo.rowCount; r++) {
-                            var val = cVals[r]; // || 0;
+                            var val = cVals[r];
+                            if (val >= 0)
+                                wellFilled = true;
                             var cY = r * cfg.miniHeatWellDiameter;
                             ctx.fillStyle = BaseConfiguration.shareColorMap(val).toString();
                             ctx.fillRect(cX, cY, 2, 2);
                         }
                     }
                 });
+                plateShareImage = {
+                    image: image,
+                    wellFilled: wellFilled
+                };
                 wellClusterShares[tag] = plateShareImage;
             }
             return plateShareImage;
         };
         PlateMiniHeatmap.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             interaction.selectedCoordinates.switchPlate(this.plateNumber);
-            //interaction.selectedCoordinates.plate = this.plateNumber;
             interaction.selectedCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
             interaction.pushView('plates');
-            //interaction.pushView('plate');
         };
-        /*mouseMove(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-            interaction.hoveredCoordinates.plate = this.plateNumber;
-            //interaction.hoveredCoordinates.well = PlateMiniHeatmap.wellCoordinatesAt(coordinates, enriched);
-        }*/
         PlateMiniHeatmap.wellCoordinatesAt = function (mouseCoordinates, state) {
             var info = state.dataSetInfo.value;
             return new WellCoordinates(Math.round(mouseCoordinates[0] * (info.columnCount - 1)), Math.round(mouseCoordinates[1] * (info.rowCount - 1)));

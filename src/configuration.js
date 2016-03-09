@@ -18,7 +18,8 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.baseMuted = Color.grey(140);
             this.baseDim = Color.grey(200);
             this.baseVeryDim = Color.grey(225);
-            this.baseSelected = new Color(25, 50, 255); //new Color(185, 28, 48);  //Color.CRIMSON;
+            this.baseSelected = new Color(25, 50, 255);
+            this.lightSelected = new Color(240, 240, 255);
             this.highlight = Color.grey(50); // Focused highlight color.
             this.highlightTrans = Color.grey(50, 0.75);
             // Panel configuration.
