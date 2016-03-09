@@ -17,6 +17,8 @@ Use Pip to install the following Python packages:
 - pandas `>= 0.17.0`
 - scipy `>= 0.13`
 - scikit-learn `>= 0.17`
+- wrapt `>= 1.10.5`
+
 
 Bash:
 ```
@@ -35,6 +37,8 @@ Use bower to install additional Javascript libraries. Bash, in the root director
 ```
 bower install
 ```
+
+Add an directory __session__ to the root.
 
 Run tangelo to launch the server. Bash, in the root directory of the prototype:
 ```
