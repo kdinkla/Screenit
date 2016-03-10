@@ -660,7 +660,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 context.textAlign('right');
                 context.textBaseline('middle');
                 context.translate([-cfg.transferFont.size, .5 * cfg.transferPlotSize]);
-                context.fillText('score');
+                context.fillText('\u2193 \u03A3 score');
                 context.restore();
             }
             context.transitioning = true;
@@ -1297,6 +1297,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Cumulative share, first column is padding.
             var cumulativeShares = [this.wells.map(function (w) { return 0; })];
             populations.forEach(function (p, i) { return cumulativeShares.push(Vector.add(cumulativeShares[i], shares[i])); });
+            // Normalize cumulative shares to [0, max.cum. share].
+            this.abundanceShareMax = _.max(cumulativeShares[cumulativeShares.length - 1]);
+            cumulativeShares = cumulativeShares.map(function (pS) { return pS.map(function (s) { return s / _this.abundanceShareMax; }); });
             this.populationAreaWidth = this.dimensions[0] - cfg.transferPlotSize - cfg.exemplarColumnSpace;
             this.populationAreas = populations.map(function (p, pI) {
                 var listCs = function (cI) {
@@ -1318,13 +1321,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Object count (total population).
             var counts = this.wells.map(function (w) { return clusterShares.share(Population.POPULATION_TOTAL_NAME, w.location); });
             if (counts) {
-                var cntMin = 0;
-                var cntMax = clusterShares.maxObjectCount;
-                var cntDelta = (cntMax - cntMin);
+                this.cntMin = 0;
+                this.cntMax = clusterShares.maxObjectCount;
+                var cntDelta = (this.cntMax - this.cntMin);
                 var cntWidth = cfg.transferPlotSize;
                 var cntListCs = counts.map(function (cnt, wI) {
                     var y = (wI + .5) * _this.wellHeight;
-                    var x = cntWidth * (cnt - cntMin) / cntDelta;
+                    var x = cntWidth * (cnt - _this.cntMin) / cntDelta;
                     return [x, y];
                 });
                 // Extend ends to close list.
@@ -1338,7 +1341,41 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.save();
             context.translate(this.topLeft);
             context.snippets(this.populationAreas);
+            // Origin demarcation.
+            context.strokeStyle(cfg.baseDim);
+            context.font(cfg.transferFont.toString());
+            var demarcLength = this.dimensions[1] + 2;
+            // Minimum abundance (0%) at left.
+            context.textAlign('left');
+            context.textBaseline('top');
+            context.fillText("0", 0, this.dimensions[1]);
+            context.strokeLine([0, 0], [0, demarcLength]);
+            // Abundance label.
+            context.textAlign('left');
+            context.textBaseline('top');
+            context.fillText('% abundance', 0, this.dimensions[1] + cfg.transferFont.size);
+            // Maximum abundance at right.
+            context.textAlign('right');
+            context.textBaseline('top');
+            context.fillText((this.abundanceShareMax * 100).toFixed(0), this.populationAreaWidth, this.dimensions[1]);
+            context.strokeLine([this.populationAreaWidth, 0], [this.populationAreaWidth, demarcLength]);
+            // Move to cell part.
             context.translate([this.populationAreaWidth + cfg.exemplarColumnSpace, 0]);
+            // Minimum cells at left.
+            context.textAlign('left');
+            context.textBaseline('top');
+            context.fillText(this.cntMin.toString(), 0, this.dimensions[1]);
+            context.strokeLine([0, 0], [0, demarcLength]);
+            // Cell label.
+            context.textAlign('left');
+            context.textBaseline('top');
+            context.fillText('# cells', 0, this.dimensions[1] + cfg.transferFont.size);
+            // Maximum cells at right.
+            context.textAlign('right');
+            context.textBaseline('top');
+            context.fillText(this.cntMax.toString(), cfg.transferPlotSize, this.dimensions[1]);
+            context.strokeLine([cfg.transferPlotSize, 0], [cfg.transferPlotSize, demarcLength]);
+            // Count plot.
             context.snippet(this.cntLine);
             context.restore();
         };
