@@ -33,11 +33,22 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             window.addEventListener("resize", function () { return _this.resizeBus.push(new ViewResizeEvent(_this.dimensions())); });
             this.resize.onValue(function (dim) { return console.log("Resize dimensions: " + dim); });
             // Update mouse hits.
-            Bacon.fromEventTarget(this.canvas, 'mousemove').onValue(function (e) {
-                _this.mousePos = _this.correctHighDPIMouse([e.offsetX, e.offsetY]);
+            var jqCanvas = $(this.canvas);
+            jqCanvas.mousemove(function (me) {
+                _this.mousePos = _this.correctHighDPIMouse([
+                    (me.offsetX || me.pageX - $(me.target).offset().left),
+                    (me.offsetY || me.pageY - $(me.target).offset().top)
+                ]);
                 _this.update();
             });
+            /*Bacon.fromEventTarget<MouseEvent>(this.canvas, 'mousemove').onValue(e => {
+                this.mousePos = this.correctHighDPIMouse([e.offsetX, e.offsetY]);
+                this.update();
+            });*/
             // Push mouse events to subjects.
+            /*jqCanvas['asEventStream']('click').onValue(e => {
+                console.log("Mouse click as stream!");
+            });*/
             document.oncontextmenu = function () { return false; }; // Circumvent mouse context menu.
             this.mouseClick = Bacon.fromEventTarget(this.canvas, 'click').map(function (e) { return new ViewMouseEvent(e, 'mouseClick', _this.mousePos, _this.hits); });
             this.mouseDown = Bacon.fromEventTarget(this.canvas, 'mousedown').map(function (e) { return new ViewMouseEvent(e, 'mouseDown', _this.mousePos, _this.hits); });
@@ -57,6 +68,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
                 this.mouseDown,
                 this.mouseUp,
                 this.mouseDrag,
+                this.mouseMove,
                 this.keyPress
             ]);
         }
@@ -499,16 +511,31 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         };
         ViewContext.prototype.strokeEllipse = function (cx, cy, rw, rh) {
             this.context.beginPath();
-            this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
+            this.ellipse(cx, cy, rw, rh);
+            //this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
             this.context.stroke();
         };
         ViewContext.prototype.fillEllipse = function (cx, cy, rw, rh) {
             this.context.beginPath();
-            this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
+            this.ellipse(cx, cy, rw, rh);
+            //this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
             this.context.fill();
             // Mouse hit.
             if (Vector.Euclidean(Vector.subtract([cx, cy], [this.mouseR[0], this.mouseR[1]])) <= 0.5 * (rw + rh))
                 this.pushHit();
+        };
+        // Ellipse path with fallback.
+        ViewContext.prototype.ellipse = function (cx, cy, w, h) {
+            if (this.context['ellipse']) {
+                this.context['ellipse'](this.t(cx), this.t(cy), this.t(w), this.t(h), 0, 2 * Math.PI, false);
+            }
+            else {
+                this.context.save();
+                this.context.translate(this.t(cx), this.t(cy));
+                this.context.scale(this.t(w), this.t(h));
+                this.context.arc(0, 0, 1, 0, 2 * Math.PI, false);
+                this.context.restore();
+            }
         };
         ViewContext.prototype.beginPath = function () {
             this.context.beginPath();

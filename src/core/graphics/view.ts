@@ -68,12 +68,25 @@ export class View<M extends Model> {
         this.resize.onValue(dim => console.log("Resize dimensions: " + dim));
 
         // Update mouse hits.
-        Bacon.fromEventTarget<MouseEvent>(this.canvas, 'mousemove').onValue(e => {
-            this.mousePos = this.correctHighDPIMouse([e.offsetX, e.offsetY]);
+        var jqCanvas = $(this.canvas);
+        jqCanvas.mousemove(me => {
+            this.mousePos = this.correctHighDPIMouse([
+                (me.offsetX || me.pageX - $(me.target).offset().left),
+                (me.offsetY || me.pageY - $(me.target).offset().top)
+            ]);
             this.update();
         });
 
+        /*Bacon.fromEventTarget<MouseEvent>(this.canvas, 'mousemove').onValue(e => {
+            this.mousePos = this.correctHighDPIMouse([e.offsetX, e.offsetY]);
+            this.update();
+        });*/
+
         // Push mouse events to subjects.
+        /*jqCanvas['asEventStream']('click').onValue(e => {
+            console.log("Mouse click as stream!");
+        });*/
+
         document.oncontextmenu = () => false;   // Circumvent mouse context menu.
         this.mouseClick = Bacon.fromEventTarget<MouseEvent>(this.canvas, 'click')
             .map(e => new ViewMouseEvent(e, 'mouseClick', this.mousePos, this.hits));
@@ -102,7 +115,7 @@ export class View<M extends Model> {
             this.mouseDown,
             this.mouseUp,
             this.mouseDrag,
-            //this.mouseMove, # Ignore mouse movements (hover over).
+            this.mouseMove, // Ignore mouse movements (hover over).
             this.keyPress]);
     }
 
@@ -647,18 +660,35 @@ export class ViewContext {
 
     strokeEllipse(cx:number, cy:number, rw:number, rh:number) {
         this.context.beginPath();
-        this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
+        this.ellipse(cx, cy, rw, rh);
+
+        //this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
         this.context.stroke();
     }
 
     fillEllipse(cx:number, cy:number, rw:number, rh:number) {
         this.context.beginPath();
-        this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
+        this.ellipse(cx, cy, rw, rh);
+
+        //this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
         this.context.fill();
 
         // Mouse hit.
         if (Vector.Euclidean(Vector.subtract([cx, cy], [this.mouseR[0], this.mouseR[1]])) <= 0.5 * (rw + rh))
             this.pushHit();
+    }
+
+    // Ellipse path with fallback.
+    private ellipse(cx: number, cy: number, w: number, h: number) {
+        if(this.context['ellipse']) {
+            this.context['ellipse'](this.t(cx), this.t(cy), this.t(w), this.t(h), 0, 2 * Math.PI, false);
+        } else {
+            this.context.save();
+            this.context.translate(this.t(cx), this.t(cy));
+            this.context.scale(this.t(w), this.t(h));
+            this.context.arc(0, 0, 1, 0, 2 * Math.PI, false);
+            this.context.restore();
+        }
     }
 
     beginPath() {

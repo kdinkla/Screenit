@@ -195,11 +195,13 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.save();
             context.context.lineJoin = "round";
             context.transitioning = this.transition;
-            context.beginPath();
-            context.moveTo(cs[0][0], cs[0][1]);
-            for (var i = 1; i < cs.length; i++)
-                context.lineTo(cs[i][0], cs[i][1]);
-            context.closePath();
+            if (cs.length > 0) {
+                context.beginPath();
+                context.moveTo(cs[0][0], cs[0][1]);
+                for (var i = 1; i < cs.length; i++)
+                    context.lineTo(cs[i][0], cs[i][1]);
+                context.closePath();
+            }
             context.transitioning = true;
             context.fillStyle(this.fillColor);
             context.fill();
@@ -225,10 +227,12 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.save();
             context.context.lineJoin = "round";
             context.transitioning = this.transition;
-            context.beginPath();
-            context.moveTo(cs[0][0], cs[0][1]);
-            for (var i = 1; i < cs.length; i++)
-                context.lineTo(cs[i][0], cs[i][1]);
+            if (cs.length > 0) {
+                context.beginPath();
+                context.moveTo(cs[0][0], cs[0][1]);
+                for (var i = 1; i < cs.length; i++)
+                    context.lineTo(cs[i][0], cs[i][1]);
+            }
             context.transitioning = true;
             context.strokeStyle(this.strokeColor);
             context.stroke();
