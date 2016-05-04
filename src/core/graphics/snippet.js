@@ -1,11 +1,11 @@
 /// <reference path='style.ts' />
-var __extends = this.__extends || function (d, b) {
+var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", './view', './style', '../math'], function (require, exports, view, style, math) {
+define(["require", "exports", './style', '../math'], function (require, exports, style, math) {
+    "use strict";
     var Color = style.Color;
     var Font = style.Font;
     var Vector = math.Vector;
@@ -21,7 +21,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             return this.identifier;
         };
         return BaseSnippet;
-    })();
+    }());
     exports.BaseSnippet = BaseSnippet;
     // Positioned snippet with dimensions. Abstract class
     var PlacedSnippet = (function (_super) {
@@ -51,7 +51,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             this.bottomRight = Vector.add(this.topLeft, this.dimensions);
         };
         return PlacedSnippet;
-    })(BaseSnippet);
+    }(BaseSnippet));
     exports.PlacedSnippet = PlacedSnippet;
     var List = (function (_super) {
         __extends(List, _super);
@@ -92,12 +92,15 @@ define(["require", "exports", './view', './style', '../math'], function (require
                 span = Math.max(span, this.dimensions[wAxis]);
                 var lAcc = this.topLeft[lAxis];
                 this.snippets.forEach(function (s) {
-                    var wPos = _this.topLeft[wAxis] + (_this.alignment === 'right' ? span - s.dimensions[wAxis] : _this.alignment === 'middle' ? .5 * (span - s.dimensions[wAxis]) : 0);
+                    var wPos = _this.topLeft[wAxis] +
+                        (_this.alignment === 'right' ? span - s.dimensions[wAxis] :
+                            _this.alignment === 'middle' ? .5 * (span - s.dimensions[wAxis]) : 0);
                     s.setTopLeft(_this.orientation === 'vertical' ? [wPos, lAcc] : [lAcc, wPos]);
                     s.updatePositions();
                     lAcc += s.dimensions[lAxis] + _this.space;
                 });
-                this.dimensions = this.snippets.length > 0 ? Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) : [0, 0];
+                this.dimensions = this.snippets.length > 0 ?
+                    Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) : [0, 0];
                 //this.dimensions[lAxis] = Math.max(0, lAcc - this.space);
                 this.dimensions[wAxis] = span;
             }
@@ -107,7 +110,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.snippets(this.snippets);
         };
         return List;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     exports.List = List;
     // Background snippet.
     var Background = (function (_super) {
@@ -123,7 +126,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.fillRect(0, 0, context.dimensions[0], context.dimensions[1]); // Clear display.
         };
         return Background;
-    })(BaseSnippet);
+    }(BaseSnippet));
     exports.Background = Background;
     // Basic snippets.
     var Rectangle = (function (_super) {
@@ -147,7 +150,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.restore();
         };
         return Rectangle;
-    })(BaseSnippet);
+    }(BaseSnippet));
     exports.Rectangle = Rectangle;
     var Triangle = (function (_super) {
         __extends(Triangle, _super);
@@ -176,7 +179,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.restore();
         };
         return Triangle;
-    })(BaseSnippet);
+    }(BaseSnippet));
     exports.Triangle = Triangle;
     var Polygon = (function (_super) {
         __extends(Polygon, _super);
@@ -210,7 +213,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.restore();
         };
         return Polygon;
-    })(BaseSnippet);
+    }(BaseSnippet));
     exports.Polygon = Polygon;
     var Line = (function (_super) {
         __extends(Line, _super);
@@ -239,7 +242,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.restore();
         };
         return Line;
-    })(BaseSnippet);
+    }(BaseSnippet));
     exports.Line = Line;
     // Basic text label.
     var LabelStyle = (function () {
@@ -256,7 +259,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             this.rotation = rotation;
         }
         return LabelStyle;
-    })();
+    }());
     exports.LabelStyle = LabelStyle;
     var Label = (function (_super) {
         __extends(Label, _super);
@@ -299,7 +302,7 @@ define(["require", "exports", './view', './style', '../math'], function (require
             context.restore();
         };
         return Label;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     exports.Label = Label;
 });
 //# sourceMappingURL=snippet.js.map

@@ -27,13 +27,14 @@ export class RemoteFunction<R> {
 export class ProxyService<M> {
     private resolvingModel: M;
     private expandBus: bacon.Bus<M>;
-    public output: bacon.EventStream<M>;
-
-    //private requestBuffer: {[id: string]: boolean};
-
     private requestBuffer: ProxyValue<any>[];
 
-    constructor(public url: string, public input: bacon.EventStream<M>) {
+    public output: bacon.EventStream<M>;        // Model output stream, enriched with information from server.
+
+    constructor(
+        public url: string,                     // Server root URL.
+        public input: bacon.EventStream<M>      // Model input stream.
+    ) {
         this.input.onValue((model: M) => {
             this.resolvingModel = this.update(this.resolvingModel, model);
             this.propagate();
@@ -41,7 +42,6 @@ export class ProxyService<M> {
         this.expandBus = new bacon.Bus<M>();
         this.output = this.expandBus;
         this.requestBuffer = [];
-        //this.requestBuffer = {};
     }
 
     // Compose update requests.
@@ -52,10 +52,9 @@ export class ProxyService<M> {
         var result = null;
 
         if (_.isArray(newBranch) || _.isString(newBranch) || _.isNumber(newBranch) || _.isBoolean(newBranch)) {
-            result = newBranch; //result = _.clone(newBranch);
+            result = newBranch;
         } else if(newBranch && typeof newBranch !== "undefined") {
-            result = newBranch; //result = Object.create(newBranch['__proto__']);
-            //_.assign(result, newBranch);
+            result = newBranch;
         }
 
         if (newBranch && !(_.isString(newBranch) || _.isNumber(newBranch) || _.isBoolean(newBranch))) {
@@ -109,46 +108,27 @@ export class ProxyService<M> {
             var proxyValue = _.head(this.requestBuffer);
             this.requestBuffer = _.tail(this.requestBuffer);
 
-            // Actual request.
+            // Convert complex arguments to json.
+            var flatArgs = {};
+            _.pairs(proxyValue.args).forEach((p) => flatArgs[p[0]] = JSON.stringify(p[1]));
 
-            //var reqId = JSON.stringify(proxyValue);
-            //if(!this.requestBuffer[reqId]) {
-            //    this.requestBuffer[reqId] = true;
+            // Send request for information to server.
+            Promise
+                .resolve($.ajax({
+                    type: "POST",
+                    url: this.url + "/" + proxyValue.name,
+                    data: flatArgs,
+                    dataType: "json"
+                }))
+                .then(v => {
+                    proxyValue.value = proxyValue.map(v);
+                    proxyValue.converged = true;
 
-                //console.log("Full request:")
-                //console.log(proxyValue.args);
+                    this.propagate();
 
-                // Convert complex arguments to json.
-                var flatArgs = {};
-                _.pairs(proxyValue.args).forEach((p) => {
-                    flatArgs[p[0]] = JSON.stringify(p[1]);
-                        //_.isNumber(p[1]) || _.isString(p[1]) || _.isBoolean(p[1]) ?
-                        //p[1] : JSON.stringify(p[1]);
+                    this.clearActive = false;
+                    this.clearRequests();
                 });
-
-                //console.log("Call request:");
-                //console.log(flatArgs);
-
-                Promise
-                    .resolve($.ajax({
-                        type: "POST",   //"GET",    //"POST",
-                        url: this.url + "/" + proxyValue.name,
-                        data: flatArgs,
-                        dataType: "json"
-                    }))
-                    .then(v => {
-                        //console.log("Call response: ");
-                        //console.log(v);
-                        proxyValue.value = proxyValue.map(v);
-                        proxyValue.converged = true;
-                        //delete this.requestBuffer[reqId];
-
-                        this.propagate();
-
-                        this.clearActive = false;
-                        this.clearRequests();
-                    });
-            //}
         }
     }
 

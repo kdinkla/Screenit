@@ -17,7 +17,8 @@ import OverView = view.OverView;
 
 var serverPath = "server";
 
-// If no session key is specified, request one and redirect to session.
+
+// If no session key is specified in URL, request one and redirect to new session URL.
 var sessionPart = window.location.search.replace("?", "");
 if(sessionPart.length === 0) {
     // Request session key.
@@ -32,17 +33,22 @@ if(sessionPart.length === 0) {
 }
 // Otherwise, set up session.
 else {
-    // Module view as main view in index.html.
+    // Main view with a canvas across the entire window.
     var overView = new OverView();
 
+    // Current state of the application.
     var interactionState = new InteractionState();
+
+    // Stream for pushing, and listening for, new application states.
     var interactionStates = new bacon.Bus<InteractionState>();
+
+    // Enrich the state with additional information, which includes server dependent information.
     var enrichedStates = interactionStates
         .throttle(100)
-        //.skipDuplicates((l, r) => _.isEqual(l, r))
         .map(s => new EnrichedState(s));
     var proxyService = new ProxyService<EnrichedState>(serverPath, enrichedStates);
 
+    // Mutate interaction state, based on mouse and keyboard event.
     overView.event.onValue(event => {
         var oldState = overView.model;
         var newState = overView.model ? overView.model.cloneInteractionState() : new EnrichedState(interactionState);
@@ -53,7 +59,7 @@ else {
                     me.topHit.snippet[event.type](event, me.topHit.local, oldState, newState)
         });
 
-        // Alter annotation filter on key press.
+        // Alter well annotation filter on key press.
         event.onKey(ke => {
             var key = ke.keyCode || ke.charCode;
             var keyChar = String.fromCharCode(ke.which);
@@ -71,10 +77,10 @@ else {
         interactionStates.push(interactionState);
     });
 
-    // Extend model with information from server.
+    // Push state, enriched with latest information from server, to the view.
     proxyService.output.onValue(m => overView.update(m));
 
-    // Finally, trigger model update by fetching existing one from server or pushing a new one.
+    // Finally, trigger state update by fetching a stored state from server, and otherwise creating a new state.
     var oldSessionKey = Number(sessionPart);
     Promise
         .resolve($.ajax({
@@ -97,7 +103,7 @@ else {
             }
         });
 
-    // Fetch new session id (to prevent overwriting old one).
+    // Always create a new session id to prevent overwriting old one.
     var newSessionKey = null;
     Promise
         .resolve($.ajax({
@@ -111,7 +117,7 @@ else {
             history.pushState({}, "HighCons", "index.html?" + v);
         });
 
-    // Save interaction states to server.
+    // Regularly save interaction states on server.
     interactionStates.throttle(3000).onValue(s => {
         // Guard from overwriting old session.
         if(newSessionKey !== null) {
@@ -126,5 +132,4 @@ else {
             })
         }
     });
-
 }

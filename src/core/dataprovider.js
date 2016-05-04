@@ -1,5 +1,6 @@
 ///<reference path="../references.d.ts"/>
 define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, exports, $, _, bacon) {
+    "use strict";
     var RemoteService = (function () {
         function RemoteService(url) {
             this.url = url;
@@ -8,7 +9,7 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
             return new RemoteFunction(this.url + "/" + name);
         };
         return RemoteService;
-    })();
+    }());
     exports.RemoteService = RemoteService;
     var RemoteFunction = (function () {
         function RemoteFunction(url) {
@@ -20,11 +21,13 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
             return Promise.resolve($.ajax(this.url, { data: query }));
         };
         return RemoteFunction;
-    })();
+    }());
     exports.RemoteFunction = RemoteFunction;
     // Proxy service provider.
     var ProxyService = (function () {
-        function ProxyService(url, input) {
+        function ProxyService(url, // Server root URL.
+            input // Model input stream.
+            ) {
             var _this = this;
             this.url = url;
             this.input = input;
@@ -36,7 +39,6 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
             this.expandBus = new bacon.Bus();
             this.output = this.expandBus;
             this.requestBuffer = [];
-            //this.requestBuffer = {};
         }
         // Compose update requests.
         ProxyService.prototype.update = function (oldBranch, newBranch) {
@@ -46,10 +48,10 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
             // Copy new branch.
             var result = null;
             if (_.isArray(newBranch) || _.isString(newBranch) || _.isNumber(newBranch) || _.isBoolean(newBranch)) {
-                result = newBranch; //result = _.clone(newBranch);
+                result = newBranch;
             }
             else if (newBranch && typeof newBranch !== "undefined") {
-                result = newBranch; //result = Object.create(newBranch['__proto__']);
+                result = newBranch;
             }
             if (newBranch && !(_.isString(newBranch) || _.isNumber(newBranch) || _.isBoolean(newBranch))) {
                 _.pairs(newBranch).forEach(function (nP) {
@@ -57,7 +59,9 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
                     var newValue = nP[1];
                     var oldValue = oldBranch[newKey];
                     // Resolve proxy values, and (deep) update non-proxy values.
-                    result[newKey] = newValue instanceof ProxyValue ? _this.resolve(oldValue, newValue) : _this.update(oldValue, newValue);
+                    result[newKey] = newValue instanceof ProxyValue ?
+                        _this.resolve(oldValue, newValue) :
+                        _this.update(oldValue, newValue);
                 });
             }
             return result;
@@ -89,32 +93,20 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
                 this.clearActive = true;
                 var proxyValue = _.head(this.requestBuffer);
                 this.requestBuffer = _.tail(this.requestBuffer);
-                // Actual request.
-                //var reqId = JSON.stringify(proxyValue);
-                //if(!this.requestBuffer[reqId]) {
-                //    this.requestBuffer[reqId] = true;
-                //console.log("Full request:")
-                //console.log(proxyValue.args);
                 // Convert complex arguments to json.
                 var flatArgs = {};
-                _.pairs(proxyValue.args).forEach(function (p) {
-                    flatArgs[p[0]] = JSON.stringify(p[1]);
-                    //_.isNumber(p[1]) || _.isString(p[1]) || _.isBoolean(p[1]) ?
-                    //p[1] : JSON.stringify(p[1]);
-                });
-                //console.log("Call request:");
-                //console.log(flatArgs);
-                Promise.resolve($.ajax({
+                _.pairs(proxyValue.args).forEach(function (p) { return flatArgs[p[0]] = JSON.stringify(p[1]); });
+                // Send request for information to server.
+                Promise
+                    .resolve($.ajax({
                     type: "POST",
                     url: this.url + "/" + proxyValue.name,
                     data: flatArgs,
                     dataType: "json"
-                })).then(function (v) {
-                    //console.log("Call response: ");
-                    //console.log(v);
+                }))
+                    .then(function (v) {
                     proxyValue.value = proxyValue.map(v);
                     proxyValue.converged = true;
-                    //delete this.requestBuffer[reqId];
                     _this.propagate();
                     _this.clearActive = false;
                     _this.clearRequests();
@@ -129,7 +121,7 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
             this.expandBus.push(this.resolvingModel);
         };
         return ProxyService;
-    })();
+    }());
     exports.ProxyService = ProxyService;
     var ProxyValue = (function () {
         function ProxyValue(name, args, initialValue, map) {
@@ -146,7 +138,7 @@ define(["require", "exports", 'jquery', 'lodash', 'bacon'], function (require, e
             return this.name === that.name && _.isEqual(this.args, that.args);
         };
         return ProxyValue;
-    })();
+    }());
     exports.ProxyValue = ProxyValue;
 });
 //# sourceMappingURL=dataprovider.js.map

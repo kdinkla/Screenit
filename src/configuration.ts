@@ -142,7 +142,7 @@ export class BaseConfiguration {
     annotationTagSpace = 2;
 
     // Activation function.
-    activationZScoreRange = 4;
+    activationZScoreRange = 5;
 
     // Object details view.
     objectViewImageRadius = 40;

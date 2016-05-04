@@ -1,5 +1,6 @@
 ///<reference path="references.d.ts"/>
 define(["require", "exports", './core/graphics/style', './core/graphics/snippet', './core/math'], function (require, exports, style, Snippet, math) {
+    "use strict";
     var LabelStyle = Snippet.LabelStyle;
     var Color = style.Color;
     var Font = style.Font;
@@ -113,16 +114,17 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.annotationColumnSpace = 5;
             this.annotationTagSpace = 2;
             // Activation function.
-            this.activationZScoreRange = 4;
+            this.activationZScoreRange = 5;
             // Object details view.
             this.objectViewImageRadius = 40;
             this.wellViewMaxObjectRadius = 50;
         }
         // Plate cluster shares.
         BaseConfiguration.voidColor = Color.NONE; //new Color(222, 220, 220);   //Color.NONE;  //Color.GREEN;
-        BaseConfiguration.shareColorMap = function (normVal) { return (normVal >= 0 ? heatLookup[Math.ceil(255 * (1 - normVal))] : BaseConfiguration.voidColor); };
+        BaseConfiguration.shareColorMap = function (normVal) { return (normVal >= 0 ? heatLookup[Math.ceil(255 * (1 - normVal))] :
+            BaseConfiguration.voidColor); };
         return BaseConfiguration;
-    })();
+    }());
     exports.BaseConfiguration = BaseConfiguration;
     var NumberTableConfiguration = (function () {
         function NumberTableConfiguration(font, fontColor, cellDimensions, cellSpace, visibleIndex, visibleHeader) {
@@ -141,7 +143,7 @@ define(["require", "exports", './core/graphics/style', './core/graphics/snippet'
             this.cellOuterDimensions = Vector.add(cellDimensions, cellSpace);
         }
         return NumberTableConfiguration;
-    })();
+    }());
     exports.NumberTableConfiguration = NumberTableConfiguration;
     // Color maps.
     var locsLookup = [];

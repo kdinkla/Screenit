@@ -3,13 +3,13 @@
 import _ = require('lodash');
 
 // Map by number.
-export interface NumberMap<V> {
-    [index: number]: V;
+export interface NumberMap<T> {
+    [index: number]: T;
 }
 
 // Map by string.
-export interface StringMap<E> {
-    [index: string]: E;
+export interface StringMap<T> {
+    [index: string]: T;
 }
 
 // Create index map for string array.
@@ -210,13 +210,7 @@ export class Chain<E extends Identifiable> {
     }
 }
 
-// Shallow clone (including function).
-/*export function clone<T>(object: T) {
-    return typeof(object) === 'object' ?
-        <T> Object['assign'](Object.create(object['__proto__']), object) :
-        _.clone(object);
-}*/
-
+// Deep clone an object, including its functions.
 export function snapshot<E>(obj: E) {
     var clone: E;
 

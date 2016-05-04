@@ -1830,7 +1830,7 @@ class WellAbundanceList extends PlacedSnippet {
         // Abundance label.
         context.textAlign('left');
         context.textBaseline('top');
-        context.fillText('% abundance', 0, this.dimensions[1] + cfg.transferFont.size);
+        context.fillText('% share', 0, this.dimensions[1] + cfg.transferFont.size);
 
         // Maximum abundance at right.
         context.textAlign('right');
@@ -2104,7 +2104,7 @@ class WellAnnotationRow extends List<Label> {
     }
 }*/
 
-class WellAnnotationTable extends List<List<Label>> {
+class WellAnnotationTable extends List<PlacedSnippet> {
     constructor(identifier: string, annotations: StringMap<string[]>, state: EnrichedState) {
         super(identifier,
             [

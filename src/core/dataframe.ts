@@ -7,11 +7,11 @@ import math = require('./math');
 import Matrix = math.Matrix;
 
 export class DataFrame<T> {
-    columns: string[];
-    columnIndex: StringMap<number>;
-    rows: string[];
-    rowIndex: StringMap<number>;
-    matrix: T[][];     // By column index and row index.
+    columns: string[];                  // Column names.
+    columnIndex: StringMap<number>;     // Column name to index.
+    rows: string[];                     // Row names.
+    rowIndex: StringMap<number>;        // Row name to index.
+    matrix: T[][];                      // By column index and row index.
 
     constructor(dictionary: any = {}) {
         this.columns = _.keys(dictionary);
@@ -21,14 +21,17 @@ export class DataFrame<T> {
         this.matrix = this.columns.map(c => this.rows.map(r => dictionary[c][r]));
     }
 
+    // All values for given column name.
     columnVector(name: string) {
         return this.matrix[this.columnIndex[name]];
     }
 
+    // Value at given column and row names.
     cell(column: any, row: any) {
         return (this.columnVector(column) || [])[this.rowIndex[row]];
     }
 
+    // Exchange columns and rows.
     transpose() {
         var tr = this.shallowClone();
 
@@ -41,16 +44,16 @@ export class DataFrame<T> {
         return tr;
     }
 
-    // Apply function to cells.
-    applyToCells(f: (n: T) => T): DataFrame<T> {
+    // Apply function to all cells.
+    /*applyToCells(f: (n: T) => T): DataFrame<T> {
         var tr = this.shallowClone();
 
         tr.matrix = tr.matrix.map(c => c.map(f));
 
         return tr;
-    }
+    }*/
 
-    // Normalize along columns, or globally.
+    // Normalize along columns, or globally. Normalized map is [min, max] => [0,1] or [0, max] => [0,1].
     normalize(global: boolean = false, lowerBoundZero: boolean = false): DataFrame<number> {
         var tr: DataFrame<number> = <any> this.shallowClone();
 
@@ -66,6 +69,7 @@ export class DataFrame<T> {
             max = tr.matrix.map(c => indMax);
         }
 
+        // Normalize matrix.
         tr.matrix = lowerBoundZero ?
             tr.matrix.map((c, cI) => c.map(r => (r / max[cI]) || 0)) :
             tr.matrix.map((c, cI) => c.map(r => (r - min[cI]) / ((max[cI] - min[cI]) || 0)));

@@ -1,14 +1,17 @@
 /// <reference path="../../typings/tsd.d.ts" />
 /// <reference path="collection.ts" />
-define(["require", "exports", 'lodash', './collection'], function (require, exports, _, collections) {
-    var Chain = collections.Chain;
-    var indexMap = collections.indexMap;
-    var swap = collections.swap;
-    // Constants.
-    var PI = Math.PI;
-    var PI2 = Math.PI * 2;
-    var IPI = 1 / PI;
-    var IPI2 = 1 / PI2;
+define(["require", "exports", 'lodash'], function (require, exports, _) {
+    "use strict";
+    // Array statistics and vector extensions.
+    /*var protoArray = <any> Array.prototype;
+    protoArray.statistics = () => new ArrayStatistics(this);
+    
+    export class ArrayStatistics {
+        constructor(public values: number[]) {
+            console.log("Array statistics values:");
+            console.log(values);
+        }
+    }*/
     // Vector math functions.
     // Assumes all operations are applied to number array of equal size.
     var Vector = (function () {
@@ -180,7 +183,7 @@ define(["require", "exports", 'lodash', './collection'], function (require, expo
             return v.map(function (n) { return n; });
         };
         return Vector;
-    })();
+    }());
     exports.Vector = Vector;
     // Assumes all operations are applied to matrices of equal size.
     var Matrix = (function () {
@@ -226,27 +229,11 @@ define(["require", "exports", 'lodash', './collection'], function (require, expo
                     transposed[i][j] = matrix[j][i];
                 }
             }
-            /*for(var i = 0; i < target.length; i++) {
-                for(var j = 0; j < target[i].length; j++) {
-                    var t = target[i][j];
-                    target[i][j] = target[j][i];
-                    target[j][i] = t;
-                }
-            }*/
             return transposed;
         };
         return Matrix;
-    })();
+    }());
     exports.Matrix = Matrix;
-    // Range of numbers.
-    var Range = (function () {
-        function Range(begin, end) {
-            this.begin = begin;
-            this.end = end;
-        }
-        return Range;
-    })();
-    exports.Range = Range;
     // Rectangle (inclusive).
     var Rectangle = (function () {
         // Base constructor.
@@ -290,7 +277,7 @@ define(["require", "exports", 'lodash', './collection'], function (require, expo
             return new Rectangle(Vector.interpolate(this.position, target.position, s), Vector.interpolate(this.dimensions, target.dimensions, s));
         };
         return Rectangle;
-    })();
+    }());
     exports.Rectangle = Rectangle;
     // Returns mean and standard deviation of given numbers.
     function statistics(values) {
@@ -303,127 +290,5 @@ define(["require", "exports", 'lodash', './collection'], function (require, expo
         };
     }
     exports.statistics = statistics;
-    // Combinatorial optimization functions.
-    var Optimize = (function () {
-        function Optimize() {
-        }
-        // Perform 2-opt optimization, for given elements by given distance matrix (mapped by index).
-        // TODO: increase performance by order of N with a linked list implementation.
-        Optimize.optTSP = function (orderedSet, distances, invert) {
-            if (invert === void 0) { invert = false; }
-            var index = indexMap(orderedSet.elements.map(function (e) { return e.toString(); }));
-            // Element permutation by (local) index, include dummy node.
-            var permutation = [];
-            for (var i = 0; i < orderedSet.length + 1; i++) {
-                permutation.push(i);
-            }
-            // Local distance matrix.
-            var d = Matrix.create(permutation.length, permutation.length, 0);
-            for (var i = 0; i < permutation.length - 1; i++) {
-                var eI = index[orderedSet.elements[i].toString()];
-                for (var j = 0; j < permutation.length - 1; j++) {
-                    var eJ = index[orderedSet.elements[j].toString()];
-                    d[i][j] = invert ? 1 - distances[eI][eJ] : distances[eI][eJ];
-                }
-            }
-            for (var i = 1; i < permutation.length; i++) {
-                // Select next best node to swap.
-                var minD = Number.MAX_VALUE;
-                var minN = null;
-                for (var j = i; j < permutation.length; j++) {
-                    var dP = d[permutation[i - 1]][permutation[j]];
-                    if (dP < minD) {
-                        minD = dP;
-                        minN = j;
-                    }
-                }
-                // Swap best node and i.
-                swap(permutation, i, minN);
-            }
-            // Continue optimization until we hit a minima.
-            var swaps = 0;
-            var improved = true;
-            while (improved) {
-                improved = false;
-                var minCost = this.cost(permutation, d);
-                tryPairs: for (var i = 0; i < permutation.length - 1; i++) {
-                    for (var k = i + 1; k < permutation.length; k++) {
-                        this.invertSegment(permutation, i, k);
-                        var newCost = this.cost(permutation, d);
-                        if (newCost < minCost) {
-                            minCost = newCost;
-                            improved = true;
-                            break tryPairs;
-                        }
-                        else {
-                            this.invertSegment(permutation, i, k);
-                        }
-                    }
-                }
-                swaps++;
-            }
-            //console.log("Optimization swaps: " + swaps);
-            // Open cycle at dummy and cut it out.
-            var dummyIndex = _.indexOf(permutation, orderedSet.length);
-            var newSets = permutation.slice(dummyIndex + 1, permutation.length).concat(permutation.slice(0, dummyIndex)).map(function (i) { return orderedSet.elements[i]; });
-            return new Chain(newSets);
-        };
-        // The cost of a TSP tour for the given distance function.
-        Optimize.cost = function (permutation, d) {
-            var sum = 0;
-            for (var i = 0; i < permutation.length; i++) {
-                sum += d[permutation[i]][permutation[(i + 1) % permutation.length]];
-            }
-            return sum;
-        };
-        // Invert a segment indexed [i..k] of a TSP tour.
-        Optimize.invertSegment = function (permutation, i, k) {
-            var tmp;
-            for (var j = i; j < (i + k) / 2; j++) {
-                var jC = k - j;
-                tmp = permutation[j];
-                permutation[j] = permutation[jC];
-                permutation[jC] = tmp;
-            }
-        };
-        return Optimize;
-    })();
-    exports.Optimize = Optimize;
-    function interpolate(source, target, s) {
-        var result;
-        var src = source;
-        var tar = target;
-        // No source.
-        if (!source) {
-            result = target;
-        }
-        else if (!target) {
-            result = source;
-        }
-        else if (source['interpolate']) {
-            result = source['interpolate'](target, s);
-        }
-        else if (_.isNumber(source.constructor)) {
-            result = (1 - s) * src + s * tar;
-        }
-        else if (_.isArray(source)) {
-            var maxLen = Math.max(src.length, tar.length);
-            result = [];
-            for (var i = 0; i < maxLen; i++) {
-                result.push(interpolate(src[i] || tar[i], tar[i] || src[i], s));
-            }
-        }
-        else if (_.isObject(source)) {
-            result = _.clone(target); // Clone for proper function transfer.
-            // Interpolate fields.
-            var fields = _.union(_.keys(src), _.keys(tar));
-            fields.forEach(function (f) { return result[f] = interpolate(src[f] || tar[f], tar[f] || src[f], s); });
-        }
-        else {
-            result = s < 0.5 ? source : target;
-        }
-        return result;
-    }
-    exports.interpolate = interpolate;
 });
 //# sourceMappingURL=math.js.map

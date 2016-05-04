@@ -6,13 +6,6 @@
     src: url('font/OpenSans-Regular.ttf') format("truetype");
 }
 
-@font-face {
-    font-family: OpenSans;
-    font-style: normal;
-    font-weight: 300;
-    src: url('font/OpenSans-Light.ttf') format("truetype");
-}
-
 /* Reset. */
 * {
     margin: 0;

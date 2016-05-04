@@ -1,11 +1,11 @@
 /// <reference path="references.d.ts"/>
-var __extends = this.__extends || function (d, b) {
+var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 define(["require", "exports", './core/math', './core/graphics/style', './core/collection', './core/dataframe', './core/dataprovider', './configuration'], function (require, exports, math, style, collection, dataframe, data, config) {
+    "use strict";
     var Vector = math.Vector;
     var Color = style.Color;
     var Chain = collection.Chain;
@@ -64,10 +64,12 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
         };
         InteractionState.fromJSON = function (data) {
-            return new InteractionState(PopulationSpace.fromJSON(data['populationSpace']), SelectionCoordinates.fromJSON(data['selectedCoordinates']), Chain.fromJSON(data['openViews']), new BaseConfiguration());
+            return new InteractionState(PopulationSpace.fromJSON(data['populationSpace']), 
+            //SelectionCoordinates.fromJSON(data['hoveredCoordinates']),
+            SelectionCoordinates.fromJSON(data['selectedCoordinates']), Chain.fromJSON(data['openViews']), new BaseConfiguration());
         };
         return InteractionState;
-    })();
+    }());
     exports.InteractionState = InteractionState;
     var EnrichedState = (function (_super) {
         __extends(EnrichedState, _super);
@@ -84,7 +86,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             populationDict['dataSet'] = dataSet;
             var objectHistogramDict = this.populationSpace.toDict();
             objectHistogramDict['dataSet'] = dataSet;
-            this.objectHistogramSize = Math.floor(((cfg.splomTotalSize - Math.max(0, this.populationSpace.features.length - 2) * cfg.splomSpace) / Math.max(2, this.populationSpace.features.length)) - cfg.splomSpace);
+            this.objectHistogramSize = Math.floor(((cfg.splomTotalSize - Math.max(0, this.populationSpace.features.length - 2) * cfg.splomSpace) /
+                Math.max(2, this.populationSpace.features.length)) - cfg.splomSpace);
             objectHistogramDict['bins'] = this.objectHistogramSize; //state.configuration.splomInnerSize;
             var histogramDict = this.populationSpace.toDict();
             histogramDict['dataSet'] = dataSet;
@@ -96,7 +99,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 dict['row'] = focusedWell.well === null ? -1 : focusedWell.well.row;
                 dict['plate'] = focusedWell.plate === null ? -1 : focusedWell.plate;
                 dict['probes'] = {};
-                state.selectedCoordinates.probeColumns.forEach(function (c, cI) { return dict['probes'][c] = state.selectedCoordinates.probeCoordinates[cI]; });
+                state.selectedCoordinates.probeColumns.forEach(function (c, cI) {
+                    return dict['probes'][c] = state.selectedCoordinates.probeCoordinates[cI];
+                });
             };
             var objectInfoDict = this.populationSpace.toDict();
             addObjectInfo(objectInfoDict);
@@ -118,11 +123,17 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             // Incorporate well types into population space.
             this.populationSpace.conformPopulations(this.dataSetInfo.value.wellTypes);
             // Focus probed object if no other object is selected, if available.
-            if (this.selectedCoordinates.object === null && this.selectedCoordinates.probeColumns.length > 0 && this.objectInfo && this.objectInfo.converged) {
+            if (this.selectedCoordinates.object === null &&
+                this.selectedCoordinates.probeColumns.length > 0 &&
+                this.objectInfo &&
+                this.objectInfo.converged) {
                 var objInfo = this.objectInfo.value;
                 var probeCandidates = objInfo.rows.filter(function (obj) {
                     var objNr = Number(obj);
-                    return !(objInfo.cell("plate", obj) === _this.selectedCoordinates.plate && objInfo.cell("column", obj) === _this.selectedCoordinates.well.column && objInfo.cell("row", obj) === _this.selectedCoordinates.well.row) && !_this.allExemplars.has(Number(objNr));
+                    return !(objInfo.cell("plate", obj) === _this.selectedCoordinates.plate &&
+                        objInfo.cell("column", obj) === _this.selectedCoordinates.well.column &&
+                        objInfo.cell("row", obj) === _this.selectedCoordinates.well.row) &&
+                        !_this.allExemplars.has(Number(objNr));
                 });
                 // Found a probe candidate.
                 if (probeCandidates.length > 0) {
@@ -146,7 +157,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 var col = tbl.columnVector('column');
                 var focusedWell = this.focused();
                 for (var i = 0; i < tbl.rows.length; i++) {
-                    if (plate[i] === focusedWell.plate && focusedWell.well && row[i] === focusedWell.well.row && col[i] === focusedWell.well.column) {
+                    if (plate[i] === focusedWell.plate && focusedWell.well &&
+                        row[i] === focusedWell.well.row && col[i] === focusedWell.well.column) {
                         result[Number(tbl.rows[i])] = [x[i], y[i]];
                     }
                 }
@@ -165,7 +177,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 var minDist = Number.MAX_VALUE;
                 var focusedWell = this.focused();
                 for (var i = 0; i < tbl.rows.length; i++) {
-                    if (plate[i] === focusedWell.plate && focusedWell.well && row[i] === focusedWell.well.row && col[i] === focusedWell.well.column) {
+                    if (plate[i] === focusedWell.plate &&
+                        focusedWell.well && row[i] === focusedWell.well.row &&
+                        col[i] === focusedWell.well.column) {
                         var csDist = Vector.distance(coordinates, [x[i], y[i]]);
                         if (csDist < minDist) {
                             minDist = csDist;
@@ -294,7 +308,13 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     var maxScore = _.max(flatScores);
                     var delta = maxScore - minScore;
                     // Include well tag filter to scores.
-                    this.wellScs = this.wellScs.map(function (plt, pI) { return plt.map(function (col, cI) { return col.map(function (val, rI) { return _this.filterWell(pI, new WellCoordinates(cI, rI)) ? (val - minScore) / delta : -Number.MAX_VALUE; }); }); });
+                    this.wellScs = this.wellScs.map(function (plt, pI) {
+                        return plt.map(function (col, cI) { return col.map(function (val, rI) {
+                            return _this.filterWell(pI, new WellCoordinates(cI, rI)) ?
+                                (val - minScore) / delta :
+                                -Number.MAX_VALUE;
+                        }); });
+                    });
                 }
             }
             return this.wellScs || [];
@@ -305,13 +325,17 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.rnkWls = [];
                 var selectedLocation = this.selectedCoordinates.location();
                 var selElement;
-                this.wellScores().forEach(function (plt, pI) { return plt.forEach(function (col, cI) { return col.forEach(function (wellScore, rI) {
-                    var location = new WellLocation(cI, rI, pI);
-                    var wS = { location: location, score: wellScore };
-                    if (location.equals(selectedLocation))
-                        selElement = wS;
-                    _this.rnkWls.push(wS);
-                }); }); });
+                this.wellScores().forEach(function (plt, pI) {
+                    return plt.forEach(function (col, cI) {
+                        return col.forEach(function (wellScore, rI) {
+                            var location = new WellLocation(cI, rI, pI);
+                            var wS = { location: location, score: wellScore };
+                            if (location.equals(selectedLocation))
+                                selElement = wS;
+                            _this.rnkWls.push(wS);
+                        });
+                    });
+                });
                 this.rnkWls.sort(function (l, r) { return r.score - l.score; });
                 if (selElement)
                     this.rnkWls = _.union([selElement], this.rnkWls.filter(function (wS) { return !selElement || !wS.location.equals(selElement.location); }));
@@ -429,7 +453,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return this.focused().object !== null && !this.hoveredObjectIsExemplar();
         };
         return EnrichedState;
-    })(InteractionState);
+    }(InteractionState));
     exports.EnrichedState = EnrichedState;
     var WellScore = (function () {
         function WellScore(location, score) {
@@ -437,7 +461,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.score = score;
         }
         return WellScore;
-    })();
+    }());
     exports.WellScore = WellScore;
     // Populations and their feature space.
     var PopulationSpace = (function () {
@@ -530,8 +554,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (includeFeatures === void 0) { includeFeatures = true; }
             var exemplars = {};
             // Active populations.
-            this.allPopulations().filter(function (p) { return p.exemplars.length > 0; }).forEach(function (p) { return exemplars[p.identifier] = _.clone(p.exemplars.elements); });
-            return includeFeatures ? { features: this.features.elements, exemplars: exemplars } : { exemplars: exemplars };
+            this.allPopulations().filter(function (p) { return p.exemplars.length > 0; })
+                .forEach(function (p) { return exemplars[p.identifier] = _.clone(p.exemplars.elements); });
+            return includeFeatures ?
+                { features: this.features.elements, exemplars: exemplars } :
+                { exemplars: exemplars };
         };
         // Whether given object is an exemplar.
         PopulationSpace.prototype.isExemplar = function (object) {
@@ -539,7 +566,11 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Population activation function as a string.
         PopulationSpace.prototype.activationString = function () {
-            return this.populations.elements.map(function (p) { return p.identifier + ":[" + p.activation.map(function (cs) { return cs.join(","); }).join(";") + "]"; }).join(",");
+            return this.populations.elements.map(function (p) {
+                return p.identifier + ":[" +
+                    p.activation.map(function (cs) { return cs.join(","); }).join(";") +
+                    "]";
+            }).join(",");
         };
         // Return all exemplars of populations.
         PopulationSpace.prototype.allExemplars = function () {
@@ -549,7 +580,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return new PopulationSpace(Chain.fromJSON(data['features']), new Chain(data['populations']['elements'].map(function (p) { return Population.fromJSON(p); })), new Chain(data['inactivePopulations']['elements'].map(function (p) { return Population.fromJSON(p); })));
         };
         return PopulationSpace;
-    })();
+    }());
     exports.PopulationSpace = PopulationSpace;
     // Population.
     var Population = (function () {
@@ -614,7 +645,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         Population.POPULATION_WELL_TYPE_FIRST_NAME = 3;
         Population.POPULATION_ID_COUNTER = 100; // 0 and 1 are reserved for above population identifiers
         return Population;
-    })();
+    }());
     exports.Population = Population;
     // Field selection coordinates.
     var SelectionCoordinates = (function () {
@@ -682,7 +713,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return new SelectionCoordinates(data['dataSet'], data['population'], data['object'], WellCoordinates.fromJSON(data['well']), data['plate'], data['probeColumns'], data['probeCoordinates'], data['wellFilter']);
         };
         return SelectionCoordinates;
-    })();
+    }());
     exports.SelectionCoordinates = SelectionCoordinates;
     var DataSetInfo = (function () {
         //wellSelections: WellSelection[];
@@ -707,7 +738,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             //];
         }
         return DataSetInfo;
-    })();
+    }());
     exports.DataSetInfo = DataSetInfo;
     var WellClusterShares = (function (_super) {
         __extends(WellClusterShares, _super);
@@ -727,14 +758,18 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 });
             });
             //delete this.wellIndex[0];
-            this.maxPlateObjectCount = (this.wellIndex[Population.POPULATION_TOTAL_NAME] || []).map(function (plt) { return _.max(_.flattenDeep(plt)); });
+            this.maxPlateObjectCount = (this.wellIndex[Population.POPULATION_TOTAL_NAME] || [])
+                .map(function (plt) { return _.max(_.flattenDeep(plt)); });
             // Missing wells have zero of everything.
             //this.wellIndex = this.wellIndex.map(p => p.map(plt => plt.map(col => Vector.invalidToZero(col))));
             // Share statistics.
             this.shareStatistics = this.wellIndex.map(function (pShares) { return math.statistics(Vector.invalidToZero(_.flattenDeep(pShares))); });
             // z-scores of all wells, indexed by population, plate, column, and row.
             this.zScores = [];
-            this.wellIndex.forEach(function (pS, pI) { return _this.zScores[pI] = pS.map(function (plS) { return plS.map(function (cS) { return cS.map(function (s) { return (s - _this.shareStatistics[pI].mean) / _this.shareStatistics[pI].standardDeviation; }); }); }); });
+            this.wellIndex.forEach(function (pS, pI) { return _this.zScores[pI] = pS.map(function (plS) { return plS.map(function (cS) {
+                return cS.map(function (s) { return (s - _this.shareStatistics[pI].mean) /
+                    _this.shareStatistics[pI].standardDeviation; });
+            }); }); });
             this.zScoresMin = [];
             this.zScoresMax = [];
             this.zScores.forEach(function (p, pI) {
@@ -767,7 +802,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return (((this.zScores[population] || [])[plate] || [])[well.column] || [])[well.row] || null;
         };
         return WellClusterShares;
-    })(NumberFrame);
+    }(NumberFrame));
     exports.WellClusterShares = WellClusterShares;
     var WellAnnotations = (function (_super) {
         __extends(WellAnnotations, _super);
@@ -832,7 +867,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         WellAnnotations.ANNOTATION_SPLIT = "|";
         return WellAnnotations;
-    })(DataFrame);
+    }(DataFrame));
     exports.WellAnnotations = WellAnnotations;
     var FeatureHistograms = (function () {
         function FeatureHistograms(dict) {
@@ -842,7 +877,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             _.keys(dict).map(function (k) { return _this.histograms[k] = new DataFrame(dict[k]).normalize(false, true); });
         }
         return FeatureHistograms;
-    })();
+    }());
     exports.FeatureHistograms = FeatureHistograms;
     // Wells by column and row coordinates.
     var WellCoordinates = (function () {
@@ -868,7 +903,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return _.flatten(columns.map(function (c) { return _.range(0, rowCount).map(function (r) { return new WellCoordinates(c, r); }); }));
         };
         return WellCoordinates;
-    })();
+    }());
     exports.WellCoordinates = WellCoordinates;
     // Well by plate, column, and row coordinates.
     var WellLocation = (function (_super) {
@@ -912,7 +947,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return this.imgArrived ? this.img : null;
         };
         return WellLocation;
-    })(WellCoordinates);
+    }(WellCoordinates));
     exports.WellLocation = WellLocation;
     var WellSelection = (function () {
         function WellSelection(category, tag, plate, wells) {
@@ -922,7 +957,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.wells = wells;
         }
         return WellSelection;
-    })();
+    }());
     exports.WellSelection = WellSelection;
     var HistogramMatrix = (function () {
         function HistogramMatrix(matrixMap) {
@@ -933,7 +968,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return (this.matrices[xFeature] || {})[yFeature] || null;
         };
         return HistogramMatrix;
-    })();
+    }());
     exports.HistogramMatrix = HistogramMatrix;
 });
 //# sourceMappingURL=model.js.map

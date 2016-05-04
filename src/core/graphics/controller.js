@@ -1,5 +1,6 @@
 /// <reference path="view.ts" />
-define(["require", "exports", 'bacon', '../collection', './view', '../dataprovider'], function (require, exports, bacon, collection, view, data) {
+define(["require", "exports", 'bacon', '../collection'], function (require, exports, bacon, collection) {
+    "use strict";
     // Controller.
     var Controller = (function () {
         function Controller(view) {
@@ -14,10 +15,12 @@ define(["require", "exports", 'bacon', '../collection', './view', '../dataprovid
                 // Alter model copy with separate mutations.
                 //mutations.forEach(mut => mut(event, this.model));
                 // Alter model copy with mutations that are defined at snippet.
-                event.onMouse(function (me) { return me.hits.forEach(function (hit) {
-                    if (event.type in hit.snippet)
-                        hit.snippet[event.type](_this.model, event, hit.local);
-                }); });
+                event.onMouse(function (me) {
+                    return me.hits.forEach(function (hit) {
+                        if (event.type in hit.snippet)
+                            hit.snippet[event.type](_this.model, event, hit.local);
+                    });
+                });
                 //this.model.proxy();
                 return _this.model;
             }).skipDuplicates().throttle(250);
@@ -37,7 +40,7 @@ define(["require", "exports", 'bacon', '../collection', './view', '../dataprovid
             this.modelBus.push(this.model);
         };
         return Controller;
-    })();
+    }());
     exports.Controller = Controller;
 });
 // Mutation of a data model.

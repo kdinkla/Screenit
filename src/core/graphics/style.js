@@ -1,4 +1,5 @@
 define(["require", "exports"], function (require, exports) {
+    "use strict";
     // Font configuration.
     var Font = (function () {
         function Font(size, wrapLength) {
@@ -12,7 +13,8 @@ define(["require", "exports"], function (require, exports) {
             return this.string;
         };
         Font.prototype.width = function (text) {
-            var canvas = Font.textCanvas || (Font.textCanvas = document.createElement("canvas"));
+            var canvas = Font.textCanvas ||
+                (Font.textCanvas = document.createElement("canvas"));
             var context = canvas.getContext("2d");
             context.font = this.toString();
             var metrics = context.measureText(text);
@@ -47,7 +49,7 @@ define(["require", "exports"], function (require, exports) {
             return [maxLineLength, lines.length * this.size];
         };
         return Font;
-    })();
+    }());
     exports.Font = Font;
     // RGB color in [0..255] (maps to CSS rgb string).
     var Color = (function () {
@@ -122,9 +124,16 @@ define(["require", "exports"], function (require, exports) {
             new Color(166, 86, 40),
             new Color(247, 129, 191)
         ];
-        Color.colorMapNominal8 = [new Color(228, 26, 28), new Color(55, 126, 184), new Color(77, 175, 74), new Color(152, 78, 163), new Color(255, 127, 0), new Color(255, 255, 51), new Color(166, 86, 40), new Color(247, 129, 191)];
+        Color.colorMapNominal8 = [new Color(228, 26, 28),
+            new Color(55, 126, 184),
+            new Color(77, 175, 74),
+            new Color(152, 78, 163),
+            new Color(255, 127, 0),
+            new Color(255, 255, 51),
+            new Color(166, 86, 40),
+            new Color(247, 129, 191)];
         return Color;
-    })();
+    }());
     exports.Color = Color;
 });
 //# sourceMappingURL=style.js.map

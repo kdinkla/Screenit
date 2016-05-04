@@ -1,13 +1,13 @@
 /// <reference path='../collection.ts' />
 /// <reference path='../math.ts' />
 /// <reference path='style.ts' />
-var __extends = this.__extends || function (d, b) {
+var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", 'lodash', '../collection', './style', '../math', '../dataprovider'], function (require, exports, _, collection, style, math, data) {
+define(["require", "exports", 'lodash', '../collection', '../math'], function (require, exports, _, collection, math) {
+    "use strict";
     var identify = collection.identify;
     var Vector = math.Vector;
     // Canvas view that supports state transitions while drawing a model of type M.
@@ -50,11 +50,18 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
                 console.log("Mouse click as stream!");
             });*/
             document.oncontextmenu = function () { return false; }; // Circumvent mouse context menu.
-            this.mouseClick = Bacon.fromEventTarget(this.canvas, 'click').map(function (e) { return new ViewMouseEvent(e, 'mouseClick', _this.mousePos, _this.hits); });
-            this.mouseDown = Bacon.fromEventTarget(this.canvas, 'mousedown').map(function (e) { return new ViewMouseEvent(e, 'mouseDown', _this.mousePos, _this.hits); });
-            this.mouseUp = Bacon.fromEventTarget(this.canvas, 'mouseup').map(function (e) { return new ViewMouseEvent(e, 'mouseUp', _this.mousePos, _this.hits); });
-            this.mouseDrag = Bacon.fromEventTarget(this.canvas, 'mousemove').filter(function (e) { return _this.detectLeftButton(e); }).map(function (e) { return new ViewMouseEvent(e, 'mouseDrag', _this.mousePos, _this.hits); });
-            this.mouseMove = Bacon.fromEventTarget(this.canvas, 'mousemove').filter(function (e) { return !_this.detectLeftButton(e); }).map(function (e) { return new ViewMouseEvent(e, 'mouseMove', _this.mousePos, _this.hits); });
+            this.mouseClick = Bacon.fromEventTarget(this.canvas, 'click')
+                .map(function (e) { return new ViewMouseEvent(e, 'mouseClick', _this.mousePos, _this.hits); });
+            this.mouseDown = Bacon.fromEventTarget(this.canvas, 'mousedown')
+                .map(function (e) { return new ViewMouseEvent(e, 'mouseDown', _this.mousePos, _this.hits); });
+            this.mouseUp = Bacon.fromEventTarget(this.canvas, 'mouseup')
+                .map(function (e) { return new ViewMouseEvent(e, 'mouseUp', _this.mousePos, _this.hits); });
+            this.mouseDrag = Bacon.fromEventTarget(this.canvas, 'mousemove')
+                .filter(function (e) { return _this.detectLeftButton(e); })
+                .map(function (e) { return new ViewMouseEvent(e, 'mouseDrag', _this.mousePos, _this.hits); });
+            this.mouseMove = Bacon.fromEventTarget(this.canvas, 'mousemove')
+                .filter(function (e) { return !_this.detectLeftButton(e); })
+                .map(function (e) { return new ViewMouseEvent(e, 'mouseMove', _this.mousePos, _this.hits); });
             $(document).on("keydown", function (e) {
                 if (e.which === 8 && !$(e.target).is("input:not([readonly]), textarea")) {
                     e.preventDefault();
@@ -69,8 +76,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
                 this.mouseUp,
                 this.mouseDrag,
                 this.mouseMove,
-                this.keyPress
-            ]);
+                this.keyPress]);
         }
         View.prototype.update = function (model) {
             var _this = this;
@@ -115,7 +121,9 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             man.snippetList.forEach(function (sV) {
                 // Fade in.
                 if (sV.drawn) {
-                    sV.presence = sV.transitioning ? Math.min(1, sV.presence + man.dT / DrawManager.pD) : 1;
+                    sV.presence = sV.transitioning ?
+                        Math.min(1, sV.presence + man.dT / DrawManager.pD) :
+                        1;
                 }
                 else {
                     // Remove.
@@ -123,7 +131,9 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
                         toRemove.push(sV);
                     }
                     else {
-                        sV.presence = sV.transitioning ? sV.presence - man.dT / DrawManager.pD : 0;
+                        sV.presence = sV.transitioning ?
+                            sV.presence - man.dT / DrawManager.pD :
+                            0;
                     }
                 }
             });
@@ -146,7 +156,9 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
                     context.setTransform(t[0], t[1], t[2], t[3], t[4], t[5]);
                     // Draw snippet, push to back.
                     if (sV.args) {
-                        sV.args.forEach(function (as) { return viewContext.snippet.apply(viewContext, _.union([sV.instance], as)); });
+                        sV.args.forEach(function (as) {
+                            return viewContext.snippet.apply(viewContext, _.union([sV.instance], as));
+                        });
                     }
                     else
                         viewContext.snippet(sV.instance);
@@ -169,7 +181,13 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         };
         View.prototype.correctHighDPI = function (context) {
             this.pixelRatio = window.devicePixelRatio || 1; // Device pixel ratio, fallback to 1.
-            this.storeRatio = context['webkitBackingStorePixelRatio'] || context['mozBackingStorePixelRatio'] || context['msBackingStorePixelRatio'] || context['oBackingStorePixelRatio'] || context['backingStorePixelRatio'] || 1;
+            this.storeRatio =
+                context['webkitBackingStorePixelRatio'] ||
+                    context['mozBackingStorePixelRatio'] ||
+                    context['msBackingStorePixelRatio'] ||
+                    context['oBackingStorePixelRatio'] ||
+                    context['backingStorePixelRatio'] ||
+                    1;
             var scaleRatio = this.pixelRatio / this.storeRatio; // Determine the actual ratio we want to draw at.
             // Scale up area of canvas.
             this.canvas.width = Math.ceil(this.content.offsetWidth * scaleRatio);
@@ -188,7 +206,12 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             var buffer = document.createElement('canvas');
             var ctx = buffer.getContext('2d');
             var pixelRatio = window.devicePixelRatio || 1; // Device pixel ratio, fallback to 1.
-            var storeRatio = ctx['webkitBackingStorePixelRatio'] || ctx['mozBackingStorePixelRatio'] || ctx['msBackingStorePixelRatio'] || ctx['oBackingStorePixelRatio'] || ctx['backingStorePixelRatio'] || 1;
+            var storeRatio = ctx['webkitBackingStorePixelRatio'] ||
+                ctx['mozBackingStorePixelRatio'] ||
+                ctx['msBackingStorePixelRatio'] ||
+                ctx['oBackingStorePixelRatio'] ||
+                ctx['backingStorePixelRatio'] ||
+                1;
             var scaleRatio = pixelRatio / storeRatio;
             buffer.width = Math.ceil(width * scaleRatio);
             buffer.height = Math.ceil(height * scaleRatio);
@@ -220,7 +243,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             return [this.content.offsetWidth, this.content.offsetHeight];
         };
         return View;
-    })();
+    }());
     exports.View = View;
     // Request animation frame fallback
     window["requestAnimFrame"] = window.requestAnimationFrame || (function (cb) { return window.setTimeout(cb, 1000 / 30); });
@@ -229,14 +252,11 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             this.event = event;
             this.type = type;
         }
-        ViewEvent.prototype.onMouse = function (action) {
-        };
-        ViewEvent.prototype.onResize = function (action) {
-        };
-        ViewEvent.prototype.onKey = function (action) {
-        };
+        ViewEvent.prototype.onMouse = function (action) { };
+        ViewEvent.prototype.onResize = function (action) { };
+        ViewEvent.prototype.onKey = function (action) { };
         return ViewEvent;
-    })();
+    }());
     exports.ViewEvent = ViewEvent;
     var ViewMouseEvent = (function (_super) {
         __extends(ViewMouseEvent, _super);
@@ -256,7 +276,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             action(this, this.position, this.topHit ? this.topHit.snippet.toString() : null, this.hits);
         };
         return ViewMouseEvent;
-    })(ViewEvent);
+    }(ViewEvent));
     exports.ViewMouseEvent = ViewMouseEvent;
     var MouseHit = (function () {
         function MouseHit(snippet, local, // Local mouse position.
@@ -267,7 +287,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             this.normalized = normalized;
         }
         return MouseHit;
-    })();
+    }());
     var ViewResizeEvent = (function (_super) {
         __extends(ViewResizeEvent, _super);
         function ViewResizeEvent(dimensions) {
@@ -279,7 +299,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             action(this.dimensions);
         };
         return ViewResizeEvent;
-    })(ViewEvent);
+    }(ViewEvent));
     exports.ViewResizeEvent = ViewResizeEvent;
     var ViewKeyEvent = (function (_super) {
         __extends(ViewKeyEvent, _super);
@@ -292,7 +312,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             action(this.event);
         };
         return ViewKeyEvent;
-    })(ViewEvent);
+    }(ViewEvent));
     exports.ViewKeyEvent = ViewKeyEvent;
     // Manages the interpolation for a view.
     var DrawManager = (function () {
@@ -303,7 +323,7 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         DrawManager.mD = 100; // Movement duration.
         DrawManager.pD = 500; // Presence duration.
         return DrawManager;
-    })();
+    }());
     // Additional information that is maintained for a snippet during its lifespan.
     var SnippetValues = (function () {
         function SnippetValues() {
@@ -316,14 +336,14 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             this.args = []; // All instance call arguments.
         }
         return SnippetValues;
-    })();
+    }());
     var Intermediate = (function () {
         function Intermediate(value, change) {
             this.value = value;
             this.change = change;
         }
         return Intermediate;
-    })();
+    }());
     var ViewContext = (function () {
         function ViewContext(context, manager, dimensions, // Canvas dimensions.
             mouse // Absolute mouse position.
@@ -381,7 +401,9 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             if (!snippets)
                 return;
             if (args.length)
-                snippets.forEach(function (s) { return _this.snippet.apply(_this, _.flatten([s, args], true)); });
+                snippets.forEach(function (s) {
+                    return _this.snippet.apply(_this, _.flatten([s, args], true));
+                });
             else
                 snippets.forEach(function (s) { return _this.snippet(s); });
         };
@@ -414,14 +436,25 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         };
         // Interpolate color to CSS string.
         ViewContext.prototype.tColor = function (color) {
-            return "rgba(" + Math.round(this.t(color.r)) + "," + Math.round(this.t(color.g)) + "," + Math.round(this.t(color.b)) + "," + (this.t(color.a) * (this.sV ? this.sV.presence : 0)).toFixed(2) + ")";
+            return "rgba(" +
+                Math.round(this.t(color.r)) + "," +
+                Math.round(this.t(color.g)) + "," +
+                Math.round(this.t(color.b)) + "," +
+                // Transparency by presence.
+                (this.t(color.a) * (this.sV ? this.sV.presence : 0)).toFixed(2) + ")";
         };
         // Update mouse position in local space.
         ViewContext.prototype.updateMouse = function () {
             var t = this.context['getTransform']();
             var d = 1 / (t[0] * t[3] - t[1] * t[2]);
-            var iT = [d * t[3], d * -t[1], d * -t[2], d * t[0], d * (t[2] * t[5] - t[3] * t[4]), d * (t[1] * t[4] - t[0] * t[5])];
-            this.mouseR = [this.mouse[0] * iT[0] + this.mouse[1] * iT[2] + iT[4], this.mouse[0] * iT[1] + this.mouse[1] * iT[3] + iT[5]];
+            var iT = [d * t[3],
+                d * -t[1],
+                d * -t[2],
+                d * t[0],
+                d * (t[2] * t[5] - t[3] * t[4]),
+                d * (t[1] * t[4] - t[0] * t[5])];
+            this.mouseR = [this.mouse[0] * iT[0] + this.mouse[1] * iT[2] + iT[4],
+                this.mouse[0] * iT[1] + this.mouse[1] * iT[3] + iT[5]];
         };
         // Push mouse hit, if there is a snippet.
         ViewContext.prototype.pushHit = function (normalized) {
@@ -480,7 +513,8 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
         ViewContext.prototype.fillRect = function (x, y, w, h) {
             this.context.fillRect(this.t(x), this.t(y), this.t(w), this.t(h));
             // Mouse hit.
-            if (x <= this.mouseR[0] && y <= this.mouseR[1] && this.mouseR[0] <= x + w && this.mouseR[1] <= y + h)
+            if (x <= this.mouseR[0] && y <= this.mouseR[1] &&
+                this.mouseR[0] <= x + w && this.mouseR[1] <= y + h)
                 this.pushHit([this.mouseR[0] / w, this.mouseR[1] / h]);
         };
         ViewContext.prototype.strokeRoundRect = function (x, y, width, height, radius) {
@@ -565,7 +599,8 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             this.context.fillText(text, this.t(x), this.t(y));
             // Mouse hit.
             var w = this.context.measureText(text).width;
-            if (x <= this.mouseR[0] && y - this.fontHeight <= this.mouseR[1] && this.mouseR[0] <= x + w && this.mouseR[1] <= y)
+            if (x <= this.mouseR[0] && y - this.fontHeight <= this.mouseR[1] &&
+                this.mouseR[0] <= x + w && this.mouseR[1] <= y)
                 this.pushHit();
         };
         ViewContext.prototype.strokeText = function (text, x, y) {
@@ -574,7 +609,8 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             this.context.strokeText(text, this.t(x), this.t(y));
             // Mouse hit.
             var w = this.context.measureText(text).width;
-            if (x <= this.mouseR[0] && y - this.fontHeight <= this.mouseR[1] && this.mouseR[0] <= x + w && this.mouseR[1] <= y)
+            if (x <= this.mouseR[0] && y - this.fontHeight <= this.mouseR[1] &&
+                this.mouseR[0] <= x + w && this.mouseR[1] <= y)
                 this.pushHit();
         };
         ViewContext.prototype.textAlign = function (align) {
@@ -593,7 +629,8 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
                 this.context.globalAlpha = Math.max(0, this.sV.presence);
                 this.context.drawImage(img, this.t(pos[0]), this.t(pos[1]));
                 // Mouse hit.
-                if (pos[0] <= this.mouseR[0] && pos[1] <= this.mouseR[1] && this.mouseR[0] <= pos[0] + img.width && this.mouseR[1] <= pos[1] + img.height)
+                if (pos[0] <= this.mouseR[0] && pos[1] <= this.mouseR[1] &&
+                    this.mouseR[0] <= pos[0] + img.width && this.mouseR[1] <= pos[1] + img.height)
                     this.pushHit();
                 this.context.globalAlpha = oldAlpha;
             }
@@ -603,23 +640,26 @@ define(["require", "exports", 'lodash', '../collection', './style', '../math', '
             this.context.globalAlpha = Math.max(0, this.sV.presence);
             this.context.drawImage(img, this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
             // Mouse hit.
-            if (pos[0] <= this.mouseR[0] && pos[1] <= this.mouseR[1] && this.mouseR[0] <= pos[0] + dim[0] && this.mouseR[1] <= pos[1] + dim[1])
+            if (pos[0] <= this.mouseR[0] && pos[1] <= this.mouseR[1] &&
+                this.mouseR[0] <= pos[0] + dim[0] && this.mouseR[1] <= pos[1] + dim[1])
                 this.pushHit();
             this.context.globalAlpha = oldAlpha;
         };
         ViewContext.prototype.drawImageClipped = function (img, spos, sdim, pos, dim) {
             var oldAlpha = this.context.globalAlpha;
             this.context.globalAlpha = Math.max(0, this.sV.presence);
-            this.context.drawImage(img, spos[0], spos[1], sdim[0], sdim[1], this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
+            this.context.drawImage(img, spos[0], spos[1], sdim[0], sdim[1], //this.t(spos[0]), this.t(spos[1]), this.t(sdim[0]), this.t(sdim[1]),
+            this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
             // Correct mouse coordinates for image scaling.
             this.mouseR = [this.mouseR[0] * sdim[0] / dim[0], this.mouseR[1] * sdim[1] / dim[1]];
             // Mouse hit. TODO: scale.
-            if (pos[0] <= this.mouseR[0] && pos[1] <= this.mouseR[1] && this.mouseR[0] <= pos[0] + sdim[0] && this.mouseR[1] <= pos[1] + sdim[1])
+            if (pos[0] <= this.mouseR[0] && pos[1] <= this.mouseR[1] &&
+                this.mouseR[0] <= pos[0] + sdim[0] && this.mouseR[1] <= pos[1] + sdim[1])
                 this.pushHit();
             this.context.globalAlpha = oldAlpha;
         };
         return ViewContext;
-    })();
+    }());
     exports.ViewContext = ViewContext;
     /**
      * Get transformation addition.

@@ -1,11 +1,11 @@
 /// <reference path="references.d.ts"/>
-var __extends = this.__extends || function (d, b) {
+var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", 'jsts', './model', './core/graphics/view', './core/graphics/snippet', './configuration', './core/math', './core/dataframe', './core/graphics/style'], function (require, exports, jsts, model, view, snippet, config, math, dataframe, style) {
+define(["require", "exports", 'jsts', './model', './core/graphics/view', './core/graphics/snippet', './configuration', './core/math', './core/graphics/style'], function (require, exports, jsts, model, view, snippet, config, math, style) {
+    "use strict";
     var Population = model.Population;
     var WellCoordinates = model.WellCoordinates;
     var View = view.View;
@@ -40,7 +40,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = state.configuration;
             var constructors = viewConstructors(); // All panel constructors.
             // Active panels.
-            var openPanels = model.viewCycle.map(function (ov) { return new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)); });
+            var openPanels = model.viewCycle.map(function (ov) {
+                return new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov));
+            });
             this.panelColumns = new List("pnlCols", openPanels, [0, 0], [0, 0], 'horizontal', cfg.panelSpace, 'left');
             //console.log("State:");
             //console.log(state);
@@ -74,16 +76,17 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             c.restore();
         };
         return OverView;
-    })(View);
+    }(View));
     exports.OverView = OverView;
     var ColumnPanel = (function (_super) {
         __extends(ColumnPanel, _super);
         function ColumnPanel(identifier, core, state, opened) {
             if (opened === void 0) { opened = false; }
-            _super.call(this, "cp_" + identifier, _.union([new ColumnLabel(identifier, core['toString'](opened), opened, state)], opened ? [core] : []), [0, 0], [0, 0], 'vertical', state.configuration.panelSpace, 'middle');
+            _super.call(this, "cp_" + identifier, _.union([new ColumnLabel(identifier, core['toString'](opened), opened, state)], opened ? [core] : []), //[new Label("hdr_" + identifier, core.toString(), [0,0], state.configuration.panelHeaderLabel), core],
+            [0, 0], [0, 0], 'vertical', state.configuration.panelSpace, 'middle');
         }
         return ColumnPanel;
-    })(List);
+    }(List));
     var ColumnLabel = (function (_super) {
         __extends(ColumnLabel, _super);
         function ColumnLabel(viewIdentifier, text, opened, state) {
@@ -113,18 +116,20 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
         };
         return ColumnLabel;
-    })(Label);
+    }(Label));
     var DataSetList = (function (_super) {
         __extends(DataSetList, _super);
         function DataSetList(state) {
-            _super.call(this, "dataSetList", state.dataSets.value.filter(function (ds) { return ds !== state.selectedCoordinates.dataSet; }).map(function (ds) { return new DataSetLabel(ds, state); }), [0, 0], [0, 0], 'vertical', state.configuration.featureCellSpace[0]);
+            _super.call(this, "dataSetList", state.dataSets.value
+                .filter(function (ds) { return ds !== state.selectedCoordinates.dataSet; })
+                .map(function (ds) { return new DataSetLabel(ds, state); }), [0, 0], [0, 0], 'vertical', state.configuration.featureCellSpace[0]);
             this.state = state;
         }
         DataSetList.prototype.toString = function () {
             return "Screen: " + this.state.selectedCoordinates.dataSet;
         };
         return DataSetList;
-    })(List);
+    }(List));
     var DataSetLabel = (function (_super) {
         __extends(DataSetLabel, _super);
         function DataSetLabel(dataSet, state) {
@@ -136,7 +141,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.pushView('plates');
         };
         return DataSetLabel;
-    })(Label);
+    }(Label));
     var FeatureHistogramTable = (function (_super) {
         __extends(FeatureHistogramTable, _super);
         function FeatureHistogramTable(state) {
@@ -164,7 +169,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Features";
         };
         return FeatureHistogramTable;
-    })(List);
+    }(List));
     var FeatureList = (function (_super) {
         __extends(FeatureList, _super);
         function FeatureList(identifier, state, construct, align) {
@@ -172,11 +177,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             _super.call(this, identifier, state.features.value.map(function (f) { return new construct(f, state); }), [0, 0], [0, 0], 'vertical', state.configuration.featureCellSpace[1], align);
         }
         return FeatureList;
-    })(List);
+    }(List));
     var FeatureLabel = (function (_super) {
         __extends(FeatureLabel, _super);
         function FeatureLabel(feature, state) {
-            _super.call(this, "ftrLbl" + feature, feature, [0, 0], new LabelStyle(state.configuration.featureFont, state.populationSpace.features.has(feature) ? state.configuration.base : state.configuration.baseDim, 'left', 'top'), true);
+            _super.call(this, "ftrLbl" + feature, feature, [0, 0], new LabelStyle(state.configuration.featureFont, state.populationSpace.features.has(feature) ?
+                state.configuration.base :
+                state.configuration.baseDim, 'left', 'top'), true);
             this.feature = feature;
         }
         FeatureLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
@@ -184,7 +191,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             //interaction.pushView('splom');
         };
         return FeatureLabel;
-    })(Label);
+    }(Label));
     var FeatureHistogram = (function (_super) {
         __extends(FeatureHistogram, _super);
         function FeatureHistogram(feature, state) {
@@ -254,7 +261,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.selectedCoordinates.switchProbe([this.feature], [coordinates[0]]);
         };
         return FeatureHistogram;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var FeatureParallelCoordinates = (function (_super) {
         __extends(FeatureParallelCoordinates, _super);
         function FeatureParallelCoordinates(state) {
@@ -263,8 +270,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = state.configuration;
             this.setDimensions([
                 cfg.featureCellDimensions[0],
-                state.features.value.length * (cfg.featureCellDimensions[1] + cfg.featureCellSpace[1]) - cfg.featureCellSpace[1]
-            ]);
+                state.features.value.length * (cfg.featureCellDimensions[1] + cfg.featureCellSpace[1]) - cfg.featureCellSpace[1]]);
         }
         FeatureParallelCoordinates.prototype.paint = function (context) {
             var _this = this;
@@ -277,7 +283,11 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             //var allObjects = state.objectInfo.value.rows;
             //var genStroke = new Color(0, 0, 0, 0.05);
             //allObjects.forEach(ob => this.paintPolyLine(context, ob.toString(), genStroke));
-            populations.forEach(function (p) { return p.exemplars.elements.forEach(function (pE) { return _this.paintPolyLine(context, pE.toString(), state.populationColorTranslucent(p)); }); });
+            populations.forEach(function (p) {
+                return p.exemplars.elements.forEach(function (pE) {
+                    return _this.paintPolyLine(context, pE.toString(), state.populationColorTranslucent(p));
+                });
+            });
             var focusedObject = state.focused().object;
             if (focusedObject !== null) {
                 this.paintPolyLine(context, focusedObject.toString(), cfg.backgroundColor, 4);
@@ -308,7 +318,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             }
         };
         return FeatureParallelCoordinates;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var Splom = (function (_super) {
         __extends(Splom, _super);
         function Splom(model) {
@@ -317,7 +327,12 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = model.configuration;
             var features = model.populationSpace.features.elements;
             // Model feature histograms.
-            this.plots = features.map(function (f1, i1) { return features.map(function (f2, i2) { return i1 < i2 ? new ObjectFeaturePlot(f1, f2, [0, 0], model, cfg, model.objectHistogramSize, i2 === features.length - 1, i1 === 0) : null; }); });
+            this.plots = features
+                .map(function (f1, i1) { return features.map(function (f2, i2) {
+                return i1 < i2 ?
+                    new ObjectFeaturePlot(f1, f2, [0, 0], model, cfg, model.objectHistogramSize, i2 === features.length - 1, i1 === 0) :
+                    null;
+            }); });
             // Optional MDS plot.
             if (model.objectHistograms.value.matricesFor("mds0", "mds1")) {
                 this.mdsPlot = new ObjectFeaturePlot("mds0", "mds1", [0, 0], model, cfg, model.objectHistogramSize, false, false, "Landscape");
@@ -335,7 +350,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     var tPCI = Math.max(0, pCI);
                     var t2PRI = Math.max(0, pRI - 1);
                     if (p)
-                        p.topLeft = Vector.add(marginTopLeft, [pCI * _this.model.objectHistogramSize + tPCI * cfg.splomSpace, (pRI - 1) * _this.model.objectHistogramSize + t2PRI * cfg.splomSpace]);
+                        p.topLeft = Vector.add(marginTopLeft, [pCI * _this.model.objectHistogramSize + tPCI * cfg.splomSpace,
+                            (pRI - 1) * _this.model.objectHistogramSize + t2PRI * cfg.splomSpace]);
                 }); });
             }
             if (this.mdsPlot) {
@@ -351,7 +367,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Space";
         };
         return Splom;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var ObjectFeaturePlot = (function (_super) {
         __extends(ObjectFeaturePlot, _super);
         function ObjectFeaturePlot(feature1, feature2, topLeft, model, configuration, size, columnLabel, rowLabel, headerLabel) {
@@ -435,12 +451,14 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var y = objectFeatures.columnVector(this.feature2) || [];
             //var clstr = mod.clusters.value;
             // Large colored dots with halo for representatives.
-            mod.populationSpace.populations.forEach(function (pop) { return pop.exemplars.forEach(function (ex) {
-                //var cI = clstr.clusterMap[pop.identifier];
-                //var color = cI >= 0 ? cfg.clusterColors[clstr.identifierIndex[cI]] : Color.NONE;
-                var oI = objectFeatures.rowIndex[ex];
-                ObjectFeaturePlot.drawBigDot(context, cfg, _this.model.populationColor(pop), x[oI] * size, (1 - y[oI]) * size);
-            }); });
+            mod.populationSpace.populations.forEach(function (pop) {
+                return pop.exemplars.forEach(function (ex) {
+                    //var cI = clstr.clusterMap[pop.identifier];
+                    //var color = cI >= 0 ? cfg.clusterColors[clstr.identifierIndex[cI]] : Color.NONE;
+                    var oI = objectFeatures.rowIndex[ex];
+                    ObjectFeaturePlot.drawBigDot(context, cfg, _this.model.populationColor(pop) /*pop.color*/, x[oI] * size, (1 - y[oI]) * size);
+                });
+            });
             // Color dot for hovered object.
             var focusedObject = mod.focused().object;
             if (focusedObject !== null) {
@@ -494,7 +512,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.selectedCoordinates.switchProbe([this.feature1, this.feature2], invCs);
         };
         return ObjectFeaturePlot;
-    })(BaseSnippet);
+    }(BaseSnippet));
     var ExemplarTable = (function (_super) {
         __extends(ExemplarTable, _super);
         function ExemplarTable(state) {
@@ -518,16 +536,20 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             //var transferButtons = new List("PopulationTransfers",
             //        mainPopulations.map((p, pI) => new PopulationTransferEdit(p, state, pI === 0)),
             //        [0,0], [0,0], 'horizontal', cfg.exemplarColumnSpace, 'left');
-            var selectedObjectDetailView = exemplarSelected ? new ObjectDetailView(state.focused().object, state, [0, 0]) : null;
-            var segSnippets = _.compact([activeTypeLabel, activeTypeLabels, exemplarLabel, selectedObjectDetailView, columns]);
+            var selectedObjectDetailView = exemplarSelected ?
+                new ObjectDetailView(state.focused().object, state, [0, 0]) :
+                null;
+            var segSnippets = _.compact([activeTypeLabel, activeTypeLabels,
+                exemplarLabel, selectedObjectDetailView, columns]);
             var shownSegment = new List("ShownSegments", segSnippets, [0, 0], [0, 0], 'vertical', cfg.subPanelSpace);
             // Hidden types.
             var hiddenSegment = [];
             //if(state.populationSpace.inactivePopulations.length > 0) {
             var hiddenTypeLabel = new Label("HiddenLbl", "Hidden", [0, 0], state.configuration.subPanelHeaderLabel, true);
-            var hiddenTypeStack = new List("HiddenTypeColumn", _.union(state.populationSpace.inactivePopulations.elements.map(function (ip) { return new TypeLabel(ip, state); }), state.isExemplarSelected() ? [
-                new ExemplarAdditionButton(state.focused().object, state.populationSpace.allPopulations().byId(Population.POPULATION_UNCONFIDENT_NAME), state)
-            ] : []), [0, 0], [cfg.clusterTileInnerSize, 0], 'vertical', cfg.exemplarColumnSpace, 'middle');
+            var hiddenTypeStack = new List("HiddenTypeColumn", _.union(state.populationSpace.inactivePopulations.elements.map(function (ip) { return new TypeLabel(ip, state); }), state.isExemplarSelected() ?
+                [
+                    new ExemplarAdditionButton(state.focused().object, state.populationSpace.allPopulations().byId(Population.POPULATION_UNCONFIDENT_NAME), state)
+                ] : []), [0, 0], [cfg.clusterTileInnerSize, 0], 'vertical', cfg.exemplarColumnSpace, 'middle');
             hiddenSegment.push(new List("HiddenSegments", [hiddenTypeLabel, hiddenTypeStack], [0, 0], [0, 0], 'vertical', cfg.subPanelSpace));
             //}
             // Combine shown and hidden segment columns.
@@ -546,7 +568,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Phenotypes";
         };
         return ExemplarTable;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var ExemplarAdditionButton = (function (_super) {
         __extends(ExemplarAdditionButton, _super);
         function ExemplarAdditionButton(object, population, state) {
@@ -593,29 +615,33 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.populationSpace.addExemplar(this.object, this.population.identifier);
         };
         return ExemplarAdditionButton;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var ExemplarHeader = (function (_super) {
         __extends(ExemplarHeader, _super);
         function ExemplarHeader(state, population, topLeft) {
             if (topLeft === void 0) { topLeft = [0, 0]; }
-            _super.call(this, "esc_" + population.identifier, _.union([new TypeLabel(population, state)]), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
+            _super.call(this, "esc_" + population.identifier, _.union([new TypeLabel(population, state)] //,
+            ), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
             this.state = state;
             this.population = population;
             this.topLeft = topLeft;
         }
         return ExemplarHeader;
-    })(List);
+    }(List));
     var ExemplarColumn = (function (_super) {
         __extends(ExemplarColumn, _super);
         function ExemplarColumn(state, population, topLeft) {
             if (topLeft === void 0) { topLeft = [0, 0]; }
-            _super.call(this, "esc_" + population.identifier, _.union(state.isExemplarSelected() && (!population.predefined) ? [new ExemplarAdditionButton(state.focused().object, population, state)] : [], population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
+            _super.call(this, "esc_" + population.identifier, _.union(state.isExemplarSelected() &&
+                (!population.predefined /*|| population.identifier === Population.POPULATION_UNCONFIDENT_NAME*/) ?
+                [new ExemplarAdditionButton(state.focused().object, population, state)] :
+                [], population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
             this.state = state;
             this.population = population;
             this.topLeft = topLeft;
         }
         return ExemplarColumn;
-    })(List);
+    }(List));
     var PopulationTransferEdit = (function (_super) {
         __extends(PopulationTransferEdit, _super);
         function PopulationTransferEdit(population, state, leftMost) {
@@ -702,7 +728,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.font(cfg.transferFont.toString());
             context.textBaseline('top');
             context.textAlign('center');
-            context.fillText(this.population.identifier === Population.POPULATION_TOTAL_NAME ? absWellShare + " cells" : (100 * absWellShare).toFixed(0) + "%", wellPnt[0], cfg.transferPlotSize);
+            context.fillText(this.population.identifier === Population.POPULATION_TOTAL_NAME ?
+                absWellShare + " cells" :
+                (100 * absWellShare).toFixed(0) + "%", wellPnt[0], cfg.transferPlotSize);
             context.transitioning = false;
             // Bottom axis labels.
             context.fillStyle(cfg.base);
@@ -737,11 +765,12 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 }
             });
             controlPoints[closestIndex] = coordinates;
+            // Enforce control point x ordering.
             for (var i = 1; i < 3; i++)
                 controlPoints[i][0] = Math.max(controlPoints[i][0], controlPoints[i - 1][0]);
         };
         return PopulationTransferEdit;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var TypeLabel = (function (_super) {
         __extends(TypeLabel, _super);
         function TypeLabel(population, state) {
@@ -790,7 +819,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             });
             context.restore();
             if (canBeHidden) {
-                var actionLbl = this.state.populationSpace.populations.has(this.population) ? 'hide \u25B6' : '\u25C0 show';
+                var actionLbl = this.state.populationSpace.populations.has(this.population) ?
+                    'hide \u25B6' :
+                    '\u25C0 show';
                 context.fillStyle(cfg.baseDim);
                 context.textBaseline('bottom');
                 context.fillText(actionLbl, .5 * this.dimensions[0], this.dimensions[1]);
@@ -802,7 +833,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.populationSpace.toggle(this.population);
         };
         return TypeLabel;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     /*class TypeLabel extends Label {
         constructor(public population: Population,
                     public state: EnrichedState) {
@@ -1082,6 +1113,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var polygon = geometry;
                 var extRing = polygon.getExteriorRing();
                 if (extRing.getCoordinates().length > 2) {
+                    // All rings as paths.
                     for (var i = 0; i < polygon.getNumInteriorRing(); i++) {
                         TemplatePlate.ringToPath(context, polygon.getInteriorRingN(i));
                     }
@@ -1096,7 +1128,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.closePath();
         };
         return AbstractPlate;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var TemplatePlate = (function (_super) {
         __extends(TemplatePlate, _super);
         function TemplatePlate(topLeft, model) {
@@ -1134,7 +1166,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             }
         };
         return TemplatePlate;
-    })(AbstractPlate);
+    }(AbstractPlate));
     var FlowerPlate = (function (_super) {
         __extends(FlowerPlate, _super);
         function FlowerPlate(topLeft, state) {
@@ -1202,7 +1234,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             });
         };
         return FlowerPlate;
-    })(AbstractPlate);
+    }(AbstractPlate));
     var JointWellPlates = (function (_super) {
         __extends(JointWellPlates, _super);
         function JointWellPlates(state) {
@@ -1214,7 +1246,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Plate " + this.state.dataSetInfo.value.plateLabels[focusedPlate];
         };
         return JointWellPlates;
-    })(List);
+    }(List));
     var WellView = (function (_super) {
         __extends(WellView, _super);
         function WellView(state) {
@@ -1223,18 +1255,23 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         }
         WellView.prototype.toString = function (opened) {
             var wellFilter = this.state.selectedCoordinates.wellFilter;
-            return "Wells" + (opened ? ": " + (wellFilter.length > 0 ? wellFilter : "\<press key\>") : "");
+            return "Wells" + (opened ?
+                ": " + (wellFilter.length > 0 ? wellFilter : "\<press key\>") :
+                "");
         };
         return WellView;
-    })(List);
+    }(List));
     var WellListView = (function (_super) {
         __extends(WellListView, _super);
         function WellListView(state) {
-            _super.call(this, "WellDetailView", [WellListView.transferButtons(state), WellListView.tableColumns(state)], [0, 0], [0, 0], 'vertical', state.configuration.subPanelSpace, 'right');
+            _super.call(this, "WellDetailView", [WellListView.transferButtons(state),
+                WellListView.tableColumns(state)], [0, 0], [0, 0], 'vertical', state.configuration.subPanelSpace, 'right');
             this.state = state;
         }
         WellListView.tableColumns = function (state) {
-            var columns = ['plate', 'column', 'row'].map(function (field) { return new WellLocationList(field, WellListView.composeWells(state), state); }).concat(new WellAbundanceList(state, WellListView.composeWells(state), WellListView.buttonsWidth(state)));
+            var columns = ['plate', 'column', 'row']
+                .map(function (field) { return new WellLocationList(field, WellListView.composeWells(state), state); })
+                .concat(new WellAbundanceList(state, WellListView.composeWells(state), WellListView.buttonsWidth(state)));
             return new List("WellDetailColumns", columns, [0, 0], [0, 0], 'horizontal', state.configuration.listColumnSpace, 'left');
         };
         WellListView.buttonsWidth = function (state) {
@@ -1246,14 +1283,17 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = state.configuration;
             var mainPopulations = _.union(state.populationSpace.visiblePopulations().elements, [state.populationSpace.populations.byId(Population.POPULATION_TOTAL_NAME)]);
             //var transferLabel = new Label("PopulationTransfersLbl", "Score", [0,0], cfg.subPanelHeaderLabel, true);
-            var transferButtons = new List("PopulationTransfers", mainPopulations.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var transferButtons = new List("PopulationTransfers", 
+            //_.union<PlacedSnippet>([transferLabel],
+            mainPopulations.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), //),
+            [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
             return transferButtons;
         };
         WellListView.composeWells = function (state) {
             return state.topWells();
         };
         return WellListView;
-    })(List);
+    }(List));
     var WellLocationList = (function (_super) {
         __extends(WellLocationList, _super);
         function WellLocationList(field, wells, state) {
@@ -1261,18 +1301,20 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.state = state;
         }
         return WellLocationList;
-    })(List);
+    }(List));
     var WellLocationLabel = (function (_super) {
         __extends(WellLocationLabel, _super);
         function WellLocationLabel(location, field, state) {
-            _super.call(this, "WL_" + field + "_" + location.toString(), state.dataSetInfo.value[field + "Labels"][location[field]], [0, 0], location.equals(state.selectedCoordinates.location()) ? state.configuration.selectedSideLabel : state.configuration.sideLabel, true);
+            _super.call(this, "WL_" + field + "_" + location.toString(), state.dataSetInfo.value[field + "Labels"][location[field]], [0, 0], location.equals(state.selectedCoordinates.location()) ?
+                state.configuration.selectedSideLabel :
+                state.configuration.sideLabel, true);
             this.location = location;
         }
         WellLocationLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             interaction.selectedCoordinates.switchLocation(this.location);
         };
         return WellLocationLabel;
-    })(Label);
+    }(Label));
     var WellAbundanceList = (function (_super) {
         __extends(WellAbundanceList, _super);
         function WellAbundanceList(state, wells, width) {
@@ -1293,7 +1335,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var clusterShares = this.state.wellClusterShares.value;
             var populations = this.state.populationSpace.visiblePopulations().elements;
             // Per well, population.
-            var shares = populations.map(function (p) { return _this.wells.map(function (well) { return clusterShares.share(p.identifier, well.location); }); });
+            var shares = populations.map(function (p) { return _this.wells.map(function (well) {
+                return clusterShares.share(p.identifier, well.location);
+            }); });
             // Cumulative share, first column is padding.
             var cumulativeShares = [this.wells.map(function (w) { return 0; })];
             populations.forEach(function (p, i) { return cumulativeShares.push(Vector.add(cumulativeShares[i], shares[i])); });
@@ -1310,7 +1354,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     });
                     // Extend ends to close list.
                     if (midCoordinates.length > 0)
-                        midCoordinates = [[midCoordinates[0][0], 0]].concat(midCoordinates).concat([[midCoordinates[midCoordinates.length - 1][0], midCoordinates.length * _this.wellHeight]]);
+                        midCoordinates = [[midCoordinates[0][0], 0]]
+                            .concat(midCoordinates)
+                            .concat([[midCoordinates[midCoordinates.length - 1][0],
+                                midCoordinates.length * _this.wellHeight]]);
                     return midCoordinates;
                 };
                 var preList = listCs(pI);
@@ -1332,7 +1379,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 });
                 // Extend ends to close list.
                 if (cntListCs.length > 0)
-                    cntListCs = [[cntListCs[0][0], 0]].concat(cntListCs).concat([[cntListCs[cntListCs.length - 1][0], cntListCs.length * this.wellHeight]]);
+                    cntListCs = [[cntListCs[0][0], 0]]
+                        .concat(cntListCs)
+                        .concat([[cntListCs[cntListCs.length - 1][0],
+                            cntListCs.length * this.wellHeight]]);
                 this.cntLine = new Line("WellCountLine", cntListCs, Population.POPULATION_TOTAL_COLOR, false);
             }
         };
@@ -1353,7 +1403,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Abundance label.
             context.textAlign('left');
             context.textBaseline('top');
-            context.fillText('% abundance', 0, this.dimensions[1] + cfg.transferFont.size);
+            context.fillText('% share', 0, this.dimensions[1] + cfg.transferFont.size);
             // Maximum abundance at right.
             context.textAlign('right');
             context.textBaseline('top');
@@ -1380,7 +1430,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
         };
         return WellAbundanceList;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var WellDetailView = (function (_super) {
         __extends(WellDetailView, _super);
         function WellDetailView(state) {
@@ -1420,12 +1470,16 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             if (!this.objectMaxRadi) {
                 var objectCoordinates = this.state.focusedWellCoordinates();
                 this.objectMaxRadi = {};
-                _.pairs(objectCoordinates).forEach(function (p) { return _this.objectMaxRadi[p[0]] = [
-                    p[1][0],
-                    p[1][1],
-                    Math.min(_this.state.configuration.wellViewMaxObjectRadius, 0.5 * _.min(_.pairs(objectCoordinates).map(function (sp) { return p[0] === sp[0] ? Number.POSITIVE_INFINITY : Vector.distance(p[1], sp[1]); }))) - 5,
-                    _this.state.objectInfo.value.cell("population", p[0])
-                ]; });
+                _.pairs(objectCoordinates).forEach(function (p) {
+                    return _this.objectMaxRadi[p[0]] = [
+                        p[1][0],
+                        p[1][1],
+                        Math.min(_this.state.configuration.wellViewMaxObjectRadius, 0.5 * _.min(_.pairs(objectCoordinates).map(function (sp) {
+                            return p[0] === sp[0] ? Number.POSITIVE_INFINITY : Vector.distance(p[1], sp[1]);
+                        }))) - 5,
+                        _this.state.objectInfo.value.cell("population", p[0])
+                    ];
+                });
                 this.state.objectInfo.value["wellOutlines"] = this.objectMaxRadi; //this.outlines;
             }
         };
@@ -1436,7 +1490,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             //ctx.transitioning = false;
             ctx.save();
             ctx.translate(this.topLeft);
-            ctx.translate([0, 2 * cfg.annotationColumnSpace + Math.max(this.annotationTable.dimensions[1], this.optionTable.dimensions[1])]);
+            ctx.translate([0,
+                2 * cfg.annotationColumnSpace + Math.max(this.annotationTable.dimensions[1], this.optionTable.dimensions[1])
+            ]);
             var well = state.selectionWell(state.focused());
             if (well) {
                 var img = well.image(cfg.imageType);
@@ -1507,7 +1563,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.pushView('well');
         };
         return WellDetailView;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     /*class WellAnnotationTable extends List<List<Label>> {
         constructor(identifier: string, annotations: StringMap<string[]>, state: EnrichedState) {
             super(identifier,
@@ -1538,26 +1594,32 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         __extends(WellAnnotationTable, _super);
         function WellAnnotationTable(identifier, annotations, state) {
             _super.call(this, identifier, [
-                new List("annTableLbls", WellAnnotationTable.annotationKeys(annotations).map(function (k) { return new Label("annTableLbl" + k, k.toLowerCase(), [0, 0], state.configuration.annotationCategoryLabel, false); }), [0, 0], [0, 0], 'vertical', state.configuration.annotationColumnSpace, 'right'),
-                new List("annTableRows", WellAnnotationTable.annotationKeys(annotations).map(function (k) { return new WellAnnotationRow(identifier, k, annotations[k], state); }), [0, 0], [0, 0], 'vertical', state.configuration.annotationColumnSpace, 'left')
+                new List("annTableLbls", WellAnnotationTable.annotationKeys(annotations).map(function (k) {
+                    return new Label("annTableLbl" + k, k.toLowerCase(), [0, 0], state.configuration.annotationCategoryLabel, false);
+                }), [0, 0], [0, 0], 'vertical', state.configuration.annotationColumnSpace, 'right'),
+                new List("annTableRows", WellAnnotationTable.annotationKeys(annotations).map(function (k) {
+                    return new WellAnnotationRow(identifier, k, annotations[k], state);
+                }), [0, 0], [0, 0], 'vertical', state.configuration.annotationColumnSpace, 'left')
             ], [0, 0], [0, 0], 'horizontal', 2 * state.configuration.annotationColumnSpace);
         }
         WellAnnotationTable.annotationKeys = function (annotations) {
             return _.keys(annotations).sort(function (l, r) { return l.length - r.length; });
         };
         return WellAnnotationTable;
-    })(List);
+    }(List));
     var WellAnnotationRow = (function (_super) {
         __extends(WellAnnotationRow, _super);
         function WellAnnotationRow(tableId, category, tags, state) {
             _super.call(this, tableId + "_" + category, tags.map(function (tag) { return new AnnotationButton(category, tag, state); }), [0, 0], [0, 0], 'horizontal', state.configuration.annotationTagSpace, 'left');
         }
         return WellAnnotationRow;
-    })(List);
+    }(List));
     var AnnotationButton = (function (_super) {
         __extends(AnnotationButton, _super);
         function AnnotationButton(category, tag, state) {
-            _super.call(this, "annBut_" + (category || "") + "_" + tag, tag, [0, 0], !category || state.isTagActive(tag) ? state.configuration.annotationSelectedLabel : state.configuration.annotationLabel, true);
+            _super.call(this, "annBut_" + (category || "") + "_" + tag, tag, [0, 0], !category || state.isTagActive(tag) ?
+                state.configuration.annotationSelectedLabel :
+                state.configuration.annotationLabel, true);
             this.category = category;
             this.tag = tag;
         }
@@ -1565,7 +1627,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.selectedCoordinates.wellFilter = this.tag;
         };
         return AnnotationButton;
-    })(Label);
+    }(Label));
     var ObjectDetailView = (function (_super) {
         __extends(ObjectDetailView, _super);
         function ObjectDetailView(object, state, topLeft) {
@@ -1575,7 +1637,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.state = state;
             var cfg = state.configuration;
             this.focused = state.focused().object === object;
-            this.dimensions = this.focused && !state.populationSpace.isExemplar(object) ? [cfg.splomInnerSize, cfg.splomInnerSize] : [cfg.clusterTileInnerSize, cfg.clusterTileInnerSize];
+            this.dimensions = this.focused && !state.populationSpace.isExemplar(object) ?
+                [cfg.splomInnerSize, cfg.splomInnerSize] :
+                [cfg.clusterTileInnerSize, cfg.clusterTileInnerSize];
             this.updatePositions();
         }
         ObjectDetailView.prototype.paint = function (ctx) {
@@ -1655,7 +1719,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 interaction.removeExemplar(this.object);
         };
         return ObjectDetailView;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var PlateIndex = (function (_super) {
         __extends(PlateIndex, _super);
         function PlateIndex(state) {
@@ -1713,7 +1777,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                         }
                     }
                 }
-                return new List("pic_" + psI, snippetStack, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
+                return new List("pic_" + psI, snippetStack, //ps.map(p => new PlateMiniHeatmap(p, state)),
+                [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
             });
             var colLists = new List("pic_", stackLists, [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'right');
             //var heatMaps = _.range(0, datInfo.plateCount).map(pI => new PlateMiniHeatmap(pI, state));
@@ -1830,7 +1895,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Plates";
         };
         return PlateIndex;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var SubstitutePlateLabel = (function (_super) {
         __extends(SubstitutePlateLabel, _super);
         function SubstitutePlateLabel(identifier, label, dimensions, style) {
@@ -1839,7 +1904,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 this.setDimensions([this.dimensions[0], dimensions[1] - 2 * this.dimensions[1]]);
         }
         return SubstitutePlateLabel;
-    })(Label);
+    }(Label));
     var PlateMiniHeatmap = (function (_super) {
         __extends(PlateMiniHeatmap, _super);
         function PlateMiniHeatmap(plateNumber, state) {
@@ -1939,7 +2004,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return new WellCoordinates(Math.round(mouseCoordinates[0] * (info.columnCount - 1)), Math.round(mouseCoordinates[1] * (info.rowCount - 1)));
         };
         return PlateMiniHeatmap;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var ConfigurationButton = (function (_super) {
         __extends(ConfigurationButton, _super);
         function ConfigurationButton(identifier, text, position, targetField, targetValue, style) {
@@ -1951,7 +2016,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.configuration[this.targetField] = this.targetValue;
         };
         return ConfigurationButton;
-    })(Label);
+    }(Label));
     var ConfigurationOptions = (function (_super) {
         __extends(ConfigurationOptions, _super);
         function ConfigurationOptions(identifier, topLeft, targetState, targetField, targetMap) {
@@ -1980,7 +2045,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.snippet(this.buttons);
         };
         return ConfigurationOptions;
-    })(PlacedSnippet);
+    }(PlacedSnippet));
     var GuideLabel = (function (_super) {
         __extends(GuideLabel, _super);
         function GuideLabel(identifier, text, position, circleCenter, circleRadius, state) {
@@ -2013,6 +2078,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             }
         };
         return GuideLabel;
-    })(Label);
+    }(Label));
 });
 //# sourceMappingURL=overview.js.map

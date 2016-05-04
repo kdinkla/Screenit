@@ -1,5 +1,6 @@
 /// <reference path="../../typings/tsd.d.ts" />
 define(["require", "exports", 'lodash'], function (require, exports, _) {
+    "use strict";
     // Create index map for string array.
     function indexMap(keys) {
         var result = {};
@@ -50,18 +51,10 @@ define(["require", "exports", 'lodash'], function (require, exports, _) {
             }
             return this;
         };
-        Chain.prototype.byId = function (id) {
-            return this.index[id];
-        };
-        Chain.prototype.map = function (f) {
-            return new Chain(this.elements.map(f));
-        };
-        Chain.prototype.filter = function (f) {
-            return new Chain(this.elements.filter(f));
-        };
-        Chain.prototype.forEach = function (f) {
-            this.elements.forEach(f);
-        };
+        Chain.prototype.byId = function (id) { return this.index[id]; };
+        Chain.prototype.map = function (f) { return new Chain(this.elements.map(f)); };
+        Chain.prototype.filter = function (f) { return new Chain(this.elements.filter(f)); };
+        Chain.prototype.forEach = function (f) { this.elements.forEach(f); };
         // Add an element at the end if it is not present yet.
         Chain.prototype.push = function (element) {
             return this.clone().pushMutation(element);
@@ -163,14 +156,9 @@ define(["require", "exports", 'lodash'], function (require, exports, _) {
             return result;
         };
         return Chain;
-    })();
+    }());
     exports.Chain = Chain;
-    // Shallow clone (including function).
-    /*export function clone<T>(object: T) {
-        return typeof(object) === 'object' ?
-            <T> Object['assign'](Object.create(object['__proto__']), object) :
-            _.clone(object);
-    }*/
+    // Deep clone an object, including its functions.
     function snapshot(obj) {
         var clone;
         if (obj === null) {

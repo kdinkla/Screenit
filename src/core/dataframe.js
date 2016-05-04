@@ -1,11 +1,11 @@
 /// <reference path="collection.ts" />
-var __extends = this.__extends || function (d, b) {
+var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
-    __.prototype = b.prototype;
-    d.prototype = new __();
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 define(["require", "exports", './collection', './math'], function (require, exports, collection, math) {
+    "use strict";
     var Matrix = math.Matrix;
     var DataFrame = (function () {
         function DataFrame(dictionary) {
@@ -17,12 +17,15 @@ define(["require", "exports", './collection', './math'], function (require, expo
             this.rowIndex = collection.indexMap(this.rows);
             this.matrix = this.columns.map(function (c) { return _this.rows.map(function (r) { return dictionary[c][r]; }); });
         }
+        // All values for given column name.
         DataFrame.prototype.columnVector = function (name) {
             return this.matrix[this.columnIndex[name]];
         };
+        // Value at given column and row names.
         DataFrame.prototype.cell = function (column, row) {
             return (this.columnVector(column) || [])[this.rowIndex[row]];
         };
+        // Exchange columns and rows.
         DataFrame.prototype.transpose = function () {
             var tr = this.shallowClone();
             tr.columns = this.rows;
@@ -32,13 +35,15 @@ define(["require", "exports", './collection', './math'], function (require, expo
             tr.matrix = Matrix.transpose(tr.matrix);
             return tr;
         };
-        // Apply function to cells.
-        DataFrame.prototype.applyToCells = function (f) {
+        // Apply function to all cells.
+        /*applyToCells(f: (n: T) => T): DataFrame<T> {
             var tr = this.shallowClone();
-            tr.matrix = tr.matrix.map(function (c) { return c.map(f); });
+    
+            tr.matrix = tr.matrix.map(c => c.map(f));
+    
             return tr;
-        };
-        // Normalize along columns, or globally.
+        }*/
+        // Normalize along columns, or globally. Normalized map is [min, max] => [0,1] or [0, max] => [0,1].
         DataFrame.prototype.normalize = function (global, lowerBoundZero) {
             if (global === void 0) { global = false; }
             if (lowerBoundZero === void 0) { lowerBoundZero = false; }
@@ -53,7 +58,10 @@ define(["require", "exports", './collection', './math'], function (require, expo
                 min = tr.matrix.map(function (c) { return indMin; });
                 max = tr.matrix.map(function (c) { return indMax; });
             }
-            tr.matrix = lowerBoundZero ? tr.matrix.map(function (c, cI) { return c.map(function (r) { return (r / max[cI]) || 0; }); }) : tr.matrix.map(function (c, cI) { return c.map(function (r) { return (r - min[cI]) / ((max[cI] - min[cI]) || 0); }); });
+            // Normalize matrix.
+            tr.matrix = lowerBoundZero ?
+                tr.matrix.map(function (c, cI) { return c.map(function (r) { return (r / max[cI]) || 0; }); }) :
+                tr.matrix.map(function (c, cI) { return c.map(function (r) { return (r - min[cI]) / ((max[cI] - min[cI]) || 0); }); });
             return tr;
         };
         DataFrame.prototype.shallowClone = function () {
@@ -103,7 +111,7 @@ define(["require", "exports", './collection', './math'], function (require, expo
             return dict;
         };
         return DataFrame;
-    })();
+    }());
     exports.DataFrame = DataFrame;
     var NumberFrame = (function (_super) {
         __extends(NumberFrame, _super);
@@ -141,7 +149,7 @@ define(["require", "exports", './collection', './math'], function (require, expo
             return this.zeroNormalizedMatrix[this.columnIndex[name]];
         };
         return NumberFrame;
-    })(DataFrame);
+    }(DataFrame));
     exports.NumberFrame = NumberFrame;
 });
 //# sourceMappingURL=dataframe.js.map

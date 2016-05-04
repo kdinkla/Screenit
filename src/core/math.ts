@@ -8,11 +8,16 @@ import Chain = collections.Chain;
 import indexMap = collections.indexMap;
 import swap = collections.swap;
 
-// Constants.
-var PI = Math.PI;
-var PI2 = Math.PI * 2;
-var IPI = 1 / PI;
-var IPI2 = 1 / PI2;
+// Array statistics and vector extensions.
+/*var protoArray = <any> Array.prototype;
+protoArray.statistics = () => new ArrayStatistics(this);
+
+export class ArrayStatistics {
+    constructor(public values: number[]) {
+        console.log("Array statistics values:");
+        console.log(values);
+    }
+}*/
 
 // Vector math functions.
 // Assumes all operations are applied to number array of equal size.
@@ -278,25 +283,17 @@ export class Matrix {
             }
         }
 
-        /*for(var i = 0; i < target.length; i++) {
-            for(var j = 0; j < target[i].length; j++) {
-                var t = target[i][j];
-                target[i][j] = target[j][i];
-                target[j][i] = t;
-            }
-        }*/
-
         return transposed;
     }
 }
 
 // Range of numbers.
-export class Range {
+/*export class Range {
     constructor(public begin: number,
                 public end: number) {
 
     }
-}
+}*/
 
 // Positioned object.
 export interface Positioned {
@@ -372,163 +369,4 @@ export function statistics(values: number[]): {mean: number; standardDeviation: 
         mean: mn,
         standardDeviation: stnDev
     };
-}
-
-
-// Combinatorial optimization functions.
-export class Optimize {
-
-    // Perform 2-opt optimization, for given elements by given distance matrix (mapped by index).
-    // TODO: increase performance by order of N with a linked list implementation.
-    static optTSP<E>(orderedSet: Chain<E>,
-                     distances: number[][],
-                     invert: boolean = false): Chain<E> {
-        var index = indexMap(orderedSet.elements.map(e => e.toString()));
-
-        // Element permutation by (local) index, include dummy node.
-        var permutation: number[] = [];
-        for (var i = 0; i < orderedSet.length + 1; i++) {
-            permutation.push(i);
-        }
-
-        // Local distance matrix.
-        var d = Matrix.create(permutation.length, permutation.length, 0);
-        for (var i = 0; i < permutation.length - 1; i++) {
-            var eI = index[orderedSet.elements[i].toString()];
-
-            for (var j = 0; j < permutation.length - 1; j++) {
-                var eJ = index[orderedSet.elements[j].toString()];
-
-                d[i][j] = invert ? 1 - distances[eI][eJ] : distances[eI][eJ];
-            }
-        }
-
-        // Initial, greedy solution.
-        for (var i = 1; i < permutation.length; i++) {
-            // Select next best node to swap.
-            var minD = Number.MAX_VALUE;
-            var minN = null;
-            for (var j = i; j < permutation.length; j++) {
-                var dP = d[permutation[i - 1]][permutation[j]];
-                if (dP < minD) {
-                    minD = dP;
-                    minN = j;
-                }
-            }
-
-            // Swap best node and i.
-            swap(permutation, i, minN);
-        }
-
-        // Continue optimization until we hit a minima.
-        var swaps = 0;
-        var improved = true;
-        while (improved) {
-            improved = false;
-
-            var minCost = this.cost(permutation, d);
-
-            tryPairs:
-            for (var i = 0; i < permutation.length - 1; i++) {
-                for (var k = i + 1; k < permutation.length; k++) {
-                    this.invertSegment(permutation, i, k);
-                    var newCost = this.cost(permutation, d);
-
-                    if (newCost < minCost) {
-                        minCost = newCost;
-                        improved = true;
-                        break tryPairs;
-                    } else {
-                        this.invertSegment(permutation, i, k);
-                    }
-                }
-            }
-
-            swaps++;
-        }
-
-        //console.log("Optimization swaps: " + swaps);
-
-        // Open cycle at dummy and cut it out.
-        var dummyIndex = _.indexOf(permutation, orderedSet.length);
-        var newSets = permutation.slice(dummyIndex + 1, permutation.length)
-            .concat(permutation.slice(0, dummyIndex))
-            .map(i => orderedSet.elements[i]);
-
-        return new Chain(newSets);
-    }
-
-
-    // The cost of a TSP tour for the given distance function.
-    private static cost(permutation: number[], d: number[][]) {
-        var sum = 0;
-
-        for (var i = 0; i < permutation.length; i++) {
-            sum += d[permutation[i]][permutation[(i + 1) % permutation.length]];
-        }
-
-        return sum;
-    }
-
-    // Invert a segment indexed [i..k] of a TSP tour.
-    private static invertSegment(permutation: number[], i: number, k: number) {
-        var tmp;
-        for (var j = i; j < (i + k) / 2; j++) {
-            var jC = k - j;
-            tmp = permutation[j];
-            permutation[j] = permutation[jC];
-            permutation[jC] = tmp;
-        }
-    }
-}
-
-// Generic object interpolation method.
-export interface Interpolatable<E> {
-    interpolate(target: E, s: number);  // Interpolate to target object, with given factor in [0..1].
-}
-
-export function interpolate<E>(source: E, target: E, s: number): E {
-    var result: any;
-
-    var src = <any>source;
-    var tar = <any>target;
-
-    // No source.
-    if(!source) {
-        result = target;
-    }
-    // No target.
-    else if(!target) {
-        result = source;
-    }
-    // Has predefined interpolation function.
-    else if(source['interpolate']) {
-        result = source['interpolate'](target, s);
-    }
-    // Number.
-    else if(_.isNumber(source.constructor)) {
-        result = (1 - s) * src + s * tar;
-    }
-    // Array.
-    else if(_.isArray(source)) {
-        var maxLen = Math.max(src.length, tar.length);
-        result = [];
-        for(var i = 0; i < maxLen; i++) {
-            result.push(interpolate<any>(src[i] || tar[i], tar[i] || src[i], s));
-        }
-    }
-    // Interpolation of object members.
-    else if(_.isObject(source)) {
-        result = <any>_.clone(target); // Clone for proper function transfer.
-
-        // Interpolate fields.
-        var fields = _.union(_.keys(src), _.keys(tar));
-        fields.forEach(f => result[f] = interpolate<any>(src[f] || tar[f], tar[f] || src[f], s));
-    }
-    // Blunt interpolation for everything else.
-    else {
-        result = s < 0.5 ? source : target;
-    }
-
-    return result;
 }
