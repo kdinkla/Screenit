@@ -4,20 +4,12 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", './core/math', './core/graphics/style', './core/collection', './core/dataframe', './core/dataprovider', './configuration'], function (require, exports, math, style, collection, dataframe, data, config) {
+define(["require", "exports", './core/math', './core/graphics/style', './core/collection', './core/dataframe', './core/dataprovider', './configuration', './core/collection', './core/math'], function (require, exports, math_1, style_1, collection_1, dataframe_1, dataprovider_1, configuration_1, collection_2, math) {
     "use strict";
-    var Vector = math.Vector;
-    var Color = style.Color;
-    var Chain = collection.Chain;
-    var DataFrame = dataframe.DataFrame;
-    var NumberFrame = dataframe.NumberFrame;
-    var ProxyValue = data.ProxyValue;
-    var BaseConfiguration = config.BaseConfiguration;
-    exports.viewCycle = ['datasets', 'plates', 'well', 'exemplars', 'features']; //, 'splom'];
+    // The view columns and their ordering.
+    exports.viewCycle = ['datasets', 'plates', 'well', 'exemplars', 'features'];
     var InteractionState = (function () {
-        function InteractionState(populationSpace, 
-            //public hoveredCoordinates: SelectionCoordinates = null,
-            selectedCoordinates, openViews, configuration) {
+        function InteractionState(populationSpace, selectedCoordinates, openViews, configuration) {
             if (populationSpace === void 0) { populationSpace = null; }
             if (selectedCoordinates === void 0) { selectedCoordinates = null; }
             if (openViews === void 0) { openViews = null; }
@@ -31,42 +23,25 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         }
         InteractionState.prototype.switchToDataSet = function (dataSet) {
             this.populationSpace = new PopulationSpace();
-            //this.hoveredCoordinates = new SelectionCoordinates();
             this.selectedCoordinates = new SelectionCoordinates();
-            this.openViews = new Chain(['plates']); //, 'exemplars']);
-            this.configuration = new BaseConfiguration();
+            this.openViews = new collection_1.Chain(['plates']);
+            this.configuration = new configuration_1.BaseConfiguration();
             this.selectedCoordinates.dataSet = dataSet;
         };
+        // Remove given exemplar from any population (should be a single population).
         InteractionState.prototype.removeExemplar = function (object) {
-            // Remove given exemplar from any population (should be a single population).
             this.populationSpace.removeExemplar(object);
-            //if(this.hoveredCoordinates.object === object) this.hoveredCoordinates.object = null;
         };
         InteractionState.prototype.pushView = function (identifier) {
             var index = exports.viewCycle.indexOf(identifier);
             index = Math.min(exports.viewCycle.length - 2, index);
-            this.openViews = new Chain([exports.viewCycle[index], exports.viewCycle[index + 1]]);
+            this.openViews = new collection_1.Chain([exports.viewCycle[index], exports.viewCycle[index + 1]]);
         };
-        /*toggleAnnotation(category: string, tag: string) {
-            var annotations = this.selectedCoordinates.wellAnnotations;
-            // Specific category is targeted; toggle its tag.
-            if(category) {
-                annotations[category] = _.contains(annotations[category], tag) ?
-                    _.difference(annotations[category], [tag]) :
-                    _.union(annotations[category], [tag]);
-            }
-            // Otherwise, remove from all categories.
-            else {
-                _.keys(annotations).forEach(k => annotations[k] = annotations[k].filter(annTag => annTag !== tag));
-            }
-        }*/
         InteractionState.prototype.toJSON = function () {
             return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
         };
         InteractionState.fromJSON = function (data) {
-            return new InteractionState(PopulationSpace.fromJSON(data['populationSpace']), 
-            //SelectionCoordinates.fromJSON(data['hoveredCoordinates']),
-            SelectionCoordinates.fromJSON(data['selectedCoordinates']), Chain.fromJSON(data['openViews']), new BaseConfiguration());
+            return new InteractionState(PopulationSpace.fromJSON(data['populationSpace']), SelectionCoordinates.fromJSON(data['selectedCoordinates']), collection_1.Chain.fromJSON(data['openViews']), new configuration_1.BaseConfiguration());
         };
         return InteractionState;
     }());
@@ -107,15 +82,15 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             addObjectInfo(objectInfoDict);
             var objectValuesDict = this.populationSpace.toDict(false);
             addObjectInfo(objectValuesDict);
-            this.dataSets = new ProxyValue("dataSetList", {}, []);
-            this.dataSetInfo = new ProxyValue("dataSetInfo", { dataSet: dataSet }, new DataSetInfo(), function (ds) { return new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels, ds.wellTypes, ds.imageDimensions); });
-            this.wellAnnotations = new ProxyValue("wellAnnotations", { dataSet: dataSet }, new WellAnnotations(), function (wa) { return new WellAnnotations(wa); });
-            this.features = new ProxyValue("features", { dataSet: dataSet }, []);
-            this.objectInfo = new ProxyValue("objectInfo", objectInfoDict, new NumberFrame(), function (o) { return new NumberFrame(o); });
-            this.objectHistograms = new ProxyValue("objectHistograms2D", objectHistogramDict, new HistogramMatrix(), function (m) { return new HistogramMatrix(m); });
-            this.wellClusterShares = new ProxyValue("wellClusterShares", populationDict, new WellClusterShares(), function (s) { return new WellClusterShares(s); });
-            this.featureHistograms = new ProxyValue("featureHistograms", histogramDict, new FeatureHistograms(), function (hs) { return new FeatureHistograms(hs); });
-            this.objectFeatureValues = new ProxyValue("objectFeatureValues", objectValuesDict, new NumberFrame(), function (vs) { return new NumberFrame(vs); });
+            this.dataSets = new dataprovider_1.ProxyValue("dataSetList", {}, []);
+            this.dataSetInfo = new dataprovider_1.ProxyValue("dataSetInfo", { dataSet: dataSet }, new DataSetInfo(), function (ds) { return new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels, ds.wellTypes, ds.imageDimensions); });
+            this.wellAnnotations = new dataprovider_1.ProxyValue("wellAnnotations", { dataSet: dataSet }, new WellAnnotations(), function (wa) { return new WellAnnotations(wa); });
+            this.features = new dataprovider_1.ProxyValue("features", { dataSet: dataSet }, []);
+            this.objectInfo = new dataprovider_1.ProxyValue("objectInfo", objectInfoDict, new dataframe_1.NumberFrame(), function (o) { return new dataframe_1.NumberFrame(o); });
+            this.objectHistograms = new dataprovider_1.ProxyValue("objectHistograms2D", objectHistogramDict, new HistogramMatrix(), function (m) { return new HistogramMatrix(m); });
+            this.wellClusterShares = new dataprovider_1.ProxyValue("wellClusterShares", populationDict, new WellClusterShares(), function (s) { return new WellClusterShares(s); });
+            this.featureHistograms = new dataprovider_1.ProxyValue("featureHistograms", histogramDict, new FeatureHistograms(), function (hs) { return new FeatureHistograms(hs); });
+            this.objectFeatureValues = new dataprovider_1.ProxyValue("objectFeatureValues", objectValuesDict, new dataframe_1.NumberFrame(), function (vs) { return new dataframe_1.NumberFrame(vs); });
         }
         // Update state on server-based value update.
         EnrichedState.prototype.update = function () {
@@ -144,7 +119,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             }
         };
         EnrichedState.prototype.cloneInteractionState = function () {
-            return new InteractionState(collection.snapshot(this.populationSpace), collection.snapshot(this.selectedCoordinates), collection.snapshot(this.openViews), collection.snapshot(this.configuration));
+            return new InteractionState(collection_2.snapshot(this.populationSpace), collection_2.snapshot(this.selectedCoordinates), collection_2.snapshot(this.openViews), collection_2.snapshot(this.configuration));
         };
         EnrichedState.prototype.focusedWellCoordinates = function () {
             var result = {};
@@ -180,7 +155,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     if (plate[i] === focusedWell.plate &&
                         focusedWell.well && row[i] === focusedWell.well.row &&
                         col[i] === focusedWell.well.column) {
-                        var csDist = Vector.distance(coordinates, [x[i], y[i]]);
+                        var csDist = math_1.Vector.distance(coordinates, [x[i], y[i]]);
                         if (csDist < minDist) {
                             minDist = csDist;
                             bestIndex = i;
@@ -345,105 +320,9 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         EnrichedState.prototype.topWells = function () {
             return this.rankedWells().slice(0, this.configuration.listWellsCount);
         };
-        // Column partition ordering of plates by score (TODO: by population/count vector.)
-        /*platePartition() {
-            // Compute score from total cell count, for now.
-            var datasetInfo = this.dataSetInfo.value;
-            var wellShares = this.wellClusterShares.value;
-            //var objectCount = wellShares.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
-    
-            // Plate score by id.
-            var plateRange = this.plates();
-            //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
-            var platesOrdered = _.clone(plateRange);
-    
-            // Shares have been loaded.
-            var plateScores: number[];
-            var wellScores = this.wellScores();
-            if(wellScores) {
-                // If target vector is not specified: take maximum object count of each plate.
-                //if(_.keys(this.populationScoreVector).length === 0) {
-                //    objectCount.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
-                //} else {
-                //    var popKeys = _.keys(this.populationScoreVector);
-                //    var populationMatrices = _.compact(popKeys.map(k => wellShares[k]));
-                //    var targetVector = popKeys.map(p => this.populationScoreVector[p]);
-    
-                //    plateRange.forEach(plate => plateScores[plate] = this.plateScore(targetVector, populationMatrices));
-                //}
-    
-                plateScores = plateRange.map(plate => _.max(_.flatten(wellScores[plate])));
-            } else {
-                plateScores = plateRange.map(i => i);
-            }
-    
-            // Order plate range by score.
-            platesOrdered = platesOrdered.sort((p1, p2) => plateScores[p1] - plateScores[p2]);
-    
-            var datInfo = this.dataSetInfo.value;
-            var cfg = this.configuration;
-            var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
-            var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
-                _.compact(_.range(0, colCapacity).map(rI => platesOrdered[cI * colCapacity + rI])).sort((p1, p2) => p1 - p2));
-    
-            return colMaps;
-        }*/
-        /*plateAnnotationPartition(): { tags: string[]; plates: number[] }[] {
-            // Plate score by id.
-            var plateRange = this.plates();
-            //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
-            //var platesOrdered = _.clone(plateRange);
-    
-            // Focused annotations.
-            /*var allTargetPlateSelections = plateRange.map(p => this.plateTargetAnnotations(p));
-    
-            // Bin plates by annotations.
-            var bins: StringMap<{ annotations: string[]; plates: number[] }> = {};
-            allTargetPlateSelections.forEach((sel, p) => {
-                var tags = _.uniq(_.flatten(_.values(sel).map(tags =>
-                                _.keys(tags).filter(t => tags[t].wells.length > 0))).sort(), true);
-                var binKey = tags.join(",");
-                if(!(binKey in bins)) bins[binKey] = { annotations: tags, plates: <number[]>[] };
-                bins[binKey].plates.push(p);
-            });
-    
-            return <any>_.values(bins);*/
-        /*var focusTags = new Chain<string>(<any>_.flatten(_.values(this.focused().wellAnnotations)));
-        var plateTags = this.wellAnnotations.value.plateTags;
-        var bins: StringMap<{ tags: string[]; plates: number[] }> = {};
-        plateRange.forEach(p => {
-            var tags: Chain<string> = plateTags[p] || new Chain<string>();
-            var matchTags = _.intersection(focusTags.elements, tags.elements);    ///Chain.intersection<string>([focusTags, tags]);
-            var binKey = matchTags.join(",");
-            if(!(binKey in bins)) bins[binKey] = { tags: matchTags, plates: [] };
-            bins[binKey].plates.push(p);
-        });
-
-        return <any> _.values(bins);
-    }*/
         // Plate annotations as well selections, returned as a map of annotation category and tag.
         EnrichedState.prototype.plateTargetAnnotations = function (plate) {
-            //var dataInfo = this.dataSetInfo.value;
-            //var wellAnnotations = this.wellAnnotations.value;
-            //var focusAnnotations = this.focused().wellAnnotations;
             var selections = {};
-            /*_.keys(focusAnnotations).forEach(cat => {
-                selections[cat] = {};
-                focusAnnotations[cat].forEach(tag =>
-                        selections[cat][tag] = new WellSelection(cat, tag, plate, [])
-                );
-            });
-            dataInfo.columnLabels.forEach((c, cI) =>
-                dataInfo.rowLabels.forEach((r, rI) => {
-                    var wellCoordinates = new WellCoordinates(cI, rI);
-                    var annotations = wellAnnotations.annotationsAt(plate, wellCoordinates);
-    
-                    _.keys(annotations).forEach(cat => annotations[cat].forEach(tag => {
-                        if (cat in selections && tag in selections[cat])
-                            selections[cat][tag].wells.push(wellCoordinates);
-                    }));
-                })
-            );*/
             // Add focused well.
             selections["Selected"] = {};
             selections["Selected"]["Selected"] = new WellSelection("Selected", "Selected", plate, [this.focused().well]);
@@ -467,17 +346,17 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     var PopulationSpace = (function () {
         function PopulationSpace(features, // Feature axes of space to model in.
             populations, inactivePopulations) {
-            if (features === void 0) { features = new Chain(); }
-            if (populations === void 0) { populations = new Chain(); }
-            if (inactivePopulations === void 0) { inactivePopulations = new Chain(); }
+            if (features === void 0) { features = new collection_1.Chain(); }
+            if (populations === void 0) { populations = new collection_1.Chain(); }
+            if (inactivePopulations === void 0) { inactivePopulations = new collection_1.Chain(); }
             this.features = features;
             this.populations = populations;
             this.inactivePopulations = inactivePopulations;
             // Total cell count population.
-            var totalPop = new Population(Population.POPULATION_TOTAL_NAME, "Cell\nCount", new Chain(), Population.POPULATION_TOTAL_COLOR, true);
+            var totalPop = new Population(Population.POPULATION_TOTAL_NAME, "Cell\nCount", new collection_1.Chain(), Population.POPULATION_TOTAL_COLOR, true);
             totalPop.activation = [[-1, 0], [0, 1], [1, 1]];
             // Unconfident population.
-            var unconfPop = new Population(Population.POPULATION_UNCONFIDENT_NAME, "Not\nSure", new Chain(), Population.POPULATION_UNCONFIDENT_COLOR, true);
+            var unconfPop = new Population(Population.POPULATION_UNCONFIDENT_NAME, "Not\nSure", new collection_1.Chain(), Population.POPULATION_UNCONFIDENT_COLOR, true);
             this.populations = this.populations.pushAll([totalPop, unconfPop]);
             this.conformPopulations();
         }
@@ -500,19 +379,15 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             var unconfPopulation = this.populations.byId(Population.POPULATION_UNCONFIDENT_NAME);
             if (unconfPopulation && unconfPopulation.exemplars.length > 0) {
                 this.createPopulation().exemplars = unconfPopulation.exemplars.clone();
-                unconfPopulation.exemplars = new Chain();
+                unconfPopulation.exemplars = new collection_1.Chain();
             }
         };
         // Active and inactive populations.
         PopulationSpace.prototype.allPopulations = function () {
-            var allPops = Chain.union([this.populations, this.inactivePopulations]);
+            var allPops = collection_1.Chain.union([this.populations, this.inactivePopulations]);
             allPops.elements.sort(function (lP, rP) { return lP.identifier - rP.identifier; });
             return allPops;
         };
-        // Active populations, or all population as fallback. TODO: get rid of this by going unconfident for all.
-        //activeOrAll() {
-        //    return this.populations.length > 1 ? this.populations : new Chain([Population.ALL]);
-        //}
         // Toggle activation of population.
         PopulationSpace.prototype.toggle = function (population) {
             if (this.populations.has(population)) {
@@ -542,10 +417,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             if (predefined === void 0) { predefined = false; }
             // Choose an available nominal color.
             var takenColors = this.allPopulations().map(function (p) { return p.color; });
-            var availableColors = new Chain(Color.colorMapNominal12);
-            var freeColors = Chain.difference(availableColors, takenColors);
-            var color = freeColors.length > 0 ? freeColors.elements[0] : Color.WHITE;
-            var population = new Population(id, tag, new Chain(), color, predefined);
+            var availableColors = new collection_1.Chain(style_1.Color.colorMapNominal18);
+            var freeColors = collection_1.Chain.difference(availableColors, takenColors);
+            var color = freeColors.length > 0 ? freeColors.elements[0] : style_1.Color.WHITE;
+            var population = new Population(id, tag, new collection_1.Chain(), color, predefined);
             this.populations = this.populations.push(population);
             return population;
         };
@@ -574,10 +449,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         };
         // Return all exemplars of populations.
         PopulationSpace.prototype.allExemplars = function () {
-            return Chain.union(this.allPopulations().elements.map(function (p) { return p.exemplars; }));
+            return collection_1.Chain.union(this.allPopulations().elements.map(function (p) { return p.exemplars; }));
         };
         PopulationSpace.fromJSON = function (data) {
-            return new PopulationSpace(Chain.fromJSON(data['features']), new Chain(data['populations']['elements'].map(function (p) { return Population.fromJSON(p); })), new Chain(data['inactivePopulations']['elements'].map(function (p) { return Population.fromJSON(p); })));
+            return new PopulationSpace(collection_1.Chain.fromJSON(data['features']), new collection_1.Chain(data['populations']['elements'].map(function (p) { return Population.fromJSON(p); })), new collection_1.Chain(data['inactivePopulations']['elements'].map(function (p) { return Population.fromJSON(p); })));
         };
         return PopulationSpace;
     }());
@@ -588,8 +463,8 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             activation) {
             if (identifier === void 0) { identifier = null; }
             if (name === void 0) { name = null; }
-            if (exemplars === void 0) { exemplars = new Chain(); }
-            if (color === void 0) { color = Color.NONE; }
+            if (exemplars === void 0) { exemplars = new collection_1.Chain(); }
+            if (color === void 0) { color = style_1.Color.NONE; }
             if (predefined === void 0) { predefined = false; }
             if (activation === void 0) { activation = [[-1, 0], [0, 0], [1, 0]]; }
             this.identifier = identifier;
@@ -634,14 +509,14 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return result;
         };
         Population.fromJSON = function (data) {
-            return new Population(data['identifier'], data['name'], Chain.fromJSON(data['exemplars']), Color.fromJSON(data['color']), data['predefined'], data['activation']);
+            return new Population(data['identifier'], data['name'], collection_1.Chain.fromJSON(data['exemplars']), style_1.Color.fromJSON(data['color']), data['predefined'], data['activation']);
         };
         Population.POPULATION_TOTAL_NAME = 0; // All cell population (for cell count purposes).
-        Population.POPULATION_TOTAL_COLOR = new Color(75, 75, 75);
+        Population.POPULATION_TOTAL_COLOR = new style_1.Color(75, 75, 75);
         Population.POPULATION_ALL_NAME = 1; // Population code in case of no known phenotypes.
-        Population.ALL = new Population(Population.POPULATION_ALL_NAME, "All", new Chain(), Population.POPULATION_TOTAL_COLOR, true);
+        Population.ALL = new Population(Population.POPULATION_ALL_NAME, "All", new collection_1.Chain(), Population.POPULATION_TOTAL_COLOR, true);
         Population.POPULATION_UNCONFIDENT_NAME = 2;
-        Population.POPULATION_UNCONFIDENT_COLOR = new Color(175, 175, 175);
+        Population.POPULATION_UNCONFIDENT_COLOR = new style_1.Color(175, 175, 175);
         Population.POPULATION_WELL_TYPE_FIRST_NAME = 3;
         Population.POPULATION_ID_COUNTER = 100; // 0 and 1 are reserved for above population identifiers
         return Population;
@@ -716,7 +591,6 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     }());
     exports.SelectionCoordinates = SelectionCoordinates;
     var DataSetInfo = (function () {
-        //wellSelections: WellSelection[];
         function DataSetInfo(plateLabels, columnLabels, rowLabels, wellTypes, imageDimensions) {
             if (plateLabels === void 0) { plateLabels = []; }
             if (columnLabels === void 0) { columnLabels = []; }
@@ -731,11 +605,6 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             this.plateCount = plateLabels.length;
             this.columnCount = columnLabels.length;
             this.rowCount = rowLabels.length;
-            // Well selection placeholder; complete selection and control wells, for now.
-            //this.wellSelections = [
-            //new WellSelection("All", [[0, this.plateCount-1]], WellCoordinates.allWells(this.columnCount, this.rowCount)),
-            //new WellSelection("Control", [[0, this.plateCount-1]], WellCoordinates.rowWells(this.columnCount, [0]))  // First two columns.
-            //];
         }
         return DataSetInfo;
     }());
@@ -757,13 +626,10 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                     _this.inject(val, _this.wellIndex, _.flatten([[c], localI]));
                 });
             });
-            //delete this.wellIndex[0];
             this.maxPlateObjectCount = (this.wellIndex[Population.POPULATION_TOTAL_NAME] || [])
                 .map(function (plt) { return _.max(_.flattenDeep(plt)); });
-            // Missing wells have zero of everything.
-            //this.wellIndex = this.wellIndex.map(p => p.map(plt => plt.map(col => Vector.invalidToZero(col))));
             // Share statistics.
-            this.shareStatistics = this.wellIndex.map(function (pShares) { return math.statistics(Vector.invalidToZero(_.flattenDeep(pShares))); });
+            this.shareStatistics = this.wellIndex.map(function (pShares) { return math.statistics(math_1.Vector.invalidToZero(_.flattenDeep(pShares))); });
             // z-scores of all wells, indexed by population, plate, column, and row.
             this.zScores = [];
             this.wellIndex.forEach(function (pS, pI) { return _this.zScores[pI] = pS.map(function (plS) { return plS.map(function (cS) {
@@ -802,14 +668,14 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             return (((this.zScores[population] || [])[plate] || [])[well.column] || [])[well.row] || null;
         };
         return WellClusterShares;
-    }(NumberFrame));
+    }(dataframe_1.NumberFrame));
     exports.WellClusterShares = WellClusterShares;
     var WellAnnotations = (function (_super) {
         __extends(WellAnnotations, _super);
+        //plateTags: Chain<string>[];
         function WellAnnotations(dictionary) {
             if (dictionary === void 0) { dictionary = {}; }
             _super.call(this, dictionary);
-            //this.computePlateAnnotations();
         }
         // Return dictionary of annotations for given plate and well coordinates.
         WellAnnotations.prototype.annotationsAt = function (plate, coordinates) {
@@ -820,61 +686,16 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                 this.columns.forEach(function (c) { return dict[c] = _this.matrix[_this.columnIndex[c]][rowIndex]; });
             return dict;
         };
-        WellAnnotations.prototype.computePlateAnnotations = function () {
-            var _this = this;
-            this.plateTags = [];
-            // Accumulate plate annotations by scanning all rows.
-            this.rows.forEach(function (row) {
-                var parts = row.split('_');
-                var plate = Number(parts[0]);
-                //var column = Number(parts[1]);
-                //var row = Number(parts[2]);
-                // Create plate selection array.
-                if (!(plate in _this.plateTags))
-                    _this.plateTags[plate] = new Chain();
-                //var plateSelection = this.plateTags[plate];
-                // Columns are annotation categories.
-                _this.columns.forEach(function (column) {
-                    var tags = _this.cell(column, row);
-                    _this.plateTags[plate] = _this.plateTags[plate].pushAll(tags);
-                    /*if(tags.length > 0) {
-                        if(!(column in plateSelection)) plateSelection[column] = new Chain<string>();
-                        plateSelection[column] = plateSelection[column].pushAll(tags);
-                    }*/
-                });
-            });
-            // Sort tags, in place.
-            this.plateTags.forEach(function (ts) { return ts.elements.sort(); });
-            return this.plateTags;
-            /*var selections: StringMap<StringMap<WellSelection>> = {};
-            _.keys(focusAnnotations).forEach(cat => {
-                selections[cat] = {};
-                focusAnnotations[cat].forEach(tag =>
-                        selections[cat][tag] = new WellSelection(cat, tag, plate, [])
-                );
-            });
-            dataInfo.columnLabels.forEach((c, cI) =>
-                    dataInfo.rowLabels.forEach((r, rI) => {
-                        var wellCoordinates = new WellCoordinates(cI, rI);
-                        var annotations = wellAnnotations.annotationsAt(plate, wellCoordinates);
-    
-                        _.keys(annotations).forEach(cat => annotations[cat].forEach(tag => {
-                            if (cat in selections && tag in selections[cat])
-                                selections[cat][tag].wells.push(wellCoordinates);
-                        }));
-                    })
-            );*/
-        };
         WellAnnotations.ANNOTATION_SPLIT = "|";
         return WellAnnotations;
-    }(DataFrame));
+    }(dataframe_1.DataFrame));
     exports.WellAnnotations = WellAnnotations;
     var FeatureHistograms = (function () {
         function FeatureHistograms(dict) {
             var _this = this;
             if (dict === void 0) { dict = {}; }
             this.histograms = {};
-            _.keys(dict).map(function (k) { return _this.histograms[k] = new DataFrame(dict[k]).normalize(false, true); });
+            _.keys(dict).map(function (k) { return _this.histograms[k] = new dataframe_1.DataFrame(dict[k]).normalize(false, true); });
         }
         return FeatureHistograms;
     }());

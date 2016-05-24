@@ -2,7 +2,8 @@ define(["require", "exports"], function (require, exports) {
     "use strict";
     // Font configuration.
     var Font = (function () {
-        function Font(size, wrapLength) {
+        function Font(size, // Font size.
+            wrapLength) {
             if (size === void 0) { size = 16; }
             if (wrapLength === void 0) { wrapLength = 1000; }
             this.size = size;
@@ -12,14 +13,15 @@ define(["require", "exports"], function (require, exports) {
         Font.prototype.toString = function () {
             return this.string;
         };
+        // The width of the painted text, in pixels.
         Font.prototype.width = function (text) {
-            var canvas = Font.textCanvas ||
-                (Font.textCanvas = document.createElement("canvas"));
+            var canvas = Font.textCanvas || (Font.textCanvas = document.createElement("canvas"));
             var context = canvas.getContext("2d");
             context.font = this.toString();
             var metrics = context.measureText(text);
             return metrics.width;
         };
+        // Cut text into multiple sentences to respect wrapLength.
         Font.prototype.wordWrap = function (text) {
             var _this = this;
             var words = text.split(" ");
@@ -51,7 +53,7 @@ define(["require", "exports"], function (require, exports) {
         return Font;
     }());
     exports.Font = Font;
-    // RGB color in [0..255] (maps to CSS rgb string).
+    // RGBA color in [0..255] (maps to CSS rgb string).
     var Color = (function () {
         // Construct color from red, green, and blue in [0..255].
         function Color(r, g, b, a) {
@@ -73,6 +75,7 @@ define(["require", "exports"], function (require, exports) {
         Color.prototype.toString = function () {
             return this.cssString;
         };
+        // Interpolate this color with the given color, where s == 0 => this and s == 1 => target.
         Color.prototype.interpolate = function (target, s) {
             var nS = 1 - s;
             return new Color(Math.round(nS * this.r + s * target.r), Math.round(nS * this.g + s * target.g), Math.round(nS * this.b + s * target.b), nS * this.a + s * target.a);
@@ -93,20 +96,19 @@ define(["require", "exports"], function (require, exports) {
         Color.GREEN = new Color(0, 255, 0);
         Color.BLUE = new Color(0, 0, 255);
         Color.NONE = new Color(0, 0, 0, 0);
-        // Colorbrewer 12 nominal value color mapping.
-        /*static colorMapNominal12 =
-            [new Color(190, 186, 218),
-                new Color(251, 128, 114),
-                new Color(128, 177, 211),
-                new Color(253, 180, 98),
-                new Color(179, 222, 105),
-                new Color(252, 205, 229),
-                new Color(188, 128, 189),
-                new Color(204, 235, 197),
-                new Color(255, 237, 111),
-                new Color(141, 211, 199),
-                new Color(255, 255, 179)];*/
-        Color.colorMapNominal12 = [
+        // 8 color nominal mapping.
+        Color.colorMapNominal8 = [
+            new Color(228, 26, 28),
+            new Color(55, 126, 184),
+            new Color(77, 175, 74),
+            new Color(152, 78, 163),
+            new Color(255, 127, 0),
+            new Color(255, 255, 51),
+            new Color(166, 86, 40),
+            new Color(247, 129, 191)
+        ];
+        // 18 color nominal mapping.
+        Color.colorMapNominal18 = [
             new Color(27, 158, 119),
             new Color(217, 95, 2),
             new Color(117, 112, 179),
@@ -124,14 +126,6 @@ define(["require", "exports"], function (require, exports) {
             new Color(166, 86, 40),
             new Color(247, 129, 191)
         ];
-        Color.colorMapNominal8 = [new Color(228, 26, 28),
-            new Color(55, 126, 184),
-            new Color(77, 175, 74),
-            new Color(152, 78, 163),
-            new Color(255, 127, 0),
-            new Color(255, 255, 51),
-            new Color(166, 86, 40),
-            new Color(247, 129, 191)];
         return Color;
     }());
     exports.Color = Color;

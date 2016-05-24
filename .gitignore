@@ -4,3 +4,4 @@ session/*
 *.map
 *.pyc
 .idea
+/.project

@@ -1,18 +1,8 @@
 /// <reference path='style.ts' />
 
-import view = require('./view');
-import ViewContext = view.ViewContext;
-import Snippet = view.Snippet;
-import ViewMouseEvent = view.ViewMouseEvent;
-
-import style = require('./style');
-import Color = style.Color;
-import Font = style.Font;
-
-import math = require('../math');
-import Vector = math.Vector;
-import Positioned = math.Positioned;
-import Dimensional = math.Dimensional;
+import { ViewContext, Snippet } from './view';
+import { Color, Font } from './style';
+import { Vector, Dimensional } from '../math';
 
 // Base implementation of snippet.
 export class BaseSnippet implements Snippet {
@@ -45,7 +35,6 @@ export class PlacedSnippet extends BaseSnippet implements Dimensional {
         //this.topLeft = topLeft;
         this.dimensions = [0, 0];
         this.setTopLeft(topLeft);
-        //this.updatePositions();
     }
 
     // Sets top left position.
@@ -124,8 +113,8 @@ export class List<S extends PlacedSnippet> extends PlacedSnippet {
             });
 
             this.dimensions = this.snippets.length > 0 ?
-                Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) : [0, 0];
-            //this.dimensions[lAxis] = Math.max(0, lAcc - this.space);
+                Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) :
+                [0, 0];
             this.dimensions[wAxis] = span;
         }
 
@@ -153,11 +142,11 @@ export class Background extends BaseSnippet {
 
 // Basic snippets.
 export class Rectangle extends BaseSnippet {
-    constructor(public identifier:string,
-                public topLeft:number[],
-                public size:number[],
-                public color:style.Color = style.Color.BLACK,
-                public pickable:boolean = false) {
+    constructor(public identifier: string,
+                public topLeft: number[],
+                public size: number[],
+                public color: Color = Color.BLACK,
+                public pickable: boolean = false) {
         super(identifier);
     }
 
@@ -174,7 +163,7 @@ export class Rectangle extends BaseSnippet {
 export class Triangle extends BaseSnippet {
     constructor(public identifier: string,
                 public coordinates: number[][],
-                public color: Color = style.Color.BLACK,
+                public color: Color = Color.BLACK,
                 public pickable: boolean = false) {
         super(identifier);
     }
@@ -261,8 +250,8 @@ export class Line extends BaseSnippet {
 
 // Basic text label.
 export class LabelStyle {
-    constructor(public font: style.Font = new Font(),
-                public color: style.Color = Color.BLACK,
+    constructor(public font: Font = new Font(),
+                public color: Color = Color.BLACK,
                 public horizontalAnchor: string = 'left',
                 public verticalAnchor: string = 'top',
                 public rotation: number = 0) {

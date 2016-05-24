@@ -2,7 +2,9 @@
 export class Font {
     string: string;
 
-    constructor(public size: number = 16, public wrapLength: number = 1000) {
+    constructor(
+        public size: number = 16,               // Font size.
+        public wrapLength: number = 1000) {     // Maximum sentence wrap length, in characters.
         this.string = this.size + "px OpenSans";
     }
 
@@ -10,11 +12,12 @@ export class Font {
         return this.string;
     }
 
-    private static textCanvas:HTMLCanvasElement;
+    // Use an off screen canvas to determine text dimensions.
+    private static textCanvas: HTMLCanvasElement;
 
+    // The width of the painted text, in pixels.
     width(text: string) {
-        var canvas = Font.textCanvas ||
-            (Font.textCanvas = document.createElement("canvas"));
+        var canvas = Font.textCanvas || (Font.textCanvas = document.createElement("canvas"));
         var context = canvas.getContext("2d");
         context.font = this.toString();
         var metrics = context.measureText(text);
@@ -22,6 +25,7 @@ export class Font {
         return metrics.width;
     }
 
+    // Cut text into multiple sentences to respect wrapLength.
     wordWrap(text: string): string[] {
         var words = text.split(" ");
         var lines = [];
@@ -51,7 +55,7 @@ export class Font {
     }
 }
 
-// RGB color in [0..255] (maps to CSS rgb string).
+// RGBA color in [0..255] (maps to CSS rgb string).
 export class Color {
     cssString: string;
 
@@ -64,26 +68,33 @@ export class Color {
     }
 
     // Alpha adjusted color.
-    alpha(mulAlpha:number):Color {
+    alpha(mulAlpha: number): Color {
         return new Color(this.r, this.g, this.b, mulAlpha * this.a);
     }
 
     // Darken the color by the given factor.
     darken(factor: number) {
-        return new Color(Math.floor(factor * this.r), Math.floor(factor * this.g), Math.floor(factor * this.b), this.a);
+        return new Color(
+            Math.floor(factor * this.r),
+            Math.floor(factor * this.g),
+            Math.floor(factor * this.b),
+            this.a
+        );
     }
 
     toString() {
         return this.cssString;
     }
 
-    interpolate(target:Color, s:number) {
+    // Interpolate this color with the given color, where s == 0 => this and s == 1 => target.
+    interpolate(target: Color, s: number) {
         var nS = 1 - s;
         return new Color(
             Math.round(nS * this.r + s * target.r),
             Math.round(nS * this.g + s * target.g),
             Math.round(nS * this.b + s * target.b),
-            nS * this.a + s * target.a);
+            nS * this.a + s * target.a
+        );
     }
 
     static fromJSON(data: {}) {
@@ -91,59 +102,49 @@ export class Color {
     }
 
     // Static shortcuts.
-    static WHITE = new Color(255, 255, 255);
-    static BLACK = new Color(0, 0, 0);
-    static RED = new Color(255, 0, 0);
-    static CRIMSON = new Color(165, 28, 48);
-    static GREEN = new Color(0, 255, 0);
-    static BLUE = new Color(0, 0, 255);
-    static NONE = new Color(0, 0, 0, 0);
+    static WHITE    = new Color(255, 255, 255);
+    static BLACK    = new Color(0,   0,   0);
+    static RED      = new Color(255, 0,   0);
+    static CRIMSON  = new Color(165, 28,  48);
+    static GREEN    = new Color(0,   255, 0);
+    static BLUE     = new Color(0,   0,   255);
+    static NONE     = new Color(0,   0,   0, 0);
 
     // Construct gray-scale value (in [0..255]).
-    static grey(v:number, a:number = 1) {
+    static grey(v: number, a: number = 1) {
         return new Color(v, v, v, a);
     }
 
-    // Colorbrewer 12 nominal value color mapping.
-    /*static colorMapNominal12 =
-        [new Color(190, 186, 218),
-            new Color(251, 128, 114),
-            new Color(128, 177, 211),
-            new Color(253, 180, 98),
-            new Color(179, 222, 105),
-            new Color(252, 205, 229),
-            new Color(188, 128, 189),
-            new Color(204, 235, 197),
-            new Color(255, 237, 111),
-            new Color(141, 211, 199),
-            new Color(255, 255, 179)];*/
-    static colorMapNominal12 = [
-        new Color(27,158,119),
-        new Color(217,95,2),
-        new Color(117,112,179),
-        new Color(231,41,138),
-        new Color(102,166,30),
-        new Color(230,171,2),
-        new Color(166,118,29),
-        new Color(102,102,102),
-
-        new Color(228, 26, 28),
-        new Color(55, 126, 184),
-        new Color(77, 175, 74),
-        new Color(152, 78, 163),
+    // 8 color nominal mapping.
+    static colorMapNominal8 = [
+        new Color(228, 26,  28),
+        new Color(55,  126, 184),
+        new Color(77,  175, 74),
+        new Color(152, 78,  163),
         new Color(255, 127, 0),
         new Color(255, 255, 51),
-        new Color(166, 86, 40),
+        new Color(166, 86,  40),
         new Color(247, 129, 191)
     ];
 
-    static colorMapNominal8 =
-        [new Color(228, 26, 28),
-            new Color(55, 126, 184),
-            new Color(77, 175, 74),
-            new Color(152, 78, 163),
-            new Color(255, 127, 0),
-            new Color(255, 255, 51),
-            new Color(166, 86, 40),
-            new Color(247, 129, 191)];
+    // 18 color nominal mapping.
+    static colorMapNominal18 = [
+        new Color(27,  158, 119),
+        new Color(217, 95,  2),
+        new Color(117, 112, 179),
+        new Color(231, 41,  138),
+        new Color(102, 166, 30),
+        new Color(230, 171, 2),
+        new Color(166, 118, 29),
+        new Color(102, 102, 102),
+
+        new Color(228, 26,  28),
+        new Color(55,  126, 184),
+        new Color(77,  175, 74),
+        new Color(152, 78,  163),
+        new Color(255, 127, 0),
+        new Color(255, 255, 51),
+        new Color(166, 86,  40),
+        new Color(247, 129, 191)
+    ];
 }

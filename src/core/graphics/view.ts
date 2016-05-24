@@ -8,30 +8,17 @@ import bacon = require('bacon');
 import EventStream = bacon.EventStream;
 import Bus = bacon.Bus;
 
-import collection = require('../collection');
-import Identifiable = collection.Identifiable;
-import identify = collection.identify;
-import StringMap = collection.StringMap;
-
-import style = require('./style');
-import Color = style.Color;
-
-import math = require('../math');
-import Vector = math.Vector;
-
-import data = require('../dataprovider');
-import ProxyService = data.ProxyService;
-
-import model = require('./model');
-import Model = model.Model;
+import { Identifiable, identify, StringMap } from '../collection';
+import { Color } from './style';
+import { Vector } from '../math';
 
 // Canvas view that supports state transitions while drawing a model of type M.
-export class View<M extends Model> {
-    content: HTMLElement;            // Paper embedding element.
-    canvas: HTMLCanvasElement;       // Canvas element.
+export class View<M> {
+    content: HTMLElement;                     // Paper embedding element.
+    canvas: HTMLCanvasElement;                // Canvas element.
 
-    model: M;                       // Model that is rendered.
-    private manager: DrawManager;   // Interpolation manager.
+    model: M;                                 // Model that is rendered.
+    private manager: DrawManager;             // Interpolation manager.
 
     // View property streams.
     private resizeBus: Bus<ViewResizeEvent>;  // View dimensions upon resize as bus.
@@ -47,8 +34,8 @@ export class View<M extends Model> {
 
     event: EventStream<ViewEvent<any>>;       // Generic view event.
 
-    private mousePos: number[]; // Last known mouse position.
-    private hits: MouseHit[];   // Last known mouse hits.
+    private mousePos: number[];               // Last known mouse position.
+    private hits: MouseHit[];                 // Last known mouse hits.
 
     // Base constructor, by HTML element id.
     constructor(public htmlId: string) {
@@ -76,16 +63,6 @@ export class View<M extends Model> {
             ]);
             this.update();
         });
-
-        /*Bacon.fromEventTarget<MouseEvent>(this.canvas, 'mousemove').onValue(e => {
-            this.mousePos = this.correctHighDPIMouse([e.offsetX, e.offsetY]);
-            this.update();
-        });*/
-
-        // Push mouse events to subjects.
-        /*jqCanvas['asEventStream']('click').onValue(e => {
-            console.log("Mouse click as stream!");
-        });*/
 
         document.oncontextmenu = () => false;   // Circumvent mouse context menu.
         this.mouseClick = Bacon.fromEventTarget<MouseEvent>(this.canvas, 'click')
@@ -140,16 +117,12 @@ export class View<M extends Model> {
     private updateCycle() {
         var man = this.manager;
 
-        //this.canvas.width = this.content.offsetWidth;
-        //this.canvas.height = this.content.offsetHeight;
-
         var context: CanvasRenderingContext2D = <any> this.canvas.getContext('2d');
         context.setTransform(1, 0, 0, 1, 0, 0);
         context.textBaseline = "bottom";
 
         // Adjust canvas scaling and dimensions for high-DPI screens.
         this.correctHighDPI(context);
-        //this.resizeBus.push(new ViewResizeEvent(this.dimensions()));
 
         // Pre draw.
         var nT = new Date().getTime();  // Determine the time passed since last draw.
@@ -201,9 +174,6 @@ export class View<M extends Model> {
             }
         });
 
-        // Update snippets.
-        //var newSnippets: StringMap<SnippetValues> = {};
-
         // Draw non-drawn snippets.
         man.snippetList.forEach(sV => {
             if (!sV.drawn) {
@@ -229,13 +199,6 @@ export class View<M extends Model> {
             window.clearInterval(this.updater);
             this.updater = null;
         }
-
-        /*if(nT - this.updateTime > 10 * DrawManager.pD) {
-            this.updater = false;
-        } else {
-            window["requestAnimFrame"](() => this.updateCycle());
-            //console.log("Update anim frame.");
-        }*/
     }
 
     // Adjust canvas scaling and dimensions for high-DPI screens.
@@ -502,7 +465,6 @@ export class ViewContext {
                 var d = target - im.value;      // Apply acceleration.
                 im.change += this.dT * (d - (2 * im.change * this.mD)) / this.mD2;
                 var ad = this.dT * im.change;   // Apply velocity.
-                //im.value += ad;
                 im.value = ad > 0 ? Math.min(target, im.value + ad) : Math.max(target, im.value + ad);
 
                 sV.ti++; // Increment for next transition.
@@ -523,8 +485,7 @@ export class ViewContext {
             Math.round(this.t(color.r)) + "," +
             Math.round(this.t(color.g)) + "," +
             Math.round(this.t(color.b)) + "," +
-            // Transparency by presence.
-            (this.t(color.a) * (this.sV ? this.sV.presence : 0)).toFixed(2) + ")";
+            (this.t(color.a) * (this.sV ? this.sV.presence : 0)).toFixed(2) + ")";  // Transparency by presence.
     }
 
     // Update mouse position in local space.
@@ -584,7 +545,6 @@ export class ViewContext {
     translate(d: number[]) {
         this.context.translate(this.t(d[0]), this.t(d[1]));
         this.updateMouse();
-        //this.translate(d[0], d[1]);
     }
 
     rotate(dr: number) {
@@ -661,16 +621,12 @@ export class ViewContext {
     strokeEllipse(cx:number, cy:number, rw:number, rh:number) {
         this.context.beginPath();
         this.ellipse(cx, cy, rw, rh);
-
-        //this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
         this.context.stroke();
     }
 
     fillEllipse(cx:number, cy:number, rw:number, rh:number) {
         this.context.beginPath();
         this.ellipse(cx, cy, rw, rh);
-
-        //this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
         this.context.fill();
 
         // Mouse hit.
@@ -786,7 +742,7 @@ export class ViewContext {
         this.context.globalAlpha = Math.max(0, this.sV.presence);
 
         this.context.drawImage(img,
-            spos[0], spos[1], sdim[0], sdim[1], //this.t(spos[0]), this.t(spos[1]), this.t(sdim[0]), this.t(sdim[1]),
+            spos[0], spos[1], sdim[0], sdim[1],
             this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
 
         // Correct mouse coordinates for image scaling.

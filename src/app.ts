@@ -3,20 +3,12 @@
 import bacon = require('bacon');
 import _ = require('lodash');
 
-import collection = require('./core/collection');
+import { InteractionState, EnrichedState } from './model';
+import { ProxyService } from './core/dataprovider';
+import { OverView } from './overview';
 
-import mod = require('./model');
-import InteractionState = mod.InteractionState;
-import EnrichedState = mod.EnrichedState;
-
-import data = require('./core/dataprovider');
-import ProxyService = data.ProxyService;
-
-import view = require('./overview');
-import OverView = view.OverView;
-
+// URL to the REST API.
 var serverPath = "server";
-
 
 // If no session key is specified in URL, request one and redirect to new session URL.
 var sessionPart = window.location.search.replace("?", "");

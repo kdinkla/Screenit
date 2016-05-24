@@ -4,30 +4,15 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", 'jsts', './model', './core/graphics/view', './core/graphics/snippet', './configuration', './core/math', './core/graphics/style'], function (require, exports, jsts, model, view, snippet, config, math, style) {
+define(["require", "exports", 'jsts', './model', './core/graphics/view', './core/graphics/snippet', './configuration', './core/math', './core/graphics/style'], function (require, exports, jsts, model_1, view_1, snippet_1, configuration_1, math_1, style_1) {
     "use strict";
-    var Population = model.Population;
-    var WellCoordinates = model.WellCoordinates;
-    var View = view.View;
-    var BaseSnippet = snippet.BaseSnippet;
-    var PlacedSnippet = snippet.PlacedSnippet;
-    var List = snippet.List;
-    var Label = snippet.Label;
-    var LabelStyle = snippet.LabelStyle;
-    var Polygon = snippet.Polygon;
-    var Line = snippet.Line;
-    var BaseConfiguration = config.BaseConfiguration;
-    var Vector = math.Vector;
-    var Color = style.Color;
     // View identifiers and their constructors.
     var viewConstructors = function () {
         return {
             'features': FeatureHistogramTable,
-            //'splom':      Splom,
             'exemplars': ExemplarTable,
             'datasets': DataSetList,
             'plates': PlateIndex,
-            //'plate':      JointWellPlates,
             'well': WellView
         };
     };
@@ -40,10 +25,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = state.configuration;
             var constructors = viewConstructors(); // All panel constructors.
             // Active panels.
-            var openPanels = model.viewCycle.map(function (ov) {
+            var openPanels = model_1.viewCycle.map(function (ov) {
                 return new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov));
             });
-            this.panelColumns = new List("pnlCols", openPanels, [0, 0], [0, 0], 'horizontal', cfg.panelSpace, 'left');
+            this.panelColumns = new snippet_1.List("pnlCols", openPanels, [0, 0], [0, 0], 'horizontal', cfg.panelSpace, 'left');
             //console.log("State:");
             //console.log(state);
         };
@@ -60,7 +45,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var isLoading = _.keys(state).filter(function (prp) { return state[prp] && _.isBoolean(state[prp]['converged']); }).some(function (prp) { return !state[prp].converged; });
             var secondsMod = Math.round(Date.now() / 1000) % 3;
             c.save();
-            c.strokeStyle(isLoading ? cfg.backgroundColor : Color.NONE);
+            c.strokeStyle(isLoading ? cfg.backgroundColor : style_1.Color.NONE);
             c.lineWidth(3);
             c.font(cfg.bigGuideStyle.font.toString());
             c.textBaseline('bottom');
@@ -70,23 +55,22 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             c.translate([.5 * this.dimensions()[0] - 20, this.dimensions()[1] - cfg.windowMargin]);
             c.transitioning = true;
             // Show computation text.
-            c.fillStyle(isLoading ? cfg.baseEmphasis : Color.NONE);
+            c.fillStyle(isLoading ? cfg.baseEmphasis : style_1.Color.NONE);
             c.strokeText(compTxt);
             c.fillText(compTxt);
             c.restore();
         };
         return OverView;
-    }(View));
+    }(view_1.View));
     exports.OverView = OverView;
     var ColumnPanel = (function (_super) {
         __extends(ColumnPanel, _super);
         function ColumnPanel(identifier, core, state, opened) {
             if (opened === void 0) { opened = false; }
-            _super.call(this, "cp_" + identifier, _.union([new ColumnLabel(identifier, core['toString'](opened), opened, state)], opened ? [core] : []), //[new Label("hdr_" + identifier, core.toString(), [0,0], state.configuration.panelHeaderLabel), core],
-            [0, 0], [0, 0], 'vertical', state.configuration.panelSpace, 'middle');
+            _super.call(this, "cp_" + identifier, _.union([new ColumnLabel(identifier, core['toString'](opened), opened, state)], opened ? [core] : []), [0, 0], [0, 0], 'vertical', state.configuration.panelSpace, 'middle');
         }
         return ColumnPanel;
-    }(List));
+    }(snippet_1.List));
     var ColumnLabel = (function (_super) {
         __extends(ColumnLabel, _super);
         function ColumnLabel(viewIdentifier, text, opened, state) {
@@ -106,7 +90,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.fillStyle(this.style.color);
             context.font(this.style.font.toString());
             context.save();
-            context.translate(this.opened ? this.topLeft : Vector.add(this.topLeft, [0, this.dimensions[1]]));
+            context.translate(this.opened ? this.topLeft : math_1.Vector.add(this.topLeft, [0, this.dimensions[1]]));
             context.rotate(this.opened ? 0 : -.5 * Math.PI);
             var dY = 0;
             this.lines.forEach(function (l) {
@@ -116,7 +100,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
         };
         return ColumnLabel;
-    }(Label));
+    }(snippet_1.Label));
     var DataSetList = (function (_super) {
         __extends(DataSetList, _super);
         function DataSetList(state) {
@@ -129,7 +113,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Screen: " + this.state.selectedCoordinates.dataSet;
         };
         return DataSetList;
-    }(List));
+    }(snippet_1.List));
     var DataSetLabel = (function (_super) {
         __extends(DataSetLabel, _super);
         function DataSetLabel(dataSet, state) {
@@ -141,7 +125,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.pushView('plates');
         };
         return DataSetLabel;
-    }(Label));
+    }(snippet_1.Label));
     var FeatureHistogramTable = (function (_super) {
         __extends(FeatureHistogramTable, _super);
         function FeatureHistogramTable(state) {
@@ -159,7 +143,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         FeatureHistogramTable.prototype.setTopLeft = function (topLeft) {
             _super.prototype.setTopLeft.call(this, topLeft);
             if (this.guide)
-                this.guide.setTopLeft(Vector.add(this.topRight, [15, 250]));
+                this.guide.setTopLeft(math_1.Vector.add(this.topRight, [15, 250]));
         };
         FeatureHistogramTable.prototype.paint = function (context) {
             _super.prototype.paint.call(this, context);
@@ -169,7 +153,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Features";
         };
         return FeatureHistogramTable;
-    }(List));
+    }(snippet_1.List));
     var FeatureList = (function (_super) {
         __extends(FeatureList, _super);
         function FeatureList(identifier, state, construct, align) {
@@ -177,21 +161,20 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             _super.call(this, identifier, state.features.value.map(function (f) { return new construct(f, state); }), [0, 0], [0, 0], 'vertical', state.configuration.featureCellSpace[1], align);
         }
         return FeatureList;
-    }(List));
+    }(snippet_1.List));
     var FeatureLabel = (function (_super) {
         __extends(FeatureLabel, _super);
         function FeatureLabel(feature, state) {
-            _super.call(this, "ftrLbl" + feature, feature, [0, 0], new LabelStyle(state.configuration.featureFont, state.populationSpace.features.has(feature) ?
+            _super.call(this, "ftrLbl" + feature, feature, [0, 0], new snippet_1.LabelStyle(state.configuration.featureFont, state.populationSpace.features.has(feature) ?
                 state.configuration.base :
                 state.configuration.baseDim, 'left', 'top'), true);
             this.feature = feature;
         }
         FeatureLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
             interaction.populationSpace.features = enriched.populationSpace.features.toggle(this.feature);
-            //interaction.pushView('splom');
         };
         return FeatureLabel;
-    }(Label));
+    }(snippet_1.Label));
     var FeatureHistogram = (function (_super) {
         __extends(FeatureHistogram, _super);
         function FeatureHistogram(feature, state) {
@@ -210,7 +193,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cacheTag = this.identifier + "_" + populations;
             var cachedImage = histograms[cacheTag];
             if (!cachedImage) {
-                cachedImage = View.renderToCanvas(this.dimensions[0], this.dimensions[1], function (plainContext) {
+                cachedImage = view_1.View.renderToCanvas(this.dimensions[0], this.dimensions[1], function (plainContext) {
                     // Per population frame.
                     var draw = function (fill) {
                         populations.forEach(function (population) {
@@ -225,12 +208,11 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                                 var x1 = i * spanWidth / len;
                                 var f1 = normFrequencies[i];
                                 var y1 = (1 - f1) * spanHeight;
-                                //plainContext.fillRect(x1, y1, 1, 1);
                                 plainContext.lineTo(x1, y1);
                             }
                             plainContext.lineTo(_this.dimensions[0], _this.dimensions[1]);
                             if (fill) {
-                                var fontColor = population.colorTrans; //population.colorTrans;
+                                var fontColor = population.colorTrans;
                                 plainContext.fillStyle = fontColor.toString();
                                 plainContext.fill();
                             }
@@ -252,7 +234,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Normalized pickable area.
             context.picking = true;
             context.scale(this.dimensions[0], this.dimensions[1]);
-            context.fillStyle(Color.NONE);
+            context.fillStyle(style_1.Color.NONE);
             context.fillRect(0, 0, 1, 1);
             context.picking = false;
             context.restore();
@@ -261,7 +243,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.selectedCoordinates.switchProbe([this.feature], [coordinates[0]]);
         };
         return FeatureHistogram;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var FeatureParallelCoordinates = (function (_super) {
         __extends(FeatureParallelCoordinates, _super);
         function FeatureParallelCoordinates(state) {
@@ -280,9 +262,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.save();
             context.translate(this.topLeft);
             context.transitioning = false;
-            //var allObjects = state.objectInfo.value.rows;
-            //var genStroke = new Color(0, 0, 0, 0.05);
-            //allObjects.forEach(ob => this.paintPolyLine(context, ob.toString(), genStroke));
             populations.forEach(function (p) {
                 return p.exemplars.elements.forEach(function (pE) {
                     return _this.paintPolyLine(context, pE.toString(), state.populationColorTranslucent(p));
@@ -299,7 +278,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         FeatureParallelCoordinates.prototype.paintPolyLine = function (context, object, color, lineWidth) {
             if (lineWidth === void 0) { lineWidth = 1; }
             var state = this.state;
-            //var cfg = state.configuration
             var features = state.features.value;
             var featureValues = state.objectFeatureValues.value;
             var width = this.dimensions[0];
@@ -318,7 +296,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             }
         };
         return FeatureParallelCoordinates;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var Splom = (function (_super) {
         __extends(Splom, _super);
         function Splom(model) {
@@ -345,18 +323,18 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             _super.prototype.setTopLeft.call(this, topLeft);
             if (this.plots) {
                 var cfg = this.model.configuration;
-                var marginTopLeft = Vector.add(this.topLeft, [cfg.sideFont.size, 0]);
+                var marginTopLeft = math_1.Vector.add(this.topLeft, [cfg.sideFont.size, 0]);
                 this.plots.forEach(function (pC, pCI) { return pC.forEach(function (p, pRI) {
                     var tPCI = Math.max(0, pCI);
                     var t2PRI = Math.max(0, pRI - 1);
                     if (p)
-                        p.topLeft = Vector.add(marginTopLeft, [pCI * _this.model.objectHistogramSize + tPCI * cfg.splomSpace,
+                        p.topLeft = math_1.Vector.add(marginTopLeft, [pCI * _this.model.objectHistogramSize + tPCI * cfg.splomSpace,
                             (pRI - 1) * _this.model.objectHistogramSize + t2PRI * cfg.splomSpace]);
                 }); });
             }
             if (this.mdsPlot) {
                 var cfg = this.model.configuration;
-                this.mdsPlot.topLeft = Vector.subtract(this.topRight, [this.model.objectHistogramSize - cfg.splomSpace, 0]);
+                this.mdsPlot.topLeft = math_1.Vector.subtract(this.topRight, [this.model.objectHistogramSize - cfg.splomSpace, 0]);
             }
         };
         Splom.prototype.paint = function (context) {
@@ -367,7 +345,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Space";
         };
         return Splom;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var ObjectFeaturePlot = (function (_super) {
         __extends(ObjectFeaturePlot, _super);
         function ObjectFeaturePlot(feature1, feature2, topLeft, model, configuration, size, columnLabel, rowLabel, headerLabel) {
@@ -390,13 +368,12 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var focusPopulation = (model.focused().population || -1).toString();
             this.cachedBackground = cachedBackgrounds[focusPopulation];
             if (!this.cachedBackground) {
-                this.cachedBackground = view.View.renderToCanvas(size, size, function (c) { return _this.histogram2DtoImage(c); });
+                this.cachedBackground = view_1.View.renderToCanvas(size, size, function (c) { return _this.histogram2DtoImage(c); });
                 model.objectHistograms.value[this.identifier] = this.cachedBackground;
             }
         }
         ObjectFeaturePlot.prototype.histogram2DtoImage = function (context) {
             var mod = this.model;
-            var cfg = this.configuration;
             var size = this.size;
             // Paint histograms, if available.
             var histograms = mod.objectHistograms.value.matricesFor(this.feature1, this.feature2) || [];
@@ -437,24 +414,20 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.scale(size, size);
             // Support picking over entire area.
             context.picking = true;
-            context.fillStyle(style.Color.NONE);
+            context.fillStyle(style_1.Color.NONE);
             context.fillRect(0, 0, 1, 1);
             context.picking = false;
             context.restore();
             context.save();
             context.translate(this.topLeft);
             context.transitioning = false;
-            //context.transitioning = false;
             context.drawImageScaled(this.cachedBackground, [0, 0], [this.size, this.size]);
             var objectFeatures = this.model.objectInfo.value;
             var x = objectFeatures.columnVector(this.feature1) || [];
             var y = objectFeatures.columnVector(this.feature2) || [];
-            //var clstr = mod.clusters.value;
             // Large colored dots with halo for representatives.
             mod.populationSpace.populations.forEach(function (pop) {
                 return pop.exemplars.forEach(function (ex) {
-                    //var cI = clstr.clusterMap[pop.identifier];
-                    //var color = cI >= 0 ? cfg.clusterColors[clstr.identifierIndex[cI]] : Color.NONE;
                     var oI = objectFeatures.rowIndex[ex];
                     ObjectFeaturePlot.drawBigDot(context, cfg, _this.model.populationColor(pop) /*pop.color*/, x[oI] * size, (1 - y[oI]) * size);
                 });
@@ -476,21 +449,21 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Header label for special plots.
             context.textBaseline('bottom');
             context.save();
-            context.fillStyle(this.headerLabel ? cfg.base : style.Color.NONE);
+            context.fillStyle(this.headerLabel ? cfg.base : style_1.Color.NONE);
             context.translate([.5 * this.size, 0]);
             context.fillText(this.headerLabel, 0, 0);
             context.restore();
             // Column (bottom) label.
             context.textBaseline('top');
             context.save();
-            context.fillStyle(this.columnLabel ? cfg.base : style.Color.NONE);
+            context.fillStyle(this.columnLabel ? cfg.base : style_1.Color.NONE);
             context.translate([.5 * this.size, this.size]);
             context.fillText(this.feature1, 0, 0);
             context.restore();
             // Row (left) label.
             context.textBaseline('bottom');
             context.save();
-            context.fillStyle(this.rowLabel ? cfg.base : style.Color.NONE);
+            context.fillStyle(this.rowLabel ? cfg.base : style_1.Color.NONE);
             context.translate([0, .5 * this.size]);
             context.rotate(-.5 * Math.PI);
             context.fillText(this.feature2, 0, 0);
@@ -512,48 +485,36 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.selectedCoordinates.switchProbe([this.feature1, this.feature2], invCs);
         };
         return ObjectFeaturePlot;
-    }(BaseSnippet));
+    }(snippet_1.BaseSnippet));
     var ExemplarTable = (function (_super) {
         __extends(ExemplarTable, _super);
         function ExemplarTable(state) {
             _super.call(this, "ExemplarStack", [0, 0]);
             this.state = state;
             var cfg = state.configuration;
-            //var activePopulations = this.state.populationSpace.populations.elements;
-            //.filter(p => p.identifier > Population.POPULATION_ALL_NAME);
             var visiblePopulations = this.state.populationSpace.visiblePopulations().elements;
             // Main Label.
-            var activeTypeLabel = new Label("ShownLbl", "Shown", [0, 0], state.configuration.subPanelHeaderLabel, true);
+            var activeTypeLabel = new snippet_1.Label("ShownLbl", "Shown", [0, 0], state.configuration.subPanelHeaderLabel, true);
             // Labels of active types.
-            var activeTypeLabels = new List("ActiveTypeLabels", visiblePopulations.map(function (p) { return new TypeLabel(p, state); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var activeTypeLabels = new snippet_1.List("ActiveTypeLabels", visiblePopulations.map(function (p) { return new TypeLabel(p, state); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
             var exemplarSelected = state.isExemplarSelected();
-            var exemplarLabel = new Label("ExemplarLbl", "Exemplars", [0, 0], state.configuration.subPanelHeaderLabel, true);
-            var columns = new List("ExemplarColumns", visiblePopulations.map(function (p) { return new ExemplarColumn(state, p); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
-            //var mainPopulations = _.union(
-            //        activePopulations, [state.populationSpace.populations.byId(Population.POPULATION_TOTAL_NAME)]);
-            //var transferLabel = new Label("PopulationTransfersLbl", "Abundance Score",
-            //                                [0,0], state.configuration.subPanelHeaderLabel, true);
-            //var transferButtons = new List("PopulationTransfers",
-            //        mainPopulations.map((p, pI) => new PopulationTransferEdit(p, state, pI === 0)),
-            //        [0,0], [0,0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var exemplarLabel = new snippet_1.Label("ExemplarLbl", "Exemplars", [0, 0], state.configuration.subPanelHeaderLabel, true);
+            var columns = new snippet_1.List("ExemplarColumns", visiblePopulations.map(function (p) { return new ExemplarColumn(state, p); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
             var selectedObjectDetailView = exemplarSelected ?
                 new ObjectDetailView(state.focused().object, state, [0, 0]) :
                 null;
-            var segSnippets = _.compact([activeTypeLabel, activeTypeLabels,
-                exemplarLabel, selectedObjectDetailView, columns]);
-            var shownSegment = new List("ShownSegments", segSnippets, [0, 0], [0, 0], 'vertical', cfg.subPanelSpace);
+            var segSnippets = _.compact([activeTypeLabel, activeTypeLabels, exemplarLabel, selectedObjectDetailView, columns]);
+            var shownSegment = new snippet_1.List("ShownSegments", segSnippets, [0, 0], [0, 0], 'vertical', cfg.subPanelSpace);
             // Hidden types.
             var hiddenSegment = [];
-            //if(state.populationSpace.inactivePopulations.length > 0) {
-            var hiddenTypeLabel = new Label("HiddenLbl", "Hidden", [0, 0], state.configuration.subPanelHeaderLabel, true);
-            var hiddenTypeStack = new List("HiddenTypeColumn", _.union(state.populationSpace.inactivePopulations.elements.map(function (ip) { return new TypeLabel(ip, state); }), state.isExemplarSelected() ?
+            var hiddenTypeLabel = new snippet_1.Label("HiddenLbl", "Hidden", [0, 0], state.configuration.subPanelHeaderLabel, true);
+            var hiddenTypeStack = new snippet_1.List("HiddenTypeColumn", _.union(state.populationSpace.inactivePopulations.elements.map(function (ip) { return new TypeLabel(ip, state); }), state.isExemplarSelected() ?
                 [
-                    new ExemplarAdditionButton(state.focused().object, state.populationSpace.allPopulations().byId(Population.POPULATION_UNCONFIDENT_NAME), state)
+                    new ExemplarAdditionButton(state.focused().object, state.populationSpace.allPopulations().byId(model_1.Population.POPULATION_UNCONFIDENT_NAME), state)
                 ] : []), [0, 0], [cfg.clusterTileInnerSize, 0], 'vertical', cfg.exemplarColumnSpace, 'middle');
-            hiddenSegment.push(new List("HiddenSegments", [hiddenTypeLabel, hiddenTypeStack], [0, 0], [0, 0], 'vertical', cfg.subPanelSpace));
-            //}
+            hiddenSegment.push(new snippet_1.List("HiddenSegments", [hiddenTypeLabel, hiddenTypeStack], [0, 0], [0, 0], 'vertical', cfg.subPanelSpace));
             // Combine shown and hidden segment columns.
-            this.segments = new List("TypeSegments", _.union([shownSegment], hiddenSegment), [0, 0], [0, 0], 'horizontal', cfg.subPanelSpace, 'left');
+            this.segments = new snippet_1.List("TypeSegments", _.union([shownSegment], hiddenSegment), [0, 0], [0, 0], 'horizontal', cfg.subPanelSpace, 'left');
             this.setDimensions(this.segments.dimensions);
         }
         ExemplarTable.prototype.setTopLeft = function (topLeft) {
@@ -568,7 +529,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Phenotypes";
         };
         return ExemplarTable;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var ExemplarAdditionButton = (function (_super) {
         __extends(ExemplarAdditionButton, _super);
         function ExemplarAdditionButton(object, population, state) {
@@ -576,7 +537,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.object = object;
             this.population = population;
             this.state = state;
-            this.labelStyle = new LabelStyle(state.configuration.clusterAdditionLabel, state.populationColor(population));
+            this.labelStyle = new snippet_1.LabelStyle(state.configuration.clusterAdditionLabel, state.populationColor(population));
             var cfg = state.configuration;
             this.setDimensions([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize]);
         }
@@ -588,17 +549,17 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.strokeStyle(cfg.baseDim);
             context.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
             context.picking = true;
-            context.fillStyle(Color.NONE);
+            context.fillStyle(style_1.Color.NONE);
             context.fillRect(0, 0, this.dimensions[0], this.dimensions[1]);
             context.picking = false;
-            context.translate(Vector.mul(this.dimensions, .5));
+            context.translate(math_1.Vector.mul(this.dimensions, .5));
             context.translate([0, -1]);
             context.textBaseline('middle');
             context.textAlign('center');
             context.fillStyle(cfg.baseDim);
             // Distinguish between regular phenotype and cell count phenotype.
             context.fillStyle(cfg.base);
-            if (this.population.identifier === Population.POPULATION_UNCONFIDENT_NAME) {
+            if (this.population.identifier === model_1.Population.POPULATION_UNCONFIDENT_NAME) {
                 context.font(cfg.sideFont.toString());
                 context.textBaseline('bottom');
                 context.fillText('New');
@@ -615,25 +576,30 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.populationSpace.addExemplar(this.object, this.population.identifier);
         };
         return ExemplarAdditionButton;
-    }(PlacedSnippet));
-    var ExemplarHeader = (function (_super) {
-        __extends(ExemplarHeader, _super);
-        function ExemplarHeader(state, population, topLeft) {
-            if (topLeft === void 0) { topLeft = [0, 0]; }
-            _super.call(this, "esc_" + population.identifier, _.union([new TypeLabel(population, state)] //,
-            ), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
-            this.state = state;
-            this.population = population;
-            this.topLeft = topLeft;
+    }(snippet_1.PlacedSnippet));
+    /*class ExemplarHeader extends List<PlacedSnippet> {
+        constructor(public state: EnrichedState,
+                    public population: Population,
+                    public topLeft = [0, 0]) {
+            super(
+                "esc_" + population.identifier,
+                _.union<PlacedSnippet>(
+                    [new TypeLabel(population, state)]
+                ),
+                topLeft,
+                [state.configuration.clusterTileInnerSize, 0],
+                'vertical',
+                state.configuration.exemplarSpace,
+                'middle'
+            );
         }
-        return ExemplarHeader;
-    }(List));
+    }*/
     var ExemplarColumn = (function (_super) {
         __extends(ExemplarColumn, _super);
         function ExemplarColumn(state, population, topLeft) {
             if (topLeft === void 0) { topLeft = [0, 0]; }
             _super.call(this, "esc_" + population.identifier, _.union(state.isExemplarSelected() &&
-                (!population.predefined /*|| population.identifier === Population.POPULATION_UNCONFIDENT_NAME*/) ?
+                !population.predefined ?
                 [new ExemplarAdditionButton(state.focused().object, population, state)] :
                 [], population.exemplars.elements.map(function (ex) { return new ObjectDetailView(ex, state, [0, 0]); })), topLeft, [state.configuration.clusterTileInnerSize, 0], 'vertical', state.configuration.exemplarSpace, 'middle');
             this.state = state;
@@ -641,7 +607,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.topLeft = topLeft;
         }
         return ExemplarColumn;
-    }(List));
+    }(snippet_1.List));
     var PopulationTransferEdit = (function (_super) {
         __extends(PopulationTransferEdit, _super);
         function PopulationTransferEdit(population, state, leftMost) {
@@ -650,17 +616,15 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.population = population;
             this.state = state;
             this.leftMost = leftMost;
-            //var minScore = state.wellClusterShares.value.zScoresMin[population.identifier];
-            //var maxScore = state.wellClusterShares.value.zScoresMax[population.identifier];
-            this.minZScoreLabel = (-state.configuration.activationZScoreRange).toString(); //minScore < 0 ? minScore.toFixed(0) : '?';
-            this.maxZScoreLabel = state.configuration.activationZScoreRange.toString(); //maxScore > 0 ? maxScore.toFixed(0) : '?';
+            this.minZScoreLabel = (-state.configuration.activationZScoreRange).toString();
+            this.maxZScoreLabel = state.configuration.activationZScoreRange.toString();
             var cfg = state.configuration;
             this.setDimensions([cfg.transferPlotSize, cfg.transferPlotSize + cfg.transferFont.size]);
         }
         PopulationTransferEdit.prototype.paint = function (context) {
             _super.prototype.paint.call(this, context);
             var cfg = this.state.configuration;
-            var center = Vector.mul([cfg.transferPlotSize, cfg.transferPlotSize], .5);
+            var center = math_1.Vector.mul([cfg.transferPlotSize, cfg.transferPlotSize], .5);
             context.save();
             context.translate(this.topLeft);
             // Internal axes.
@@ -679,7 +643,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 context.textAlign('right');
                 context.textBaseline('middle');
                 context.fillText('1  ', 0, 3);
-                //context.fillText('0  ', 0, .5 * cfg.transferPlotSize);
                 context.fillText('-1  ', 0, cfg.transferPlotSize - 3);
                 context.save();
                 context.font(cfg.sideFont.toString());
@@ -728,7 +691,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.font(cfg.transferFont.toString());
             context.textBaseline('top');
             context.textAlign('center');
-            context.fillText(this.population.identifier === Population.POPULATION_TOTAL_NAME ?
+            context.fillText(this.population.identifier === model_1.Population.POPULATION_TOTAL_NAME ?
                 absWellShare + " cells" :
                 (100 * absWellShare).toFixed(0) + "%", wellPnt[0], cfg.transferPlotSize);
             context.transitioning = false;
@@ -745,9 +708,9 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.transitioning = true;
             // Picking area.
             context.picking = true;
-            context.translate(Vector.mul([cfg.transferPlotSize, cfg.transferPlotSize], 0.5));
+            context.translate(math_1.Vector.mul([cfg.transferPlotSize, cfg.transferPlotSize], 0.5));
             context.scale(.5 * cfg.transferPlotSize, -.5 * cfg.transferPlotSize);
-            context.fillStyle(Color.NONE);
+            context.fillStyle(style_1.Color.NONE);
             context.fillRect(-1, -1, 2, 2);
             context.picking = false;
             context.restore();
@@ -770,7 +733,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 controlPoints[i][0] = Math.max(controlPoints[i][0], controlPoints[i - 1][0]);
         };
         return PopulationTransferEdit;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var TypeLabel = (function (_super) {
         __extends(TypeLabel, _super);
         function TypeLabel(population, state) {
@@ -784,7 +747,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         TypeLabel.prototype.paint = function (context) {
             _super.prototype.paint.call(this, context);
             var cfg = this.state.configuration;
-            var canBeHidden = this.population.identifier !== Population.POPULATION_TOTAL_NAME;
+            var canBeHidden = this.population.identifier !== model_1.Population.POPULATION_TOTAL_NAME;
             context.save();
             context.translate(this.topLeft);
             // Square colored inline and outline.
@@ -799,7 +762,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Picking support.
             if (canBeHidden) {
                 context.picking = true;
-                context.fillStyle(Color.NONE);
+                context.fillStyle(style_1.Color.NONE);
                 context.fillRect(0, 0, this.dimensions[0], this.dimensions[1]);
                 context.picking = false;
             }
@@ -811,7 +774,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.font(this.state.configuration.sideFont.toString());
             var fontHeight = cfg.sideFont.size + 1;
             context.save();
-            context.translate(Vector.mul([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize], .5));
+            context.translate(math_1.Vector.mul([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize], .5));
             context.translate([0, -.5 * fontHeight * (this.tagLines.length - 1)]);
             this.tagLines.forEach(function (line, i) {
                 context.strokeText(line, 0, i * fontHeight);
@@ -829,88 +792,27 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
         };
         TypeLabel.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
-            //interaction.selectedCoordinates.population = this.population.identifier;
             interaction.populationSpace.toggle(this.population);
         };
         return TypeLabel;
-    }(PlacedSnippet));
-    /*class TypeLabel extends Label {
-        constructor(public population: Population,
-                    public state: EnrichedState) {
-            super("lbl_" + population.identifier,
-                population.name,
-                [0,0],
-                //state.focused().population === population.identifier ?
-                //    state.configuration.clusterSelectedLabel :
-                    state.configuration.clusterLabel,
-                true);
-    
-            this.setDimensions([state.configuration.clusterTileInnerSize, this.dimensions[1]]);
-        }
-    
-        paint(context: ViewContext) {
-            var state = this.state;
-            var cfg = state.configuration;
-    
-            context.save();
-            context.translate(this.topLeft);
-            context.picking = true;
-    
-            context.fillStyle(state.populationColor(this.population));
-            context.fillRect(0, 0, state.configuration.clusterTileInnerSize, this.dimensions[1]);
-    
-            context.font(cfg.sideFont.toString());
-            context.fillStyle(cfg.base);
-            context.textBaseline('top');
-            context.fillText(state.populationSpace.inactivePopulations.has(this.population) ? "+" : "-");
-    
-            context.restore();
-        }
-    
-        mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
-            //interaction.selectedCoordinates.population = this.population.identifier;
-            interaction.populationSpace.toggle(this.population);
-        }
-    }*/
+    }(snippet_1.PlacedSnippet));
     var AbstractPlate = (function (_super) {
         __extends(AbstractPlate, _super);
-        function AbstractPlate(id, topLeft, state, columnLabels, rowLabels, prune) {
+        function AbstractPlate(id, topLeft, state, columnLabels, rowLabels) {
             var _this = this;
             if (columnLabels === void 0) { columnLabels = true; }
             if (rowLabels === void 0) { rowLabels = true; }
-            if (prune === void 0) { prune = false; }
             _super.call(this, id, topLeft);
             this.state = state;
             this.columnLabels = columnLabels;
             this.rowLabels = rowLabels;
-            this.prune = prune;
             var cfg = state.configuration;
             var info = state.dataSetInfo.value;
             var plate = this.state.focused().plate;
             var annotations = this.state.plateTargetAnnotations(plate);
             this.flatAnnotations = _.flatten(_.values(annotations).map(function (ann) { return _.values(ann); }));
-            // Build up (pruned) column and row indices.
-            /*if(prune) {
-                this.columnIndices = [];
-                this.rowIndices = [];
-    
-                _.values(annotations).forEach(cat =>
-                    _.values(cat).forEach((wS: WellSelection) =>
-                        wS.wells.forEach(w => {
-                            this.columnIndices.push(w.column);
-                            this.rowIndices.push(w.row);
-                        })
-                    )
-                );
-    
-                this.columnIndices = _.uniq(this.columnIndices.sort((l, r) => l - r), true);
-                this.rowIndices = _.uniq(this.rowIndices.sort((l, r) => l - r), true);
-            }
-            // Otherwise, all indices.
-            else {*/
             this.columnIndices = _.range(0, info.columnCount);
             this.rowIndices = _.range(0, info.rowCount);
-            //}
             this.columnToIndex = [];
             this.columnIndices.forEach(function (cI, i) { return _this.columnToIndex[cI] = i; });
             this.rowToIndex = [];
@@ -932,13 +834,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 // Tile per well.
                 var wellTiles = ws.wells.map(function (wc) { return tileAt(wc, 0); });
                 var body = new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
-                return body; //body ? body.buffer(1, 3, 0) : null;
+                return body;
             });
             this.selectionRims = this.flatAnnotations.map(function (ws) {
                 // Tile per well.
                 var wellTiles = ws.wells.map(function (wc) { return tileAt(wc, .5); });
                 var body = new jsts.operation.union.CascadedPolygonUnion(wellTiles).union();
-                return body; //body ? body.buffer(1, 3, 0) : null;
+                return body;
             });
             this.setDimensions([this.columnIndices.length * this.wellDiameter, this.rowIndices.length * this.wellDiameter]);
         }
@@ -946,14 +848,13 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var xIndex = Math.round(coordinates[0] * (this.columnIndices.length - 1));
             var yIndex = Math.round(coordinates[1] * (this.rowIndices.length - 1));
             if (xIndex in this.columnIndices && yIndex in this.rowIndices) {
-                var postPruneCoordinates = new WellCoordinates(this.columnIndices[xIndex], this.rowIndices[yIndex]);
+                var postPruneCoordinates = new model_1.WellCoordinates(this.columnIndices[xIndex], this.rowIndices[yIndex]);
                 interaction.selectedCoordinates.switchWell(postPruneCoordinates);
                 interaction.pushView('plates');
             }
         };
         AbstractPlate.prototype.paint = function (context) {
             var cfg = this.state.configuration;
-            //var info = this.state.dataSetInfo.value;
             context.save();
             context.translate(this.topLeft);
             context.transitioning = false;
@@ -961,13 +862,12 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.strokeStyle(cfg.baseSelected);
             context.lineWidth(2);
             context.strokeRect(-1.5, -1.5, this.dimensions[0] + 3, this.dimensions[1] + 3);
-            //this.paintSelectionBody(ctx);
             this.paintWellLabels(context);
             this.paintSelectionOutlines(context);
             // Well selection.
             context.scale(this.columnIndices.length * this.wellDiameter, this.rowIndices.length * this.wellDiameter);
             context.picking = true;
-            context.fillStyle(Color.NONE);
+            context.fillStyle(style_1.Color.NONE);
             context.fillRect(0, 0, 1, 1);
             context.picking = false;
             context.transitioning = true;
@@ -977,7 +877,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var _this = this;
             var cfg = this.state.configuration;
             var info = this.state.dataSetInfo.value;
-            var lblX = -cfg.plateRowLabelMargin; //this.columnIndices.length * this.wellDiameter + cfg.plateRowLabelMargin;
+            var lblX = -cfg.plateRowLabelMargin;
             var lblY = this.rowIndices.length * this.wellDiameter + cfg.plateColLabelMargin;
             ctx.save();
             ctx.font(cfg.sideFont.toString());
@@ -1019,7 +919,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         AbstractPlate.prototype.paintSelectionBody = function (ctx) {
             var cfg = this.state.configuration;
-            var info = this.state.dataSetInfo.value;
             ctx.fillStyle(cfg.base.alpha(0.2));
             ctx.beginPath();
             this.selectionOutlines.forEach(function (so) { return TemplatePlate.geometryToPath(ctx, so); });
@@ -1028,12 +927,11 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         AbstractPlate.prototype.paintSelectionOutlines = function (ctx) {
             var _this = this;
             var cfg = this.state.configuration;
-            var info = this.state.dataSetInfo.value;
             this.selectionOutlines.forEach(function (so, i) {
                 ctx.strokeStyle(cfg.backgroundColor);
                 ctx.lineWidth(2);
                 ctx.beginPath();
-                TemplatePlate.geometryToPath(ctx, so); //this.selectionRims[i]);
+                TemplatePlate.geometryToPath(ctx, so);
                 ctx.stroke();
                 if (_this.flatAnnotations[i].category === "Selected") {
                     ctx.fillStyle(cfg.baseSelected);
@@ -1049,17 +947,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     ctx.stroke();
                 }
             });
-            /*ctx.strokeStyle(cfg.backgroundColor);
-            ctx.lineWidth(3);
-            ctx.beginPath();
-            this.selectionOutlines.forEach(so => TemplatePlate.geometryToPath(ctx, so));
-            ctx.stroke();
-    
-            ctx.strokeStyle(cfg.base);
-            ctx.lineWidth(2);
-            ctx.beginPath();
-            this.selectionOutlines.forEach(so => TemplatePlate.geometryToPath(ctx, so));
-            ctx.stroke();*/
         };
         AbstractPlate.geometryToPath = function (context, geometry) {
             if (!geometry)
@@ -1128,7 +1015,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.closePath();
         };
         return AbstractPlate;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var TemplatePlate = (function (_super) {
         __extends(TemplatePlate, _super);
         function TemplatePlate(topLeft, model) {
@@ -1155,98 +1042,15 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var x = c * cfg.wellDiameter;
                 for (var r = 0; r < info.rowCount; r++) {
                     var y = r * cfg.wellDiameter;
-                    //ctx.strokeRect(x, y, this.wellDiameter, this.wellDiameter);
                     if (wellShares[c] && wellShares[c][r] >= -1) {
-                        ctx.fillStyle(BaseConfiguration.shareColorMap(wellShares[c][r]));
+                        ctx.fillStyle(configuration_1.BaseConfiguration.shareColorMap(wellShares[c][r]));
                         ctx.fillRect(x + .25, y + .25, this.wellDiameter - .5, this.wellDiameter - .5);
-                    }
-                    else {
                     }
                 }
             }
         };
         return TemplatePlate;
     }(AbstractPlate));
-    var FlowerPlate = (function (_super) {
-        __extends(FlowerPlate, _super);
-        function FlowerPlate(topLeft, state) {
-            _super.call(this, "flwPlt", topLeft, state, true, true, true);
-            this.state = state;
-        }
-        FlowerPlate.prototype.paint = function (context) {
-            // Selections behind well flowers.
-            _super.prototype.paint.call(this, context);
-            context.save();
-            context.translate(this.topLeft);
-            context.transitioning = false;
-            this.paintWells(context);
-            context.transitioning = true;
-            context.restore();
-        };
-        FlowerPlate.prototype.paintWells = function (ctx) {
-            var _this = this;
-            var cfg = this.state.configuration;
-            var info = this.state.dataSetInfo.value;
-            ctx.save();
-            // Population abundance flowers.
-            //for(var c = 0; c < info.columnCount; c++)
-            //    for(var r = 0; r < info.rowCount; r++)
-            //        this.paintPopulationFlower(ctx, c, r);
-            this.columnIndices.forEach(function (cI) { return _this.rowIndices.forEach(function (rI) { return _this.paintPopulationFlower(ctx, cI, rI); }); });
-            ctx.restore();
-        };
-        // Population abundance flower.
-        FlowerPlate.prototype.paintPopulationFlower = function (ctx, column, row) {
-            var _this = this;
-            var cfg = this.state.configuration;
-            var selection = this.state.focused();
-            var x = (this.columnToIndex[column] + .5) * this.wellDiameter;
-            var y = (this.rowToIndex[row] + .5) * this.wellDiameter;
-            // Fetch total cellCount.
-            var wellClusterShares = this.state.wellClusterShares.value;
-            var totalPopulation = wellClusterShares.wellIndex[Population.POPULATION_TOTAL_NAME] || [];
-            var totalWellShares = totalPopulation[selection.plate] || [];
-            var totalColumnShares = totalWellShares[column] || [];
-            var cellCount = totalColumnShares[row];
-            var maxObjectCount = wellClusterShares.maxPlateObjectCount[selection.plate]; //wellClusterShares.maxObjectCount;
-            var normObjectCellCount = Math.sqrt(maxObjectCount);
-            // Draw flower slice
-            var populations = this.state.populationSpace.allPopulations().elements.filter(function (p) { return p.exemplars.length > 0; });
-            populations.forEach(function (p, pI) {
-                var clusterShares = _this.state.wellClusterShares.value.wellIndex[p.identifier] || [];
-                var wellShares = clusterShares[selection.plate] || [];
-                var columnShares = wellShares[column] || [];
-                var share = columnShares[row];
-                ctx.fillStyle(_this.state.populationColor(p));
-                ctx.strokeStyle(cfg.baseEmphasis);
-                ctx.lineWidth(.5);
-                if (share >= 0 && cellCount >= 0) {
-                    var beginRad = 0.5 * Math.PI + 2 * Math.PI * pI / populations.length;
-                    var endRad = 0.5 * Math.PI + 2 * Math.PI * (pI + 1) / populations.length;
-                    var normWellCount = Math.sqrt(share * cellCount) / normObjectCellCount;
-                    ctx.beginPath();
-                    ctx.moveTo(x, y);
-                    ctx.arc(x, y, normWellCount * 0.5 * _this.wellDiameter, beginRad, endRad);
-                    ctx.lineTo(x, y);
-                    ctx.fill();
-                    ctx.stroke();
-                }
-            });
-        };
-        return FlowerPlate;
-    }(AbstractPlate));
-    var JointWellPlates = (function (_super) {
-        __extends(JointWellPlates, _super);
-        function JointWellPlates(state) {
-            _super.call(this, "jntPlt", [new TemplatePlate([0, 0], state), new FlowerPlate([0, 0], state)], [0, 0], [0, 0], 'vertical', state.configuration.panelHeaderSpace);
-            this.state = state;
-        }
-        JointWellPlates.prototype.toString = function () {
-            var focusedPlate = this.state.focused().plate;
-            return "Plate " + this.state.dataSetInfo.value.plateLabels[focusedPlate];
-        };
-        return JointWellPlates;
-    }(List));
     var WellView = (function (_super) {
         __extends(WellView, _super);
         function WellView(state) {
@@ -1260,7 +1064,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 "");
         };
         return WellView;
-    }(List));
+    }(snippet_1.List));
     var WellListView = (function (_super) {
         __extends(WellListView, _super);
         function WellListView(state) {
@@ -1272,7 +1076,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var columns = ['plate', 'column', 'row']
                 .map(function (field) { return new WellLocationList(field, WellListView.composeWells(state), state); })
                 .concat(new WellAbundanceList(state, WellListView.composeWells(state), WellListView.buttonsWidth(state)));
-            return new List("WellDetailColumns", columns, [0, 0], [0, 0], 'horizontal', state.configuration.listColumnSpace, 'left');
+            return new snippet_1.List("WellDetailColumns", columns, [0, 0], [0, 0], 'horizontal', state.configuration.listColumnSpace, 'left');
         };
         WellListView.buttonsWidth = function (state) {
             var cfg = state.configuration;
@@ -1281,19 +1085,15 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         WellListView.transferButtons = function (state) {
             var cfg = state.configuration;
-            var mainPopulations = _.union(state.populationSpace.visiblePopulations().elements, [state.populationSpace.populations.byId(Population.POPULATION_TOTAL_NAME)]);
-            //var transferLabel = new Label("PopulationTransfersLbl", "Score", [0,0], cfg.subPanelHeaderLabel, true);
-            var transferButtons = new List("PopulationTransfers", 
-            //_.union<PlacedSnippet>([transferLabel],
-            mainPopulations.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), //),
-            [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
+            var mainPopulations = _.union(state.populationSpace.visiblePopulations().elements, [state.populationSpace.populations.byId(model_1.Population.POPULATION_TOTAL_NAME)]);
+            var transferButtons = new snippet_1.List("PopulationTransfers", mainPopulations.map(function (p, pI) { return new PopulationTransferEdit(p, state, pI === 0); }), [0, 0], [0, 0], 'horizontal', cfg.exemplarColumnSpace, 'left');
             return transferButtons;
         };
         WellListView.composeWells = function (state) {
             return state.topWells();
         };
         return WellListView;
-    }(List));
+    }(snippet_1.List));
     var WellLocationList = (function (_super) {
         __extends(WellLocationList, _super);
         function WellLocationList(field, wells, state) {
@@ -1301,7 +1101,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.state = state;
         }
         return WellLocationList;
-    }(List));
+    }(snippet_1.List));
     var WellLocationLabel = (function (_super) {
         __extends(WellLocationLabel, _super);
         function WellLocationLabel(location, field, state) {
@@ -1314,7 +1114,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.selectedCoordinates.switchLocation(this.location);
         };
         return WellLocationLabel;
-    }(Label));
+    }(snippet_1.Label));
     var WellAbundanceList = (function (_super) {
         __extends(WellAbundanceList, _super);
         function WellAbundanceList(state, wells, width) {
@@ -1340,7 +1140,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             }); });
             // Cumulative share, first column is padding.
             var cumulativeShares = [this.wells.map(function (w) { return 0; })];
-            populations.forEach(function (p, i) { return cumulativeShares.push(Vector.add(cumulativeShares[i], shares[i])); });
+            populations.forEach(function (p, i) { return cumulativeShares.push(math_1.Vector.add(cumulativeShares[i], shares[i])); });
             // Normalize cumulative shares to [0, max.cum. share].
             this.abundanceShareMax = _.max(cumulativeShares[cumulativeShares.length - 1]);
             cumulativeShares = cumulativeShares.map(function (pS) { return pS.map(function (s) { return s / _this.abundanceShareMax; }); });
@@ -1363,10 +1163,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var preList = listCs(pI);
                 var postList = listCs(pI + 1).reverse();
                 var totalList = preList.concat(postList);
-                return new Polygon("WellListArea_" + p.identifier, totalList, p.color, cfg.backgroundColor, false);
+                return new snippet_1.Polygon("WellListArea_" + p.identifier, totalList, p.color, cfg.backgroundColor, false);
             });
             // Object count (total population).
-            var counts = this.wells.map(function (w) { return clusterShares.share(Population.POPULATION_TOTAL_NAME, w.location); });
+            var counts = this.wells.map(function (w) { return clusterShares.share(model_1.Population.POPULATION_TOTAL_NAME, w.location); });
             if (counts) {
                 this.cntMin = 0;
                 this.cntMax = clusterShares.maxObjectCount;
@@ -1383,7 +1183,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                         .concat(cntListCs)
                         .concat([[cntListCs[cntListCs.length - 1][0],
                             cntListCs.length * this.wellHeight]]);
-                this.cntLine = new Line("WellCountLine", cntListCs, Population.POPULATION_TOTAL_COLOR, false);
+                this.cntLine = new snippet_1.Line("WellCountLine", cntListCs, model_1.Population.POPULATION_TOTAL_COLOR, false);
             }
         };
         WellAbundanceList.prototype.paint = function (context) {
@@ -1430,7 +1230,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.restore();
         };
         return WellAbundanceList;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var WellDetailView = (function (_super) {
         __extends(WellDetailView, _super);
         function WellDetailView(state) {
@@ -1439,16 +1239,16 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var cfg = state.configuration;
             this.imgDim = state.dataSetInfo.value.imageDimensions;
             this.wellScale = Math.min(1, cfg.wellViewMaxWidth / this.imgDim[0]);
-            this.imgScaledDim = Vector.mul(this.imgDim, this.wellScale);
+            this.imgScaledDim = math_1.Vector.mul(this.imgDim, this.wellScale);
             this.setDimensions(this.imgScaledDim);
             var availableTypes = _.keys(state.availableImageTypes());
             var wellOptions = {};
             availableTypes.forEach(function (t) { return wellOptions[t] = t; });
             this.overlayOption = new ConfigurationOptions("WellOverlayOptions", [0, 0], state, "imagePopulationOverlay", { None: "None", Phenotypes: "Phenotypes" });
             this.imageTypeOption = new ConfigurationOptions("WellDetailOptions", [0, 0], state, "imageType", wellOptions);
-            var options = new List("wellOptions", [this.overlayOption, this.imageTypeOption], [0, 0], [0, 0], 'vertical', cfg.annotationColumnSpace, 'left');
-            var optionLabels = new List("wellOptionLabels", ["overlay", "image"].map(function (lbl) { return new Label("opt_" + lbl, lbl, [0, 0], cfg.annotationCategoryLabel); }), [0, 0], [0, 0], 'vertical', cfg.annotationColumnSpace, 'right');
-            this.optionTable = new List("wellOptionTable", [optionLabels, options], [0, 0], [0, 0], 'horizontal', 2 * cfg.annotationColumnSpace);
+            var options = new snippet_1.List("wellOptions", [this.overlayOption, this.imageTypeOption], [0, 0], [0, 0], 'vertical', cfg.annotationColumnSpace, 'left');
+            var optionLabels = new snippet_1.List("wellOptionLabels", ["overlay", "image"].map(function (lbl) { return new snippet_1.Label("opt_" + lbl, lbl, [0, 0], cfg.annotationCategoryLabel); }), [0, 0], [0, 0], 'vertical', cfg.annotationColumnSpace, 'right');
+            this.optionTable = new snippet_1.List("wellOptionTable", [optionLabels, options], [0, 0], [0, 0], 'horizontal', 2 * cfg.annotationColumnSpace);
             var focused = state.focused();
             this.annotationTable = new WellAnnotationTable("focusedAnnotations", state.wellAnnotations.value.annotationsAt(focused.plate, focused.well), state);
             // Generate predicted population outlines.
@@ -1460,8 +1260,8 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var annotationHeight = this.annotationTable.dimensions[1];
                 var optionsHeight = this.optionTable.dimensions[1];
                 var maxHeight = Math.max(annotationHeight, optionsHeight);
-                this.annotationTable.setTopLeft(Vector.add(this.topLeft, [0, maxHeight - annotationHeight]));
-                this.optionTable.setTopLeft(Vector.add(this.topRight, [-this.optionTable.dimensions[0], maxHeight - optionsHeight]));
+                this.annotationTable.setTopLeft(math_1.Vector.add(this.topLeft, [0, maxHeight - annotationHeight]));
+                this.optionTable.setTopLeft(math_1.Vector.add(this.topRight, [-this.optionTable.dimensions[0], maxHeight - optionsHeight]));
             }
         };
         WellDetailView.prototype.computePopulationOutlines = function () {
@@ -1475,19 +1275,18 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                         p[1][0],
                         p[1][1],
                         Math.min(_this.state.configuration.wellViewMaxObjectRadius, 0.5 * _.min(_.pairs(objectCoordinates).map(function (sp) {
-                            return p[0] === sp[0] ? Number.POSITIVE_INFINITY : Vector.distance(p[1], sp[1]);
+                            return p[0] === sp[0] ? Number.POSITIVE_INFINITY : math_1.Vector.distance(p[1], sp[1]);
                         }))) - 5,
                         _this.state.objectInfo.value.cell("population", p[0])
                     ];
                 });
-                this.state.objectInfo.value["wellOutlines"] = this.objectMaxRadi; //this.outlines;
+                this.state.objectInfo.value["wellOutlines"] = this.objectMaxRadi;
             }
         };
         WellDetailView.prototype.paint = function (ctx) {
             var _this = this;
             var state = this.state;
             var cfg = state.configuration;
-            //ctx.transitioning = false;
             ctx.save();
             ctx.translate(this.topLeft);
             ctx.translate([0,
@@ -1510,7 +1309,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     ctx.save();
                     var allPopulations = this.state.populationSpace.allPopulations();
                     _.pairs(this.objectMaxRadi).forEach(function (p) {
-                        //var obj = p[0];
                         var cs = p[1];
                         if (cs[3] >= 0) {
                             var x = _this.wellScale * cs[0];
@@ -1538,10 +1336,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var rI = state.focused().object === null ? -1 : objects.rowIndex[state.focused().object];
                 var rX = rI >= 0 ? x[rI] : .5 * this.dimensions[0];
                 var rY = rI >= 0 ? y[rI] : .5 * this.dimensions[1];
-                ctx.strokeStyle(rI >= 0 ? cfg.backgroundColor : Color.NONE);
+                ctx.strokeStyle(rI >= 0 ? cfg.backgroundColor : style_1.Color.NONE);
                 ctx.lineWidth(4);
                 ctx.strokeRect(this.wellScale * rX - xRad, this.wellScale * rY - yRad, 2 * xRad, 2 * yRad);
-                ctx.strokeStyle(rI >= 0 ? cfg.baseSelected : Color.NONE);
+                ctx.strokeStyle(rI >= 0 ? cfg.baseSelected : style_1.Color.NONE);
                 ctx.lineWidth(2);
                 ctx.strokeRect(this.wellScale * rX - xRad, this.wellScale * rY - yRad, 2 * xRad, 2 * yRad);
                 ctx.strokeStyle(cfg.baseDim);
@@ -1549,10 +1347,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 ctx.transitioning = true;
             }
             ctx.restore();
-            //ctx.transitioning = true;
             // Well type button.
-            //ctx.snippet(this.imageTypeOption);
-            //ctx.snippet(this.overlayOption);
             ctx.snippet(this.optionTable);
             ctx.snippet(this.annotationTable);
         };
@@ -1563,41 +1358,15 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.pushView('well');
         };
         return WellDetailView;
-    }(PlacedSnippet));
-    /*class WellAnnotationTable extends List<List<Label>> {
-        constructor(identifier: string, annotations: StringMap<string[]>, state: EnrichedState) {
-            super(identifier,
-                _.keys(annotations).sort().map(k => new WellAnnotationRow(identifier, k, annotations[k], state)),
-                [0,0],
-                [0,0],
-                'vertical',
-                state.configuration.annotationColumnSpace,
-                'left');
-        }
-    }
-    
-    class WellAnnotationRow extends List<Label> {
-        constructor(tableId: string, category: string, tags: string[], state: EnrichedState) {
-            super(tableId + "_" + category,
-                _.union(
-                    [new Label(tableId + "_" + category + "_lbl", category, [0,0], state.configuration.annotationCategoryLabel, true)],
-                    tags.map(tag => new AnnotationButton(category, tag, state))),
-                [0,0],
-                [0,0],
-                'horizontal',
-                state.configuration.annotationTagSpace,
-                'left'
-            );
-        }
-    }*/
+    }(snippet_1.PlacedSnippet));
     var WellAnnotationTable = (function (_super) {
         __extends(WellAnnotationTable, _super);
         function WellAnnotationTable(identifier, annotations, state) {
             _super.call(this, identifier, [
-                new List("annTableLbls", WellAnnotationTable.annotationKeys(annotations).map(function (k) {
-                    return new Label("annTableLbl" + k, k.toLowerCase(), [0, 0], state.configuration.annotationCategoryLabel, false);
+                new snippet_1.List("annTableLbls", WellAnnotationTable.annotationKeys(annotations).map(function (k) {
+                    return new snippet_1.Label("annTableLbl" + k, k.toLowerCase(), [0, 0], state.configuration.annotationCategoryLabel, false);
                 }), [0, 0], [0, 0], 'vertical', state.configuration.annotationColumnSpace, 'right'),
-                new List("annTableRows", WellAnnotationTable.annotationKeys(annotations).map(function (k) {
+                new snippet_1.List("annTableRows", WellAnnotationTable.annotationKeys(annotations).map(function (k) {
                     return new WellAnnotationRow(identifier, k, annotations[k], state);
                 }), [0, 0], [0, 0], 'vertical', state.configuration.annotationColumnSpace, 'left')
             ], [0, 0], [0, 0], 'horizontal', 2 * state.configuration.annotationColumnSpace);
@@ -1606,14 +1375,14 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return _.keys(annotations).sort(function (l, r) { return l.length - r.length; });
         };
         return WellAnnotationTable;
-    }(List));
+    }(snippet_1.List));
     var WellAnnotationRow = (function (_super) {
         __extends(WellAnnotationRow, _super);
         function WellAnnotationRow(tableId, category, tags, state) {
             _super.call(this, tableId + "_" + category, tags.map(function (tag) { return new AnnotationButton(category, tag, state); }), [0, 0], [0, 0], 'horizontal', state.configuration.annotationTagSpace, 'left');
         }
         return WellAnnotationRow;
-    }(List));
+    }(snippet_1.List));
     var AnnotationButton = (function (_super) {
         __extends(AnnotationButton, _super);
         function AnnotationButton(category, tag, state) {
@@ -1627,7 +1396,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.selectedCoordinates.wellFilter = this.tag;
         };
         return AnnotationButton;
-    }(Label));
+    }(snippet_1.Label));
     var ObjectDetailView = (function (_super) {
         __extends(ObjectDetailView, _super);
         function ObjectDetailView(object, state, topLeft) {
@@ -1645,29 +1414,23 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         ObjectDetailView.prototype.paint = function (ctx) {
             var mod = this.state;
             var cfg = mod.configuration;
-            //var size = [this.diameter, this.diameter];
             var imgRadius = cfg.objectViewImageRadius;
             var internalRadius = [imgRadius, imgRadius];
-            var internalDiameter = Vector.mul(internalRadius, 2);
+            var internalDiameter = math_1.Vector.mul(internalRadius, 2);
             ctx.save();
             ctx.translate(this.topLeft);
-            //ctx.transitioning = false;
             ctx.picking = true;
-            //var objectWells = mod.allObjectWells();
             var wellInfo = mod.objectWellInfo(this.object);
-            //var well = mod.wellLocation()//objectWells.location(this.object);
             if (wellInfo) {
                 var img = wellInfo.location.image(cfg.imageType === "None" ? null : cfg.imageType);
-                var coordinates = wellInfo.coordinates; //objectWells.coordinates(this.object);
-                //console.log("Object well location:");
-                //console.log(wellInfo.location);
+                var coordinates = wellInfo.coordinates;
                 if (img && coordinates) {
                     // Trunc cell coordinates to stay within image.
                     coordinates = [
                         Math.min(img.width - imgRadius, Math.max(imgRadius, coordinates[0])),
                         Math.min(.5 * img.height - imgRadius, Math.max(imgRadius, coordinates[1]))
                     ];
-                    var internalTopLeft = Vector.subtract(coordinates, internalRadius);
+                    var internalTopLeft = math_1.Vector.subtract(coordinates, internalRadius);
                     ctx.drawImageClipped(img, internalTopLeft, internalDiameter, [0, 0], this.dimensions);
                     // Predicted population tag.
                     ctx.transitioning = false;
@@ -1688,7 +1451,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                         ctx.lineWidth(4);
                     }
                     else {
-                        ctx.strokeStyle(Color.NONE);
+                        ctx.strokeStyle(style_1.Color.NONE);
                     }
                     ctx.transitioning = true;
                     ctx.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
@@ -1698,20 +1461,17 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                         ctx.lineWidth(2);
                     }
                     else {
-                        ctx.strokeStyle(Color.NONE);
+                        ctx.strokeStyle(style_1.Color.NONE);
                     }
                     ctx.transitioning = true;
                     ctx.strokeRect(0, 0, this.dimensions[0], this.dimensions[1]);
                 }
             }
             ctx.picking = false;
-            //ctx.transitioning = true;
             ctx.restore();
             ctx.transitioning = false;
         };
         ObjectDetailView.prototype.mouseClick = function (event, coordinates, enriched, interaction) {
-            //interaction.removeExemplar(this.object);
-            //interaction.selectedCoordinates.object = this.object;
             interaction.selectedCoordinates.switchObject(this.object);
             enriched.conformSelectedCoordinates(interaction);
             // Remove exemplar status of object (on second click).
@@ -1719,7 +1479,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 interaction.removeExemplar(this.object);
         };
         return ObjectDetailView;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var PlateIndex = (function (_super) {
         __extends(PlateIndex, _super);
         function PlateIndex(state) {
@@ -1732,7 +1492,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             var addedPlates = _.range(datInfo.plateCount);
             var initialStackCnt = Math.ceil(addedPlates.length / cfg.miniHeatColumnMax);
             var regularPlates = (initialStackCnt - focusPlateWidth) * cfg.miniHeatColumnMax;
-            var plateStacks = []; //_.range(0, Math.ceil(addedPlates.length / cfg.miniHeatColumnMax)).map(c => []);
+            var plateStacks = [];
             addedPlates.forEach(function (p, pI) {
                 // Regular plate goes to regular stack.
                 var targetStack = -1;
@@ -1757,7 +1517,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                     if (ps[i] === null) {
                         if (snippetStack[1]) {
                             var firstHeatmap = snippetStack[1];
-                            snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...", Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
+                            snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...", math_1.Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
                         }
                     }
                     else {
@@ -1767,108 +1527,20 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                         var miniHeatMap = new PlateMiniHeatmap(p, state);
                         // Add top plate label.
                         if (prevP === null || !((i - 1) in ps)) {
-                            snippetStack.push(new Label("plateLblTop_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
+                            snippetStack.push(new snippet_1.Label("plateLblTop_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
                         }
                         // Add heat map label.
                         snippetStack.push(miniHeatMap);
                         // Add bottom plate label.
                         if (nextP === null || !((i + 1) in ps)) {
-                            snippetStack.push(new Label("plateLblBottom_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
+                            snippetStack.push(new snippet_1.Label("plateLblBottom_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
                         }
                     }
                 }
-                return new List("pic_" + psI, snippetStack, //ps.map(p => new PlateMiniHeatmap(p, state)),
-                [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
+                return new snippet_1.List("pic_" + psI, snippetStack, [0, 0], [0, 0], 'vertical', cfg.miniHeatSpace, 'middle');
             });
-            var colLists = new List("pic_", stackLists, [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'right');
-            //var heatMaps = _.range(0, datInfo.plateCount).map(pI => new PlateMiniHeatmap(pI, state));
-            //var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
-            //var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
-            //    _.compact(_.range(0, colCapacity).map(rI => heatMaps[cI * colCapacity + rI])));
-            //var colMaps = state.platePartition().map(pR => pR.map(pI => new PlateMiniHeatmap(pI, state)));
-            /*var colPartitions = state.plateAnnotationPartition();
-    
-            var colLists = colPartitions.map((cP, cI) => {
-                var addedPlates: number[] = [];
-                for(var i = 0; i < cP.plates.length; i++) {
-                    var prevP = cP.plates[i-1];
-                    var p = cP.plates[i];
-    
-                    if(prevP < p - 1) addedPlates.push(null);   // Insert additional plate.
-    
-                    addedPlates.push(p);
-                }
-    
-                var plateStacks = _.range(0, Math.ceil(addedPlates.length / cfg.miniHeatColumnMax)).map(c => []);
-                addedPlates.forEach((p, pI) => plateStacks[Math.floor(pI / cfg.miniHeatColumnMax)].push(p));
-    
-                var stackLists = plateStacks.map((ps, psI) => {
-                    var snippetStack: PlacedSnippet[] = [];
-                    for(var i = 0; i < ps.length; i++) {
-                        if(ps[i] === null) {
-                            if(snippetStack[1]) { // Temporary fix.
-                                var firstHeatmap = snippetStack[1];
-                                snippetStack.push(new SubstitutePlateLabel("plateLblSubst_" + ps[i], "...",
-                                    Vector.add(firstHeatmap.dimensions, [0, -2 * cfg.miniHeatSpace]), cfg.sideLabel));
-                            }
-                        } else {
-                            var prevP = ps[i - 1];
-                            var p = ps[i];
-                            var nextP = ps[i + 1];
-    
-                            var miniHeatMap = new PlateMiniHeatmap(p, state);
-    
-                            // Add top plate label.
-                            if (prevP === null || !((i-1) in ps)) {
-                                snippetStack.push(new Label("plateLblTop_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
-                            }
-    
-                            // Add heat map label.
-                            snippetStack.push(miniHeatMap);
-    
-                            // Add bottom plate label.
-                            if (nextP === null || !((i+1) in ps)) {
-                                snippetStack.push(new Label("plateLblBottom_" + p, datInfo.plateLabels[p], [0, 0], cfg.sideLabel));
-                            }
-                        }
-                    }
-    
-                    return new List(
-                        "pic_" + cI + "_" + psI,
-                        snippetStack,   //ps.map(p => new PlateMiniHeatmap(p, state)),
-                        [0, 0], [0, 0],
-                        'vertical',
-                        cfg.miniHeatSpace,
-                        'middle');
-                });
-    
-                var stackWrappedLists = new List(
-                    "pic_" + cI,
-                    stackLists,
-                    [0, 0], [0, 0],
-                    'horizontal',
-                    cfg.miniHeatSpace,
-                    'left');
-    
-                var stackFooter = new List(
-                    "picf_" + cI,
-                    cP.tags.map(t => new AnnotationButton(null, t, state)),
-                    [0,0], [0,0],
-                    'vertical',
-                    cfg.miniHeatSpace,
-                    'middle'
-                );
-    
-                return new List(
-                    "tpic_" + cI,
-                    [stackWrappedLists, stackFooter],
-                    [0,0], [0,0],
-                    'vertical',
-                    2 * cfg.miniHeatSpace,
-                    'middle'
-                );
-            });*/
-            this.heatmapColumns = colLists; //new List("pics", colLists, [0,0], [0,0], 'horizontal', cfg.splomSpace, 'left');
+            var colLists = new snippet_1.List("pic_", stackLists, [0, 0], [0, 0], 'horizontal', cfg.miniHeatSpace, 'right');
+            this.heatmapColumns = colLists;
             var focusedPlate = state.focused().plate;
             if (focusedPlate >= 0)
                 this.selectedHeatmap = new TemplatePlate([0, 0], state);
@@ -1881,12 +1553,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 this.heatmapColumns.setTopLeft(topLeft);
             if (this.selectedHeatmap) {
                 var cfg = this.state.configuration;
-                this.selectedHeatmap.setTopLeft(Vector.add(this.topRight, [-this.selectedHeatmap.dimensions[0], cfg.sideLabel.font.size + cfg.miniHeatSpace]));
+                this.selectedHeatmap.setTopLeft(math_1.Vector.add(this.topRight, [-this.selectedHeatmap.dimensions[0], cfg.sideLabel.font.size + cfg.miniHeatSpace]));
             }
         };
         PlateIndex.prototype.paint = function (context) {
-            var state = this.state;
-            var cfg = state.configuration;
             // Heat maps.
             context.snippet(this.heatmapColumns);
             context.snippet(this.selectedHeatmap);
@@ -1895,7 +1565,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             return "Plates";
         };
         return PlateIndex;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var SubstitutePlateLabel = (function (_super) {
         __extends(SubstitutePlateLabel, _super);
         function SubstitutePlateLabel(identifier, label, dimensions, style) {
@@ -1904,7 +1574,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 this.setDimensions([this.dimensions[0], dimensions[1] - 2 * this.dimensions[1]]);
         }
         return SubstitutePlateLabel;
-    }(Label));
+    }(snippet_1.Label));
     var PlateMiniHeatmap = (function (_super) {
         __extends(PlateMiniHeatmap, _super);
         function PlateMiniHeatmap(plateNumber, state) {
@@ -1956,7 +1626,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             // Normalized picking.
             context.scale(this.dimensions[0], this.dimensions[1]);
             context.picking = true;
-            context.fillStyle(style.Color.NONE);
+            context.fillStyle(style_1.Color.NONE);
             context.fillRect(0, 0, 1, 1);
             context.picking = false;
             context.restore();
@@ -1972,7 +1642,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 var wellFilled = false;
                 var imgWidth = datInfo.columnCount * cfg.miniHeatWellDiameter;
                 var imgHeight = datInfo.rowCount * cfg.miniHeatWellDiameter;
-                var image = view.View.renderToCanvas(imgWidth, imgHeight, function (ctx) {
+                var image = view_1.View.renderToCanvas(imgWidth, imgHeight, function (ctx) {
                     for (var c = 0; c < datInfo.columnCount; c++) {
                         var cVals = plateShares[c] || [];
                         var cX = c * cfg.miniHeatWellDiameter;
@@ -1981,7 +1651,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                             if (val >= 0)
                                 wellFilled = true;
                             var cY = r * cfg.miniHeatWellDiameter;
-                            ctx.fillStyle = BaseConfiguration.shareColorMap(val).toString();
+                            ctx.fillStyle = configuration_1.BaseConfiguration.shareColorMap(val).toString();
                             ctx.fillRect(cX, cY, 2, 2);
                         }
                     }
@@ -2001,10 +1671,10 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
         };
         PlateMiniHeatmap.wellCoordinatesAt = function (mouseCoordinates, state) {
             var info = state.dataSetInfo.value;
-            return new WellCoordinates(Math.round(mouseCoordinates[0] * (info.columnCount - 1)), Math.round(mouseCoordinates[1] * (info.rowCount - 1)));
+            return new model_1.WellCoordinates(Math.round(mouseCoordinates[0] * (info.columnCount - 1)), Math.round(mouseCoordinates[1] * (info.rowCount - 1)));
         };
         return PlateMiniHeatmap;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var ConfigurationButton = (function (_super) {
         __extends(ConfigurationButton, _super);
         function ConfigurationButton(identifier, text, position, targetField, targetValue, style) {
@@ -2016,7 +1686,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             interaction.configuration[this.targetField] = this.targetValue;
         };
         return ConfigurationButton;
-    }(Label));
+    }(snippet_1.Label));
     var ConfigurationOptions = (function (_super) {
         __extends(ConfigurationOptions, _super);
         function ConfigurationOptions(identifier, topLeft, targetState, targetField, targetMap) {
@@ -2025,15 +1695,16 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             this.targetField = targetField;
             this.targetMap = targetMap;
             var cfg = targetState.configuration;
-            var baseStyle = new LabelStyle(cfg.annotationFont, cfg.baseDim, 'left', 'top');
-            var selectedStyle = new LabelStyle(cfg.annotationFont, cfg.baseEmphasis, 'left', 'top');
+            var baseStyle = new snippet_1.LabelStyle(cfg.annotationFont, cfg.baseDim, 'left', 'top');
+            var selectedStyle = new snippet_1.LabelStyle(cfg.annotationFont, cfg.baseEmphasis, 'left', 'top');
             var buttonSnippets = _.pairs(targetMap).map(function (p, pI) {
                 var label = p[0];
                 var value = p[1];
-                var style = cfg[targetField] === value || (!cfg[targetField] && pI === 0) ? selectedStyle : baseStyle; // Default to first option.
+                // Default to first option.
+                var style = cfg[targetField] === value || (!cfg[targetField] && pI === 0) ? selectedStyle : baseStyle;
                 return new ConfigurationButton(identifier + "_" + value, label, topLeft, targetField, value, style);
             });
-            this.buttons = new List(identifier + "_lst", buttonSnippets, topLeft, [0, 0], 'horizontal', 5, 'top');
+            this.buttons = new snippet_1.List(identifier + "_lst", buttonSnippets, topLeft, [0, 0], 'horizontal', 5, 'top');
             this.setDimensions(this.buttons.dimensions);
         }
         ConfigurationOptions.prototype.setTopLeft = function (topLeft) {
@@ -2045,7 +1716,7 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             context.snippet(this.buttons);
         };
         return ConfigurationOptions;
-    }(PlacedSnippet));
+    }(snippet_1.PlacedSnippet));
     var GuideLabel = (function (_super) {
         __extends(GuideLabel, _super);
         function GuideLabel(identifier, text, position, circleCenter, circleRadius, state) {
@@ -2060,12 +1731,11 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
                 _super.prototype.paint.call(this, context);
                 context.save();
                 var cfg = this.state.configuration;
-                var circleAbsCenter = Vector.add(this.topLeft, this.circleCenter);
+                var circleAbsCenter = math_1.Vector.add(this.topLeft, this.circleCenter);
                 circleAbsCenter[1] += 0.5 * this.dimensions[1];
-                var connectorVector = Vector.mul(Vector.normalize(this.circleCenter), -1);
-                var connectorEdge = Vector.add(circleAbsCenter, Vector.mul(connectorVector, this.circleRadius));
-                var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
-                //var connectorOuter = Vector.add(connectorEdge, Vector.mul(connectorVector, 2 * this.circleRadius));
+                var connectorVector = math_1.Vector.mul(math_1.Vector.normalize(this.circleCenter), -1);
+                var connectorEdge = math_1.Vector.add(circleAbsCenter, math_1.Vector.mul(connectorVector, this.circleRadius));
+                var connectorOuter = math_1.Vector.add(connectorEdge, math_1.Vector.mul(connectorVector, 2 * this.circleRadius));
                 context.strokeStyle(cfg.backgroundColor);
                 context.lineWidth(3.5);
                 context.strokeEllipse(circleAbsCenter[0], circleAbsCenter[1], this.circleRadius, this.circleRadius);
@@ -2078,6 +1748,6 @@ define(["require", "exports", 'jsts', './model', './core/graphics/view', './core
             }
         };
         return GuideLabel;
-    }(Label));
+    }(snippet_1.Label));
 });
 //# sourceMappingURL=overview.js.map

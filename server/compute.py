@@ -108,24 +108,10 @@ def wellToObjects(dataSet):
 def selectImageFeatures(dataSet, subset):
     return subset[data.imageFeatures(dataSet)]
 
-#@memory.cache
-# def logicleSet(vec, minimum=None, maximum=None):
-#     vecMin = vec.min() if minimum is None else minimum
-#     vecMax = vec.max() if maximum is None else maximum
-#     rNeg = min(0, vecMin)
-#     rMax = abs(vecMax)
-#     decades = max(1, abs(math.ceil(math.log10(rMax))))
-#     scaleTop = rMax
-#
-#     logicleVec = _logicle(vec, T=scaleTop, m=decades, r=rNeg, w=0.5)
-#
-#     return logicleVec
-
 def minMaxScale(vec, vecMin, vecMax):
     return (vec - vecMin) / (vecMax - vecMin)
 
 # Assume that the features are scaled, and behave decently, already. Do normalize to [0,1].
-# TODO: add client-side marking for log scaled features.
 def adaptiveScale(vec, metrics):
     vecMin = metrics['min']
     vecMax = metrics['max']
@@ -144,7 +130,7 @@ def scaledSmallSample(dataSet):
     return scale(selectImageFeatures(dataSet, smallSample))
 
 @synchronized
-@lru_cache(maxsize=100)
+@lru_cache(maxsize=5)
 def scaledArray(dataSet, column):
     return adaptiveScale(data.numpyDump(dataSet, column), featureMetrics(dataSet)[column])
 
@@ -172,7 +158,7 @@ def featureInfo(dataSet):
     return featureOrdering(dataSet)
 
 @synchronized
-@lru_cache(maxsize=5)
+@lru_cache(maxsize=1)
 def clusters(dataSet, features, exemplars):
     ftrs = list(features)
 

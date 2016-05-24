@@ -4,11 +4,8 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", './style', '../math'], function (require, exports, style, math) {
+define(["require", "exports", './style', '../math'], function (require, exports, style_1, math_1) {
     "use strict";
-    var Color = style.Color;
-    var Font = style.Font;
-    var Vector = math.Vector;
     // Base implementation of snippet.
     var BaseSnippet = (function () {
         function BaseSnippet(identifier) {
@@ -33,7 +30,6 @@ define(["require", "exports", './style', '../math'], function (require, exports,
             //this.topLeft = topLeft;
             this.dimensions = [0, 0];
             this.setTopLeft(topLeft);
-            //this.updatePositions();
         }
         // Sets top left position.
         PlacedSnippet.prototype.setTopLeft = function (topLeft) {
@@ -48,7 +44,7 @@ define(["require", "exports", './style', '../math'], function (require, exports,
         PlacedSnippet.prototype.updatePositions = function () {
             this.topRight = [this.topLeft[0] + this.dimensions[0], this.topLeft[1]];
             this.bottomLeft = [this.topLeft[0], this.topLeft[1] + this.dimensions[1]];
-            this.bottomRight = Vector.add(this.topLeft, this.dimensions);
+            this.bottomRight = math_1.Vector.add(this.topLeft, this.dimensions);
         };
         return PlacedSnippet;
     }(BaseSnippet));
@@ -100,8 +96,8 @@ define(["require", "exports", './style', '../math'], function (require, exports,
                     lAcc += s.dimensions[lAxis] + _this.space;
                 });
                 this.dimensions = this.snippets.length > 0 ?
-                    Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) : [0, 0];
-                //this.dimensions[lAxis] = Math.max(0, lAcc - this.space);
+                    math_1.Vector.subtract(this.snippets[this.snippets.length - 1].bottomRight, this.snippets[0].topLeft) :
+                    [0, 0];
                 this.dimensions[wAxis] = span;
             }
             this.updatePositions();
@@ -132,7 +128,7 @@ define(["require", "exports", './style', '../math'], function (require, exports,
     var Rectangle = (function (_super) {
         __extends(Rectangle, _super);
         function Rectangle(identifier, topLeft, size, color, pickable) {
-            if (color === void 0) { color = style.Color.BLACK; }
+            if (color === void 0) { color = style_1.Color.BLACK; }
             if (pickable === void 0) { pickable = false; }
             _super.call(this, identifier);
             this.identifier = identifier;
@@ -155,7 +151,7 @@ define(["require", "exports", './style', '../math'], function (require, exports,
     var Triangle = (function (_super) {
         __extends(Triangle, _super);
         function Triangle(identifier, coordinates, color, pickable) {
-            if (color === void 0) { color = style.Color.BLACK; }
+            if (color === void 0) { color = style_1.Color.BLACK; }
             if (pickable === void 0) { pickable = false; }
             _super.call(this, identifier);
             this.identifier = identifier;
@@ -170,9 +166,9 @@ define(["require", "exports", './style', '../math'], function (require, exports,
             context.translate(this.coordinates[0]);
             context.beginPath();
             context.moveTo(0, 0);
-            var sC = Vector.subtract(this.coordinates[1], this.coordinates[0]);
+            var sC = math_1.Vector.subtract(this.coordinates[1], this.coordinates[0]);
             context.lineTo(sC[0], sC[1]);
-            var fC = Vector.subtract(this.coordinates[2], this.coordinates[0]);
+            var fC = math_1.Vector.subtract(this.coordinates[2], this.coordinates[0]);
             context.lineTo(fC[0], fC[1]);
             context.closePath();
             context.fill();
@@ -247,8 +243,8 @@ define(["require", "exports", './style', '../math'], function (require, exports,
     // Basic text label.
     var LabelStyle = (function () {
         function LabelStyle(font, color, horizontalAnchor, verticalAnchor, rotation) {
-            if (font === void 0) { font = new Font(); }
-            if (color === void 0) { color = Color.BLACK; }
+            if (font === void 0) { font = new style_1.Font(); }
+            if (color === void 0) { color = style_1.Color.BLACK; }
             if (horizontalAnchor === void 0) { horizontalAnchor = 'left'; }
             if (verticalAnchor === void 0) { verticalAnchor = 'top'; }
             if (rotation === void 0) { rotation = 0; }
@@ -275,7 +271,7 @@ define(["require", "exports", './style', '../math'], function (require, exports,
             this.lines = style.font.wordWrap(text);
             var dimensions = style.font.wrapDimensions(this.lines);
             // Determine top left position from position and align.
-            this.topLeft = Vector.clone(this.position);
+            this.topLeft = math_1.Vector.clone(this.position);
             if (this.style.horizontalAnchor === 'middle')
                 this.topLeft[0] -= .5 * this.dimensions[0];
             else if (this.style.horizontalAnchor === 'right')

@@ -6,10 +6,8 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", 'lodash', '../collection', '../math'], function (require, exports, _, collection, math) {
+define(["require", "exports", 'lodash', '../collection', '../math'], function (require, exports, _, collection_1, math_1) {
     "use strict";
-    var identify = collection.identify;
-    var Vector = math.Vector;
     // Canvas view that supports state transitions while drawing a model of type M.
     var View = (function () {
         // Base constructor, by HTML element id.
@@ -41,14 +39,6 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
                 ]);
                 _this.update();
             });
-            /*Bacon.fromEventTarget<MouseEvent>(this.canvas, 'mousemove').onValue(e => {
-                this.mousePos = this.correctHighDPIMouse([e.offsetX, e.offsetY]);
-                this.update();
-            });*/
-            // Push mouse events to subjects.
-            /*jqCanvas['asEventStream']('click').onValue(e => {
-                console.log("Mouse click as stream!");
-            });*/
             document.oncontextmenu = function () { return false; }; // Circumvent mouse context menu.
             this.mouseClick = Bacon.fromEventTarget(this.canvas, 'click')
                 .map(function (e) { return new ViewMouseEvent(e, 'mouseClick', _this.mousePos, _this.hits); });
@@ -94,14 +84,11 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
         };
         View.prototype.updateCycle = function () {
             var man = this.manager;
-            //this.canvas.width = this.content.offsetWidth;
-            //this.canvas.height = this.content.offsetHeight;
             var context = this.canvas.getContext('2d');
             context.setTransform(1, 0, 0, 1, 0, 0);
             context.textBaseline = "bottom";
             // Adjust canvas scaling and dimensions for high-DPI screens.
             this.correctHighDPI(context);
-            //this.resizeBus.push(new ViewResizeEvent(this.dimensions()));
             // Pre draw.
             var nT = new Date().getTime(); // Determine the time passed since last draw.
             man.dT = Math.min(1000 / 30, man.oT ? (nT - man.oT) : 1000 / 30);
@@ -146,8 +133,6 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
                     endSnip.index = sV.index;
                 }
             });
-            // Update snippets.
-            //var newSnippets: StringMap<SnippetValues> = {};
             // Draw non-drawn snippets.
             man.snippetList.forEach(function (sV) {
                 if (!sV.drawn) {
@@ -172,12 +157,6 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
                 window.clearInterval(this.updater);
                 this.updater = null;
             }
-            /*if(nT - this.updateTime > 10 * DrawManager.pD) {
-                this.updater = false;
-            } else {
-                window["requestAnimFrame"](() => this.updateCycle());
-                //console.log("Update anim frame.");
-            }*/
         };
         View.prototype.correctHighDPI = function (context) {
             this.pixelRatio = window.devicePixelRatio || 1; // Device pixel ratio, fallback to 1.
@@ -199,7 +178,7 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
             context.scale(scaleRatio, scaleRatio);
         };
         View.prototype.correctHighDPIMouse = function (pos) {
-            return Vector.mul(pos, this.pixelRatio / this.storeRatio);
+            return math_1.Vector.mul(pos, this.pixelRatio / this.storeRatio);
         };
         // Off-screen buffer draw helper function.
         View.renderToCanvas = function (width, height, renderFunction) {
@@ -366,7 +345,7 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
             }
             if (!snippet)
                 return;
-            var id = identify(snippet);
+            var id = collection_1.identify(snippet);
             var man = this.manager;
             // Set snippet values context.
             this.sV = man.snippets[id];
@@ -420,7 +399,6 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
                     var d = target - im.value; // Apply acceleration.
                     im.change += this.dT * (d - (2 * im.change * this.mD)) / this.mD2;
                     var ad = this.dT * im.change; // Apply velocity.
-                    //im.value += ad;
                     im.value = ad > 0 ? Math.min(target, im.value + ad) : Math.max(target, im.value + ad);
                     sV.ti++; // Increment for next transition.
                 }
@@ -440,8 +418,7 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
                 Math.round(this.t(color.r)) + "," +
                 Math.round(this.t(color.g)) + "," +
                 Math.round(this.t(color.b)) + "," +
-                // Transparency by presence.
-                (this.t(color.a) * (this.sV ? this.sV.presence : 0)).toFixed(2) + ")";
+                (this.t(color.a) * (this.sV ? this.sV.presence : 0)).toFixed(2) + ")"; // Transparency by presence.
         };
         // Update mouse position in local space.
         ViewContext.prototype.updateMouse = function () {
@@ -490,7 +467,6 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
         ViewContext.prototype.translate = function (d) {
             this.context.translate(this.t(d[0]), this.t(d[1]));
             this.updateMouse();
-            //this.translate(d[0], d[1]);
         };
         ViewContext.prototype.rotate = function (dr) {
             this.context.rotate(this.t(dr));
@@ -546,16 +522,14 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
         ViewContext.prototype.strokeEllipse = function (cx, cy, rw, rh) {
             this.context.beginPath();
             this.ellipse(cx, cy, rw, rh);
-            //this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
             this.context.stroke();
         };
         ViewContext.prototype.fillEllipse = function (cx, cy, rw, rh) {
             this.context.beginPath();
             this.ellipse(cx, cy, rw, rh);
-            //this.context['ellipse'](this.t(cx), this.t(cy), this.t(rw), this.t(rh), 0, 2 * Math.PI, false);
             this.context.fill();
             // Mouse hit.
-            if (Vector.Euclidean(Vector.subtract([cx, cy], [this.mouseR[0], this.mouseR[1]])) <= 0.5 * (rw + rh))
+            if (math_1.Vector.Euclidean(math_1.Vector.subtract([cx, cy], [this.mouseR[0], this.mouseR[1]])) <= 0.5 * (rw + rh))
                 this.pushHit();
         };
         // Ellipse path with fallback.
@@ -648,8 +622,7 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
         ViewContext.prototype.drawImageClipped = function (img, spos, sdim, pos, dim) {
             var oldAlpha = this.context.globalAlpha;
             this.context.globalAlpha = Math.max(0, this.sV.presence);
-            this.context.drawImage(img, spos[0], spos[1], sdim[0], sdim[1], //this.t(spos[0]), this.t(spos[1]), this.t(sdim[0]), this.t(sdim[1]),
-            this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
+            this.context.drawImage(img, spos[0], spos[1], sdim[0], sdim[1], this.t(pos[0]), this.t(pos[1]), this.t(dim[0]), this.t(dim[1]));
             // Correct mouse coordinates for image scaling.
             this.mouseR = [this.mouseR[0] * sdim[0] / dim[0], this.mouseR[1] * sdim[1] / dim[1]];
             // Mouse hit. TODO: scale.

@@ -2,38 +2,21 @@
 
 import bacon = require('bacon');
 
-import math = require('./core/math');
-import Vector = math.Vector;
-import Matrix = math.Matrix;
-
-import style = require('./core/graphics/style');
-import Color = style.Color;
-
-import collection = require('./core/collection');
-import NumberMap = collection.NumberMap;
-import StringMap = collection.StringMap;
-import Chain = collection.Chain;
-
-import dataframe = require('./core/dataframe');
-import DataFrame = dataframe.DataFrame;
-import NumberFrame = dataframe.NumberFrame;
-
-import data = require('./core/dataprovider');
-import ProxyValue = data.ProxyValue;
-
-import model = require('./core/graphics/model');
-import AbstractModel = model.Model;
-
+import { Vector } from './core/math';
+import { Color } from './core/graphics/style';
+import { StringMap, Chain } from './core/collection';
+import { DataFrame, NumberFrame } from './core/dataframe';
+import { ProxyValue } from './core/dataprovider';
+import { BaseConfiguration } from './configuration';
+import { snapshot } from './core/collection';
 import controller = require('./core/graphics/controller');
+import math = require('./core/math');
 
-import config = require('./configuration');
-import BaseConfiguration = config.BaseConfiguration;
+// The view columns and their ordering.
+export var viewCycle = ['datasets', 'plates', 'well', 'exemplars', 'features'];
 
-export var viewCycle = ['datasets', 'plates', /*'plate',*/ 'well', 'exemplars', 'features'];    //, 'splom'];
-
-export class InteractionState implements AbstractModel {
+export class InteractionState {
     constructor(public populationSpace: PopulationSpace = null,
-                //public hoveredCoordinates: SelectionCoordinates = null,
                 public selectedCoordinates: SelectionCoordinates = null,
                 public openViews: Chain<string> = null,
                 public configuration: BaseConfiguration = null) {
@@ -42,18 +25,16 @@ export class InteractionState implements AbstractModel {
 
     switchToDataSet(dataSet: string) {
         this.populationSpace = new PopulationSpace();
-        //this.hoveredCoordinates = new SelectionCoordinates();
         this.selectedCoordinates = new SelectionCoordinates();
-        this.openViews = new Chain(['plates']); //, 'exemplars']);
+        this.openViews = new Chain(['plates']);
         this.configuration = new BaseConfiguration();
         this.selectedCoordinates.dataSet = dataSet;
 
     }
 
+    // Remove given exemplar from any population (should be a single population).
     removeExemplar(object: number) {
-        // Remove given exemplar from any population (should be a single population).
         this.populationSpace.removeExemplar(object);
-        //if(this.hoveredCoordinates.object === object) this.hoveredCoordinates.object = null;
     }
 
     pushView(identifier: string) {
@@ -62,20 +43,6 @@ export class InteractionState implements AbstractModel {
         this.openViews = new Chain([viewCycle[index], viewCycle[index + 1]]);
     }
 
-    /*toggleAnnotation(category: string, tag: string) {
-        var annotations = this.selectedCoordinates.wellAnnotations;
-        // Specific category is targeted; toggle its tag.
-        if(category) {
-            annotations[category] = _.contains(annotations[category], tag) ?
-                _.difference(annotations[category], [tag]) :
-                _.union(annotations[category], [tag]);
-        }
-        // Otherwise, remove from all categories.
-        else {
-            _.keys(annotations).forEach(k => annotations[k] = annotations[k].filter(annTag => annTag !== tag));
-        }
-    }*/
-
     toJSON() {
         return JSON.stringify(_.pick(this, ['populationSpace', 'hoveredCoordinates', 'selectedCoordinates', 'openViews']));
     }
@@ -83,7 +50,6 @@ export class InteractionState implements AbstractModel {
     static fromJSON(data: {}) {
         return new InteractionState(
             PopulationSpace.fromJSON(data['populationSpace']),
-            //SelectionCoordinates.fromJSON(data['hoveredCoordinates']),
             SelectionCoordinates.fromJSON(data['selectedCoordinates']),
             Chain.fromJSON<string>(data['openViews']),
             new BaseConfiguration()
@@ -228,10 +194,10 @@ export class EnrichedState extends InteractionState {
 
     cloneInteractionState() {
         return new InteractionState(
-            collection.snapshot(this.populationSpace),
-            collection.snapshot(this.selectedCoordinates),
-            collection.snapshot(this.openViews),
-            collection.snapshot(this.configuration)
+            snapshot(this.populationSpace),
+            snapshot(this.selectedCoordinates),
+            snapshot(this.openViews),
+            snapshot(this.configuration)
         );
     }
 
@@ -482,109 +448,9 @@ export class EnrichedState extends InteractionState {
         return this.rankedWells().slice(0, this.configuration.listWellsCount);
     }
 
-    // Column partition ordering of plates by score (TODO: by population/count vector.)
-    /*platePartition() {
-        // Compute score from total cell count, for now.
-        var datasetInfo = this.dataSetInfo.value;
-        var wellShares = this.wellClusterShares.value;
-        //var objectCount = wellShares.wellIndex[(this.focused().population || Population.POPULATION_TOTAL_NAME).toString()];
-
-        // Plate score by id.
-        var plateRange = this.plates();
-        //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
-        var platesOrdered = _.clone(plateRange);
-
-        // Shares have been loaded.
-        var plateScores: number[];
-        var wellScores = this.wellScores();
-        if(wellScores) {
-            // If target vector is not specified: take maximum object count of each plate.
-            //if(_.keys(this.populationScoreVector).length === 0) {
-            //    objectCount.forEach((pS, pI) => plateScores[pI] = _.max<number>(pS.map(cS => _.max<number>(cS))));
-            //} else {
-            //    var popKeys = _.keys(this.populationScoreVector);
-            //    var populationMatrices = _.compact(popKeys.map(k => wellShares[k]));
-            //    var targetVector = popKeys.map(p => this.populationScoreVector[p]);
-
-            //    plateRange.forEach(plate => plateScores[plate] = this.plateScore(targetVector, populationMatrices));
-            //}
-
-            plateScores = plateRange.map(plate => _.max(_.flatten(wellScores[plate])));
-        } else {
-            plateScores = plateRange.map(i => i);
-        }
-
-        // Order plate range by score.
-        platesOrdered = platesOrdered.sort((p1, p2) => plateScores[p1] - plateScores[p2]);
-
-        var datInfo = this.dataSetInfo.value;
-        var cfg = this.configuration;
-        var colCapacity = Math.ceil(datInfo.plateCount / cfg.miniHeatColumnCount);
-        var colMaps = _.range(0, cfg.miniHeatColumnCount).map(cI =>
-            _.compact(_.range(0, colCapacity).map(rI => platesOrdered[cI * colCapacity + rI])).sort((p1, p2) => p1 - p2));
-
-        return colMaps;
-    }*/
-
-    /*plateAnnotationPartition(): { tags: string[]; plates: number[] }[] {
-        // Plate score by id.
-        var plateRange = this.plates();
-        //var plateScores = plateRange.map(i => i); // Stick to in-order partition in case of no well shares.
-        //var platesOrdered = _.clone(plateRange);
-
-        // Focused annotations.
-        /*var allTargetPlateSelections = plateRange.map(p => this.plateTargetAnnotations(p));
-
-        // Bin plates by annotations.
-        var bins: StringMap<{ annotations: string[]; plates: number[] }> = {};
-        allTargetPlateSelections.forEach((sel, p) => {
-            var tags = _.uniq(_.flatten(_.values(sel).map(tags =>
-                            _.keys(tags).filter(t => tags[t].wells.length > 0))).sort(), true);
-            var binKey = tags.join(",");
-            if(!(binKey in bins)) bins[binKey] = { annotations: tags, plates: <number[]>[] };
-            bins[binKey].plates.push(p);
-        });
-
-        return <any>_.values(bins);*/
-
-        /*var focusTags = new Chain<string>(<any>_.flatten(_.values(this.focused().wellAnnotations)));
-        var plateTags = this.wellAnnotations.value.plateTags;
-        var bins: StringMap<{ tags: string[]; plates: number[] }> = {};
-        plateRange.forEach(p => {
-            var tags: Chain<string> = plateTags[p] || new Chain<string>();
-            var matchTags = _.intersection(focusTags.elements, tags.elements);    ///Chain.intersection<string>([focusTags, tags]);
-            var binKey = matchTags.join(",");
-            if(!(binKey in bins)) bins[binKey] = { tags: matchTags, plates: [] };
-            bins[binKey].plates.push(p);
-        });
-
-        return <any> _.values(bins);
-    }*/
-
     // Plate annotations as well selections, returned as a map of annotation category and tag.
     plateTargetAnnotations(plate: number) {
-        //var dataInfo = this.dataSetInfo.value;
-        //var wellAnnotations = this.wellAnnotations.value;
-        //var focusAnnotations = this.focused().wellAnnotations;
-
         var selections: StringMap<StringMap<WellSelection>> = {};
-        /*_.keys(focusAnnotations).forEach(cat => {
-            selections[cat] = {};
-            focusAnnotations[cat].forEach(tag =>
-                    selections[cat][tag] = new WellSelection(cat, tag, plate, [])
-            );
-        });
-        dataInfo.columnLabels.forEach((c, cI) =>
-            dataInfo.rowLabels.forEach((r, rI) => {
-                var wellCoordinates = new WellCoordinates(cI, rI);
-                var annotations = wellAnnotations.annotationsAt(plate, wellCoordinates);
-
-                _.keys(annotations).forEach(cat => annotations[cat].forEach(tag => {
-                    if (cat in selections && tag in selections[cat])
-                        selections[cat][tag].wells.push(wellCoordinates);
-                }));
-            })
-        );*/
 
         // Add focused well.
         selections["Selected"] = {};
@@ -651,11 +517,6 @@ export class PopulationSpace {
         return allPops;
     }
 
-    // Active populations, or all population as fallback. TODO: get rid of this by going unconfident for all.
-    //activeOrAll() {
-    //    return this.populations.length > 1 ? this.populations : new Chain([Population.ALL]);
-    //}
-
     // Toggle activation of population.
     toggle(population: Population) {
         if(this.populations.has(population)) {
@@ -684,7 +545,7 @@ export class PopulationSpace {
     createPopulation(id: number = null, tag: string = "Picked", predefined: boolean = false) {
         // Choose an available nominal color.
         var takenColors = this.allPopulations().map(p => p.color);
-        var availableColors = new Chain(Color.colorMapNominal12);
+        var availableColors = new Chain(Color.colorMapNominal18);
         var freeColors = Chain.difference(availableColors, takenColors);
         var color = freeColors.length > 0 ? freeColors.elements[0] : Color.WHITE;
 
@@ -885,8 +746,6 @@ export class DataSetInfo {
     columnCount: number;
     rowCount: number;
 
-    //wellSelections: WellSelection[];
-
     constructor(public plateLabels: string[] = [],
                 public columnLabels: string[] = [],
                 public rowLabels: string[] = [],
@@ -895,18 +754,12 @@ export class DataSetInfo {
         this.plateCount = plateLabels.length;
         this.columnCount = columnLabels.length;
         this.rowCount = rowLabels.length;
-
-        // Well selection placeholder; complete selection and control wells, for now.
-        //this.wellSelections = [
-            //new WellSelection("All", [[0, this.plateCount-1]], WellCoordinates.allWells(this.columnCount, this.rowCount)),
-            //new WellSelection("Control", [[0, this.plateCount-1]], WellCoordinates.rowWells(this.columnCount, [0]))  // First two columns.
-        //];
     }
 }
 
 export class WellClusterShares extends NumberFrame {
-    wellIndex: number[][][][];  // Index by cluster name (object nr), plate nr, col nr, row nr.
-    maxObjectCount: number;     // Maximum number of objects for all wells.
+    wellIndex: number[][][][];      // Index by cluster name (object nr), plate nr, col nr, row nr.
+    maxObjectCount: number;         // Maximum number of objects for all wells.
     maxPlateObjectCount: number[];  // Maximum number of objects per plate.
 
     shareStatistics: { mean: number; standardDeviation: number }[];   // Share mean and standard deviation per population.
@@ -929,13 +782,9 @@ export class WellClusterShares extends NumberFrame {
                 this.inject(val, this.wellIndex, _.flatten<any>([[c], localI]));
             });
         });
-        //delete this.wellIndex[0];
 
         this.maxPlateObjectCount = (this.wellIndex[Population.POPULATION_TOTAL_NAME] || [])
                                     .map(plt => _.max(<number[]>_.flattenDeep<number>(plt)));
-
-        // Missing wells have zero of everything.
-        //this.wellIndex = this.wellIndex.map(p => p.map(plt => plt.map(col => Vector.invalidToZero(col))));
 
         // Share statistics.
         this.shareStatistics = this.wellIndex.map(pShares => math.statistics(
@@ -986,12 +835,10 @@ export class WellClusterShares extends NumberFrame {
 export class WellAnnotations extends DataFrame<string[]> {
     static ANNOTATION_SPLIT = "|";
 
-    plateTags: Chain<string>[];
+    //plateTags: Chain<string>[];
 
     constructor(dictionary: any = {}) {
         super(dictionary);
-
-        //this.computePlateAnnotations();
     }
 
     // Return dictionary of annotations for given plate and well coordinates.
@@ -1002,29 +849,21 @@ export class WellAnnotations extends DataFrame<string[]> {
         return dict;
     }
 
-    private computePlateAnnotations() {
+    /*private computePlateAnnotations() {
         this.plateTags = [];
 
         // Accumulate plate annotations by scanning all rows.
         this.rows.forEach((row) => {
             var parts = row.split('_');
             var plate = Number(parts[0]);
-            //var column = Number(parts[1]);
-            //var row = Number(parts[2]);
 
             // Create plate selection array.
             if(!(plate in this.plateTags)) this.plateTags[plate] = new Chain<string>();
-            //var plateSelection = this.plateTags[plate];
 
             // Columns are annotation categories.
             this.columns.forEach(column => {
                 var tags = this.cell(column, row);
                 this.plateTags[plate] = this.plateTags[plate].pushAll(tags);
-
-                /*if(tags.length > 0) {
-                    if(!(column in plateSelection)) plateSelection[column] = new Chain<string>();
-                    plateSelection[column] = plateSelection[column].pushAll(tags);
-                }*/
             });
         });
 
@@ -1032,26 +871,7 @@ export class WellAnnotations extends DataFrame<string[]> {
         this.plateTags.forEach(ts => ts.elements.sort());
 
         return this.plateTags;
-
-        /*var selections: StringMap<StringMap<WellSelection>> = {};
-        _.keys(focusAnnotations).forEach(cat => {
-            selections[cat] = {};
-            focusAnnotations[cat].forEach(tag =>
-                    selections[cat][tag] = new WellSelection(cat, tag, plate, [])
-            );
-        });
-        dataInfo.columnLabels.forEach((c, cI) =>
-                dataInfo.rowLabels.forEach((r, rI) => {
-                    var wellCoordinates = new WellCoordinates(cI, rI);
-                    var annotations = wellAnnotations.annotationsAt(plate, wellCoordinates);
-
-                    _.keys(annotations).forEach(cat => annotations[cat].forEach(tag => {
-                        if (cat in selections && tag in selections[cat])
-                            selections[cat][tag].wells.push(wellCoordinates);
-                    }));
-                })
-        );*/
-    }
+    }*/
 }
 
 export class FeatureHistograms {
