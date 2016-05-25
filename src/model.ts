@@ -13,7 +13,7 @@ import controller = require('./core/graphics/controller');
 import math = require('./core/math');
 
 // The view columns and their ordering.
-export var viewCycle = ['datasets', 'plates', 'well', 'exemplars', 'features'];
+export var viewCycle = ['datasets', 'plates', 'wells', 'exemplars', 'features'];
 
 export class InteractionState {
     constructor(public populationSpace: PopulationSpace = null,
@@ -93,7 +93,7 @@ export class EnrichedState extends InteractionState {
             ((cfg.splomTotalSize - Math.max(0, this.populationSpace.features.length - 2) * cfg.splomSpace) /
             Math.max(2, this.populationSpace.features.length)) - cfg.splomSpace
         );
-        objectHistogramDict['bins'] = this.objectHistogramSize; //state.configuration.splomInnerSize;
+        objectHistogramDict['bins'] = this.objectHistogramSize;
 
         var histogramDict = this.populationSpace.toDict();
         histogramDict['dataSet'] = dataSet;

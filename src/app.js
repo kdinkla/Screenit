@@ -1,5 +1,5 @@
 ///<reference path="references.d.ts"/>
-define(["require", "exports", 'bacon', './model', './core/dataprovider', './overview'], function (require, exports, bacon, model_1, dataprovider_1, overview_1) {
+define(["require", "exports", 'bacon', './model', './core/dataprovider', './visualization/overview'], function (require, exports, bacon, model_1, dataprovider_1, overview_1) {
     "use strict";
     // URL to the REST API.
     var serverPath = "server";

@@ -4,7 +4,6 @@ import _ = require('lodash');
 
 import { LabelStyle } from './core/graphics/snippet';
 import { Color, Font } from './core/graphics/style';
-import { Vector } from './core/math';
 import { heatedObjectMap } from './core/graphics/colormap';
 
 export class BaseConfiguration {
@@ -144,7 +143,7 @@ export class BaseConfiguration {
     wellViewMaxObjectRadius = 50;
 }
 
-export class NumberTableConfiguration {
+/*export class NumberTableConfiguration {
     cellOuterDimensions: number[];
 
     constructor(public font: Font = new Font(12),
@@ -155,4 +154,4 @@ export class NumberTableConfiguration {
                 public visibleHeader: boolean = true) {
         this.cellOuterDimensions = Vector.add(cellDimensions, cellSpace);
     }
-}
+}*/

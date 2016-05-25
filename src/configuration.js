@@ -1,5 +1,5 @@
 ///<reference path="references.d.ts"/>
-define(["require", "exports", './core/graphics/snippet', './core/graphics/style', './core/math', './core/graphics/colormap'], function (require, exports, snippet_1, style_1, math_1, colormap_1) {
+define(["require", "exports", './core/graphics/snippet', './core/graphics/style', './core/graphics/colormap'], function (require, exports, snippet_1, style_1, colormap_1) {
     "use strict";
     var BaseConfiguration = (function () {
         function BaseConfiguration() {
@@ -122,24 +122,17 @@ define(["require", "exports", './core/graphics/snippet', './core/graphics/style'
         return BaseConfiguration;
     }());
     exports.BaseConfiguration = BaseConfiguration;
-    var NumberTableConfiguration = (function () {
-        function NumberTableConfiguration(font, fontColor, cellDimensions, cellSpace, visibleIndex, visibleHeader) {
-            if (font === void 0) { font = new style_1.Font(12); }
-            if (fontColor === void 0) { fontColor = style_1.Color.BLACK; }
-            if (cellDimensions === void 0) { cellDimensions = [40, 14]; }
-            if (cellSpace === void 0) { cellSpace = [2, 2]; }
-            if (visibleIndex === void 0) { visibleIndex = true; }
-            if (visibleHeader === void 0) { visibleHeader = true; }
-            this.font = font;
-            this.fontColor = fontColor;
-            this.cellDimensions = cellDimensions;
-            this.cellSpace = cellSpace;
-            this.visibleIndex = visibleIndex;
-            this.visibleHeader = visibleHeader;
-            this.cellOuterDimensions = math_1.Vector.add(cellDimensions, cellSpace);
-        }
-        return NumberTableConfiguration;
-    }());
-    exports.NumberTableConfiguration = NumberTableConfiguration;
 });
+/*export class NumberTableConfiguration {
+    cellOuterDimensions: number[];
+
+    constructor(public font: Font = new Font(12),
+                public fontColor: Color = Color.BLACK,
+                public cellDimensions: number[] = [40, 14],
+                public cellSpace: number[] = [2, 2],
+                public visibleIndex: boolean = true,
+                public visibleHeader: boolean = true) {
+        this.cellOuterDimensions = Vector.add(cellDimensions, cellSpace);
+    }
+}*/ 
 //# sourceMappingURL=configuration.js.map

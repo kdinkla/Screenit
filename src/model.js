@@ -7,7 +7,7 @@ var __extends = (this && this.__extends) || function (d, b) {
 define(["require", "exports", './core/math', './core/graphics/style', './core/collection', './core/dataframe', './core/dataprovider', './configuration', './core/collection', './core/math'], function (require, exports, math_1, style_1, collection_1, dataframe_1, dataprovider_1, configuration_1, collection_2, math) {
     "use strict";
     // The view columns and their ordering.
-    exports.viewCycle = ['datasets', 'plates', 'well', 'exemplars', 'features'];
+    exports.viewCycle = ['datasets', 'plates', 'wells', 'exemplars', 'features'];
     var InteractionState = (function () {
         function InteractionState(populationSpace, selectedCoordinates, openViews, configuration) {
             if (populationSpace === void 0) { populationSpace = null; }
@@ -63,7 +63,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             objectHistogramDict['dataSet'] = dataSet;
             this.objectHistogramSize = Math.floor(((cfg.splomTotalSize - Math.max(0, this.populationSpace.features.length - 2) * cfg.splomSpace) /
                 Math.max(2, this.populationSpace.features.length)) - cfg.splomSpace);
-            objectHistogramDict['bins'] = this.objectHistogramSize; //state.configuration.splomInnerSize;
+            objectHistogramDict['bins'] = this.objectHistogramSize;
             var histogramDict = this.populationSpace.toDict();
             histogramDict['dataSet'] = dataSet;
             histogramDict['bins'] = state.configuration.splomInnerSize;

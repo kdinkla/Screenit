@@ -5,7 +5,7 @@ import _ = require('lodash');
 
 import { InteractionState, EnrichedState } from './model';
 import { ProxyService } from './core/dataprovider';
-import { OverView } from './overview';
+import { OverView } from './visualization/overview';
 
 // URL to the REST API.
 var serverPath = "server";
