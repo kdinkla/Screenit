@@ -2,16 +2,6 @@
 /// <reference path="collection.ts" />
 define(["require", "exports", 'lodash'], function (require, exports, _) {
     "use strict";
-    // Array statistics and vector extensions.
-    /*var protoArray = <any> Array.prototype;
-    protoArray.statistics = () => new ArrayStatistics(this);
-    
-    export class ArrayStatistics {
-        constructor(public values: number[]) {
-            console.log("Array statistics values:");
-            console.log(values);
-        }
-    }*/
     // Vector math functions.
     // Assumes all operations are applied to number array of equal size.
     var Vector = (function () {

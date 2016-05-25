@@ -8,7 +8,7 @@ define(["require", "exports", '../model', '../core/graphics/snippet', '../core/g
     var ExemplarTable = (function (_super) {
         __extends(ExemplarTable, _super);
         function ExemplarTable(state) {
-            _super.call(this, "ExemplarStack", [0, 0]);
+            _super.call(this, "ExemplarStack");
             this.state = state;
             var cfg = state.configuration;
             var visiblePopulations = this.state.populationSpace.visiblePopulations().elements;

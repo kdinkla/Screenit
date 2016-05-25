@@ -1,5 +1,3 @@
-///<reference path="references.d.ts"/>
-
 import _ = require('lodash');
 
 import { LabelStyle } from './core/graphics/snippet';
@@ -10,23 +8,25 @@ export class BaseConfiguration {
     backgroundColor = Color.WHITE;
     font = new Font(16, 200);
     sideFont = new Font(10);
+    bigFont = new Font(34);
 
     // User adjustable options.
     imageType: string = null;                  // The type of image to present.
     imagePopulationOverlay: string = "None";   // Whether to show an image population overlay;
 
     // Default palette.
-    base = Color.grey(75);
-    baseEmphasis = Color.BLACK;
-    baseMuted = Color.grey(140);
-    baseDim = Color.grey(200);
-    baseVeryDim = Color.grey(225);
-    baseSelected = new Color(25, 50, 255);
-    lightSelected = new Color(240, 240, 255);
-    highlight = Color.grey(50);     // Focused highlight color.
-    highlightTrans = Color.grey(50, 0.75);
+    base            = Color.grey(75);
+    baseEmphasis    = Color.BLACK;
+    baseMuted       = Color.grey(140);
+    baseDim         = Color.grey(200);
+    baseVeryDim     = Color.grey(225);
+    baseSelected    = new Color(25, 50, 255);
+    lightSelected   = new Color(240, 240, 255);
+    highlight       = Color.grey(50);            // Focused highlight color.
+    //highlightTrans  = Color.grey(50, 0.75);      // Transparent variant of highlight.
 
     // Panel configuration.
+    windowMargin = 5;
     panelSpace = 20;
     subPanelSpace = 10;
     panelHeaderFont = new Font(16);
@@ -38,47 +38,36 @@ export class BaseConfiguration {
     sideLabel = new LabelStyle(this.sideFont, this.baseMuted, 'left', 'top');
     selectedSideLabel = new LabelStyle(this.sideFont, this.baseSelected, 'left', 'top');
 
-    // Guide labels.
-    guideStyle = new LabelStyle(new Font(12, 180), Color.CRIMSON, 'left', 'top');
-    bigGuideStyle = new LabelStyle(new Font(32, 180), Color.CRIMSON, 'left', 'top');
-    guideArrowLength = 5;
-    guideVisible = false;
-
     // Scatter plots.
-    minDotSize = 1;
-    maxDotSize = 3;
+    //minDotSize = 1;
+    //maxDotSize = 3;
 
     // Cluster view.
-    windowMargin = 5;
-    scatterPlotFont = new Font(6);
-    featureSpace = 80;
-    clusterSpace = 40;
-    tableSideMargin = 60;
-    featureMargin = 20;
-    binMargin = 5;
-    controlShareHeight = 20;
+    //scatterPlotFont = new Font(6);
+    //featureSpace = 80;
+    //clusterSpace = 40;
+    //tableSideMargin = 60;
+    //featureMargin = 20;
+    //binMargin = 5;
+    //controlShareHeight = 20;
 
     // Splom view.
-    splomColor = new Color(247, 247, 247);
+    //splomColor = new Color(247, 247, 247);
 
     splomInnerSize = 90;
     splomSpace = 2;
-    splomSize = this.splomInnerSize + this.splomSpace;
     splomTotalSize = 400;
-    splomClusterRadius = 3;
-    splomDotRadius = 1;
-    splomDotDensityColor = Color.grey(0, 0.2);
+    //splomDotDensityColor = Color.grey(0, 0.2);
     splomRepresentativeOuterDotRadius = 3;
     splomRepresentativeInnerDotRadius = 2;
-    scatterPlotSize = this.splomSize + this.splomInnerSize;
 
     // Cluster list.
     clusterTileSpace = 5;
     clusterTileInnerSize = 0.5 * (this.splomInnerSize - this.clusterTileSpace);
     clusterTileSize = this.clusterTileInnerSize + this.clusterTileSpace;
-    clusterPlateDotRadius = 1.5;
-    clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
-    clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
+    //clusterPlateDotRadius = 1.5;
+    //clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
+    //clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
     clusterAdditionLabel = new Font(34);
     exemplarSpace = 2;
     exemplarColumnSpace = 2 * this.exemplarSpace;
@@ -110,7 +99,7 @@ export class BaseConfiguration {
     miniHeatColumnMax = 12;
     miniHeatColumnCount = 5;
     largeHeatMultiplier = 3;
-    heatmapFont = new Font(6);
+    heatMapFont = new Font(6);
 
     // Plate view.
     wellDiameter = this.miniHeatWellDiameter * this.largeHeatMultiplier;
@@ -142,16 +131,3 @@ export class BaseConfiguration {
     objectViewImageRadius = 40;
     wellViewMaxObjectRadius = 50;
 }
-
-/*export class NumberTableConfiguration {
-    cellOuterDimensions: number[];
-
-    constructor(public font: Font = new Font(12),
-                public fontColor: Color = Color.BLACK,
-                public cellDimensions: number[] = [40, 14],
-                public cellSpace: number[] = [2, 2],
-                public visibleIndex: boolean = true,
-                public visibleHeader: boolean = true) {
-        this.cellOuterDimensions = Vector.add(cellDimensions, cellSpace);
-    }
-}*/

@@ -1,5 +1,3 @@
-/// <reference path="../references.d.ts"/>
-
 import jsts = require('jsts');
 
 import { EnrichedState, viewCycle } from '../model';
@@ -11,20 +9,7 @@ import { PlateIndex } from './plates';
 import { WellView } from './wells';
 import { FeatureHistogramTable } from './features';
 import { ExemplarTable } from './exemplars';
-
-import { StringMap } from '../core/collection';
 import { Color } from '../core/graphics/style';
-
-// View identifiers and their constructors.
-var viewConstructors: () => StringMap<any> = () => {
-    return {
-        'datasets':   DataSetList,
-        'plates':     PlateIndex,
-        'wells':       WellView,
-        'exemplars':  ExemplarTable,
-        'features':   FeatureHistogramTable
-    };
-};
 
 export class OverView extends View<EnrichedState> {
     panelColumns: List<PlacedSnippet>;
@@ -35,11 +20,17 @@ export class OverView extends View<EnrichedState> {
 
     updateScene(state: EnrichedState) {
         var cfg = state.configuration;
-        var constructors = viewConstructors();  // All panel constructors.
+        var columnConstructors = {
+            'datasets':     DataSetList,
+            'plates':       PlateIndex,
+            'wells':        WellView,
+            'exemplars':    ExemplarTable,
+            'features':     FeatureHistogramTable
+        };
 
         // Active panels.
         var openPanels = viewCycle.map(ov =>
-            new ColumnPanel(ov, new constructors[ov](state), state, state.openViews.has(ov)));
+            new ColumnPanel(ov, new columnConstructors[ov](state), state, state.openViews.has(ov)));
         this.panelColumns = new List("pnlCols", openPanels, [0,0], [0,0], 'horizontal', cfg.panelSpace, 'left');
 
         //console.log("State:");
@@ -48,8 +39,6 @@ export class OverView extends View<EnrichedState> {
 
     paint(c: ViewContext, state: EnrichedState) {
         var cfg = state.configuration;
-
-        c.translate([.5, .5]);
 
         // Center panels.
         this.panelColumns.setTopLeft([
@@ -66,7 +55,7 @@ export class OverView extends View<EnrichedState> {
 
         c.strokeStyle(isLoading ? cfg.backgroundColor : Color.NONE);
         c.lineWidth(3);
-        c.font(cfg.bigGuideStyle.font.toString());
+        c.font(cfg.bigFont.toString());
         c.textBaseline('bottom');
         c.textAlign('left');
 
@@ -77,7 +66,7 @@ export class OverView extends View<EnrichedState> {
         c.transitioning = true;
 
         // Show computation text.
-        c.fillStyle(isLoading ? cfg.baseEmphasis : Color.NONE);
+        c.fillStyle(isLoading ? cfg.base : Color.NONE);
         c.strokeText(compTxt);
         c.fillText(compTxt);
 

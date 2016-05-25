@@ -436,7 +436,7 @@ define(["require", "exports", '../model', '../core/graphics/snippet', './configu
             var object = enriched.closestWellObject(coordinates);
             interaction.selectedCoordinates.switchObject(object);
             enriched.conformSelectedCoordinates(interaction);
-            interaction.pushView('well');
+            interaction.pushView('wells');
         };
         return WellDetailView;
     }(snippet_1.PlacedSnippet));

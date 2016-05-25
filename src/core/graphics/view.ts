@@ -1,8 +1,4 @@
-﻿/// <reference path='../collection.ts' />
-/// <reference path='../math.ts' />
-/// <reference path='style.ts' />
-
-import _ = require('lodash');
+﻿import _ = require('lodash');
 
 import bacon = require('bacon');
 import EventStream = bacon.EventStream;
@@ -52,7 +48,6 @@ export class View<M> {
         this.resizeBus = new Bacon.Bus<ViewResizeEvent>();
         this.resize = this.resizeBus.skipDuplicates(_.isEqual);
         window.addEventListener("resize", () => this.resizeBus.push(new ViewResizeEvent(this.dimensions())));
-        this.resize.onValue(dim => console.log("Resize dimensions: " + dim));
 
         // Update mouse hits.
         var jqCanvas = $(this.canvas);

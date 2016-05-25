@@ -1,3 +1,5 @@
+import jsts = require('jsts');
+
 import { InteractionState, EnrichedState, WellCoordinates, WellSelection } from '../model';
 import { PlacedSnippet, List, Label, LabelStyle } from '../core/graphics/snippet';
 import { View, ViewMouseEvent, ViewContext } from '../core/graphics/view';

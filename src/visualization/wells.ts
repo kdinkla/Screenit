@@ -604,7 +604,7 @@ class WellDetailView extends PlacedSnippet {
         interaction.selectedCoordinates.switchObject(object);
         enriched.conformSelectedCoordinates(interaction);
 
-        interaction.pushView('well');
+        interaction.pushView('wells');
     }
 }
 

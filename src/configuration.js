@@ -1,4 +1,3 @@
-///<reference path="references.d.ts"/>
 define(["require", "exports", './core/graphics/snippet', './core/graphics/style', './core/graphics/colormap'], function (require, exports, snippet_1, style_1, colormap_1) {
     "use strict";
     var BaseConfiguration = (function () {
@@ -6,6 +5,7 @@ define(["require", "exports", './core/graphics/snippet', './core/graphics/style'
             this.backgroundColor = style_1.Color.WHITE;
             this.font = new style_1.Font(16, 200);
             this.sideFont = new style_1.Font(10);
+            this.bigFont = new style_1.Font(34);
             // User adjustable options.
             this.imageType = null; // The type of image to present.
             this.imagePopulationOverlay = "None"; // Whether to show an image population overlay;
@@ -18,8 +18,9 @@ define(["require", "exports", './core/graphics/snippet', './core/graphics/style'
             this.baseSelected = new style_1.Color(25, 50, 255);
             this.lightSelected = new style_1.Color(240, 240, 255);
             this.highlight = style_1.Color.grey(50); // Focused highlight color.
-            this.highlightTrans = style_1.Color.grey(50, 0.75);
+            //highlightTrans  = Color.grey(50, 0.75);      // Transparent variant of highlight.
             // Panel configuration.
+            this.windowMargin = 5;
             this.panelSpace = 20;
             this.subPanelSpace = 10;
             this.panelHeaderFont = new style_1.Font(16);
@@ -30,42 +31,32 @@ define(["require", "exports", './core/graphics/snippet', './core/graphics/style'
             this.subPanelHeaderLabel = new snippet_1.LabelStyle(new style_1.Font(14), this.base, 'left', 'top');
             this.sideLabel = new snippet_1.LabelStyle(this.sideFont, this.baseMuted, 'left', 'top');
             this.selectedSideLabel = new snippet_1.LabelStyle(this.sideFont, this.baseSelected, 'left', 'top');
-            // Guide labels.
-            this.guideStyle = new snippet_1.LabelStyle(new style_1.Font(12, 180), style_1.Color.CRIMSON, 'left', 'top');
-            this.bigGuideStyle = new snippet_1.LabelStyle(new style_1.Font(32, 180), style_1.Color.CRIMSON, 'left', 'top');
-            this.guideArrowLength = 5;
-            this.guideVisible = false;
             // Scatter plots.
-            this.minDotSize = 1;
-            this.maxDotSize = 3;
+            //minDotSize = 1;
+            //maxDotSize = 3;
             // Cluster view.
-            this.windowMargin = 5;
-            this.scatterPlotFont = new style_1.Font(6);
-            this.featureSpace = 80;
-            this.clusterSpace = 40;
-            this.tableSideMargin = 60;
-            this.featureMargin = 20;
-            this.binMargin = 5;
-            this.controlShareHeight = 20;
+            //scatterPlotFont = new Font(6);
+            //featureSpace = 80;
+            //clusterSpace = 40;
+            //tableSideMargin = 60;
+            //featureMargin = 20;
+            //binMargin = 5;
+            //controlShareHeight = 20;
             // Splom view.
-            this.splomColor = new style_1.Color(247, 247, 247);
+            //splomColor = new Color(247, 247, 247);
             this.splomInnerSize = 90;
             this.splomSpace = 2;
-            this.splomSize = this.splomInnerSize + this.splomSpace;
             this.splomTotalSize = 400;
-            this.splomClusterRadius = 3;
-            this.splomDotRadius = 1;
-            this.splomDotDensityColor = style_1.Color.grey(0, 0.2);
+            //splomDotDensityColor = Color.grey(0, 0.2);
             this.splomRepresentativeOuterDotRadius = 3;
             this.splomRepresentativeInnerDotRadius = 2;
-            this.scatterPlotSize = this.splomSize + this.splomInnerSize;
             // Cluster list.
             this.clusterTileSpace = 5;
             this.clusterTileInnerSize = 0.5 * (this.splomInnerSize - this.clusterTileSpace);
             this.clusterTileSize = this.clusterTileInnerSize + this.clusterTileSpace;
-            this.clusterPlateDotRadius = 1.5;
-            this.clusterLabel = new snippet_1.LabelStyle(this.sideFont, this.baseDim);
-            this.clusterSelectedLabel = new snippet_1.LabelStyle(this.sideFont, this.baseEmphasis);
+            //clusterPlateDotRadius = 1.5;
+            //clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
+            //clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
             this.clusterAdditionLabel = new style_1.Font(34);
             this.exemplarSpace = 2;
             this.exemplarColumnSpace = 2 * this.exemplarSpace;
@@ -88,7 +79,7 @@ define(["require", "exports", './core/graphics/snippet', './core/graphics/style'
             this.miniHeatColumnMax = 12;
             this.miniHeatColumnCount = 5;
             this.largeHeatMultiplier = 3;
-            this.heatmapFont = new style_1.Font(6);
+            this.heatMapFont = new style_1.Font(6);
             // Plate view.
             this.wellDiameter = this.miniHeatWellDiameter * this.largeHeatMultiplier;
             this.wellRadius = .5 * this.wellDiameter;
@@ -123,16 +114,4 @@ define(["require", "exports", './core/graphics/snippet', './core/graphics/style'
     }());
     exports.BaseConfiguration = BaseConfiguration;
 });
-/*export class NumberTableConfiguration {
-    cellOuterDimensions: number[];
-
-    constructor(public font: Font = new Font(12),
-                public fontColor: Color = Color.BLACK,
-                public cellDimensions: number[] = [40, 14],
-                public cellSpace: number[] = [2, 2],
-                public visibleIndex: boolean = true,
-                public visibleHeader: boolean = true) {
-        this.cellOuterDimensions = Vector.add(cellDimensions, cellSpace);
-    }
-}*/ 
 //# sourceMappingURL=configuration.js.map

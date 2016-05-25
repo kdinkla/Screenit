@@ -3,7 +3,7 @@ var __extends = (this && this.__extends) || function (d, b) {
     function __() { this.constructor = d; }
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
-define(["require", "exports", '../model', '../core/graphics/snippet', '../core/graphics/view', '../configuration', '../core/graphics/style', '../core/math'], function (require, exports, model_1, snippet_1, view_1, configuration_1, style_1, math_1) {
+define(["require", "exports", 'jsts', '../model', '../core/graphics/snippet', '../core/graphics/view', '../configuration', '../core/graphics/style', '../core/math'], function (require, exports, jsts, model_1, snippet_1, view_1, configuration_1, style_1, math_1) {
     "use strict";
     var PlateIndex = (function (_super) {
         __extends(PlateIndex, _super);

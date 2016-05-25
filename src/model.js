@@ -1,4 +1,3 @@
-/// <reference path="references.d.ts"/>
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -672,7 +671,6 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
     exports.WellClusterShares = WellClusterShares;
     var WellAnnotations = (function (_super) {
         __extends(WellAnnotations, _super);
-        //plateTags: Chain<string>[];
         function WellAnnotations(dictionary) {
             if (dictionary === void 0) { dictionary = {}; }
             _super.call(this, dictionary);

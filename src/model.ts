@@ -1,5 +1,3 @@
-/// <reference path="references.d.ts"/>
-
 import bacon = require('bacon');
 
 import { Vector } from './core/math';
@@ -123,7 +121,12 @@ export class EnrichedState extends InteractionState {
         this.dataSetInfo = new ProxyValue(
             "dataSetInfo",
             {dataSet: dataSet},
-            new DataSetInfo(), ds => new DataSetInfo(ds.plateLabels, ds.columnLabels, ds.rowLabels, ds.wellTypes, ds.imageDimensions)
+            new DataSetInfo(), ds => new DataSetInfo(
+                                            ds.plateLabels,
+                                            ds.columnLabels,
+                                            ds.rowLabels,
+                                            ds.wellTypes,
+                                            ds.imageDimensions)
         );
         this.wellAnnotations = new ProxyValue(
             "wellAnnotations",
@@ -762,10 +765,13 @@ export class WellClusterShares extends NumberFrame {
     maxObjectCount: number;         // Maximum number of objects for all wells.
     maxPlateObjectCount: number[];  // Maximum number of objects per plate.
 
-    shareStatistics: { mean: number; standardDeviation: number }[];   // Share mean and standard deviation per population.
-    zScores: number[][][][];    // z-scores of all wells, indexed by population, plate, column, and row.
-    zScoresMin: number[];       // z-score minimum across all wells, indexed by population.
-    zScoresMax: number[];       // z-score maximum across all wells, indexed by population.
+    shareStatistics: {
+        mean: number;
+        standardDeviation: number
+    }[];                            // Share mean and standard deviation per population.
+    zScores: number[][][][];        // z-scores of all wells, indexed by population, plate, column, and row.
+    zScoresMin: number[];           // z-score minimum across all wells, indexed by population.
+    zScoresMax: number[];           // z-score maximum across all wells, indexed by population.
 
     constructor(dictionary: any = {}) {
         super(dictionary);
@@ -835,8 +841,6 @@ export class WellClusterShares extends NumberFrame {
 export class WellAnnotations extends DataFrame<string[]> {
     static ANNOTATION_SPLIT = "|";
 
-    //plateTags: Chain<string>[];
-
     constructor(dictionary: any = {}) {
         super(dictionary);
     }
@@ -848,30 +852,6 @@ export class WellAnnotations extends DataFrame<string[]> {
         if(rowIndex >= 0) this.columns.forEach(c => dict[c] = this.matrix[this.columnIndex[c]][rowIndex]);
         return dict;
     }
-
-    /*private computePlateAnnotations() {
-        this.plateTags = [];
-
-        // Accumulate plate annotations by scanning all rows.
-        this.rows.forEach((row) => {
-            var parts = row.split('_');
-            var plate = Number(parts[0]);
-
-            // Create plate selection array.
-            if(!(plate in this.plateTags)) this.plateTags[plate] = new Chain<string>();
-
-            // Columns are annotation categories.
-            this.columns.forEach(column => {
-                var tags = this.cell(column, row);
-                this.plateTags[plate] = this.plateTags[plate].pushAll(tags);
-            });
-        });
-
-        // Sort tags, in place.
-        this.plateTags.forEach(ts => ts.elements.sort());
-
-        return this.plateTags;
-    }*/
 }
 
 export class FeatureHistograms {
@@ -885,7 +865,8 @@ export class FeatureHistograms {
 
 // Wells by column and row coordinates.
 export class WellCoordinates {
-    constructor(public column: number = null, public row: number = null) {}
+    constructor(public column: number = null,
+                public row: number = null) {}
 
     static fromJSON(data: {}) {
         return new WellCoordinates(data['column'], data['row']);
@@ -963,6 +944,7 @@ export class WellSelection {
 
 export class HistogramMatrix {
     matrices: StringMap<StringMap<number[][][]>>;   // Histogram per feature pair, per cluster
+
     constructor(matrixMap: {} = {}) {
         this.matrices = <any>matrixMap;
     }

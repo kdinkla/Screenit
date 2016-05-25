@@ -8,7 +8,7 @@ export class ExemplarTable extends PlacedSnippet {
     segments: List<PlacedSnippet>;
 
     constructor(public state: EnrichedState) {
-        super("ExemplarStack", [0,0]);
+        super("ExemplarStack");
 
         var cfg = state.configuration;
         var visiblePopulations = this.state.populationSpace.visiblePopulations().elements;

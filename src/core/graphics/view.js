@@ -1,6 +1,3 @@
-/// <reference path='../collection.ts' />
-/// <reference path='../math.ts' />
-/// <reference path='style.ts' />
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -29,7 +26,6 @@ define(["require", "exports", 'lodash', '../collection', '../math'], function (r
             this.resizeBus = new Bacon.Bus();
             this.resize = this.resizeBus.skipDuplicates(_.isEqual);
             window.addEventListener("resize", function () { return _this.resizeBus.push(new ViewResizeEvent(_this.dimensions())); });
-            this.resize.onValue(function (dim) { return console.log("Resize dimensions: " + dim); });
             // Update mouse hits.
             var jqCanvas = $(this.canvas);
             jqCanvas.mousemove(function (me) {

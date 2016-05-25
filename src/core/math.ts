@@ -3,25 +3,10 @@
 
 import _ = require('lodash');
 
-import collections = require('./collection');
-import Chain = collections.Chain;
-import indexMap = collections.indexMap;
-import swap = collections.swap;
-
-// Array statistics and vector extensions.
-/*var protoArray = <any> Array.prototype;
-protoArray.statistics = () => new ArrayStatistics(this);
-
-export class ArrayStatistics {
-    constructor(public values: number[]) {
-        console.log("Array statistics values:");
-        console.log(values);
-    }
-}*/
-
 // Vector math functions.
 // Assumes all operations are applied to number array of equal size.
 export class Vector {
+    
     // Create a (generic) vector of the given size, filled with the given value.
     static create<E>(size: number, fill: E = null): E[] {
         var result: E[] = [];
@@ -286,14 +271,6 @@ export class Matrix {
         return transposed;
     }
 }
-
-// Range of numbers.
-/*export class Range {
-    constructor(public begin: number,
-                public end: number) {
-
-    }
-}*/
 
 // Positioned object.
 export interface Positioned {
