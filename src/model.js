@@ -49,7 +49,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
         __extends(EnrichedState, _super);
         function EnrichedState(state) {
             _super.call(this, state.populationSpace, state.selectedCoordinates, state.openViews, state.configuration);
-            // Well scores, by population activation functions.
+            // Well scores as sum of population activation functions. Indexed by plate, column, and row.
             this.wellScs = null;
             // Ranking of wells, by score. Selected wells are prioritized in ordering.
             this.rnkWls = null;

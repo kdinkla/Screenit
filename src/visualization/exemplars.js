@@ -57,8 +57,8 @@ define(["require", "exports", '../model', '../core/graphics/snippet', '../core/g
             this.object = object;
             this.population = population;
             this.state = state;
-            this.labelStyle = new snippet_1.LabelStyle(state.configuration.clusterAdditionLabel, state.populationColor(population));
             var cfg = state.configuration;
+            this.labelStyle = new snippet_1.LabelStyle(state.configuration.bigFont, state.populationColor(population));
             this.setDimensions([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize]);
         }
         ExemplarAdditionButton.prototype.paint = function (context) {

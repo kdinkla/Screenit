@@ -44,15 +44,6 @@ export class DataFrame<T> {
         return tr;
     }
 
-    // Apply function to all cells.
-    /*applyToCells(f: (n: T) => T): DataFrame<T> {
-        var tr = this.shallowClone();
-
-        tr.matrix = tr.matrix.map(c => c.map(f));
-
-        return tr;
-    }*/
-
     // Normalize along columns, or globally. Normalized map is [min, max] => [0,1] or [0, max] => [0,1].
     normalize(global: boolean = false, lowerBoundZero: boolean = false): DataFrame<number> {
         var tr: DataFrame<number> = <any> this.shallowClone();
@@ -162,14 +153,18 @@ export class NumberFrame extends DataFrame<number> {
             this.min = this.matrix.map(c => indMin);
             this.max = this.matrix.map(c => indMax);
         }
-        this.normalizedMatrix = this.matrix.map((c, cI) => c.map(r => (r - this.min[cI]) / ((this.max[cI] - this.min[cI]) || 1)));
-        this.zeroNormalizedMatrix = this.matrix.map((c, cI) => c.map(r => (r / this.max[cI]) || 1));
+        this.normalizedMatrix = this.matrix.map(
+            (c, cI) => c.map(r => (r - this.min[cI]) / ((this.max[cI] - this.min[cI]) || 1)));
+        this.zeroNormalizedMatrix = this.matrix.map(
+            (c, cI) => c.map(r => (r / this.max[cI]) || 1));
     }
 
+    // Get column by given name, normalized such that [min, max] is now [0, 1].
     normalizedColumnVector(name: string) {
         return this.normalizedMatrix[this.columnIndex[name]];
     }
 
+    // Get column by given name, normalized such that [0, max] is now [0, 1].
     zeroNormalizedColumnVector(name: string) {
         return this.zeroNormalizedMatrix[this.columnIndex[name]];
     }

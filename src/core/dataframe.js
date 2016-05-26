@@ -35,14 +35,6 @@ define(["require", "exports", './collection', './math'], function (require, expo
             tr.matrix = Matrix.transpose(tr.matrix);
             return tr;
         };
-        // Apply function to all cells.
-        /*applyToCells(f: (n: T) => T): DataFrame<T> {
-            var tr = this.shallowClone();
-    
-            tr.matrix = tr.matrix.map(c => c.map(f));
-    
-            return tr;
-        }*/
         // Normalize along columns, or globally. Normalized map is [min, max] => [0,1] or [0, max] => [0,1].
         DataFrame.prototype.normalize = function (global, lowerBoundZero) {
             if (global === void 0) { global = false; }
@@ -142,9 +134,11 @@ define(["require", "exports", './collection', './math'], function (require, expo
             this.normalizedMatrix = this.matrix.map(function (c, cI) { return c.map(function (r) { return (r - _this.min[cI]) / ((_this.max[cI] - _this.min[cI]) || 1); }); });
             this.zeroNormalizedMatrix = this.matrix.map(function (c, cI) { return c.map(function (r) { return (r / _this.max[cI]) || 1; }); });
         }
+        // Get column by given name, normalized such that [min, max] is now [0, 1].
         NumberFrame.prototype.normalizedColumnVector = function (name) {
             return this.normalizedMatrix[this.columnIndex[name]];
         };
+        // Get column by given name, normalized such that [0, max] is now [0, 1].
         NumberFrame.prototype.zeroNormalizedColumnVector = function (name) {
             return this.zeroNormalizedMatrix[this.columnIndex[name]];
         };

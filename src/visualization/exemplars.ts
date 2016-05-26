@@ -100,9 +100,8 @@ class ExemplarAdditionButton extends PlacedSnippet {
     constructor(public object, public population: Population, public state: EnrichedState) {
         super("ExemplarLabel_" + population, [0,0]);
 
-        this.labelStyle = new LabelStyle(state.configuration.clusterAdditionLabel, state.populationColor(population));
-
         var cfg = state.configuration;
+        this.labelStyle = new LabelStyle(state.configuration.bigFont, state.populationColor(population));
         this.setDimensions([cfg.clusterTileInnerSize, cfg.clusterTileInnerSize]);
     }
 

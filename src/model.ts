@@ -181,8 +181,8 @@ export class EnrichedState extends InteractionState {
                 var objNr = Number(obj);
                 return !(objInfo.cell("plate", obj) === this.selectedCoordinates.plate &&
                          objInfo.cell("column", obj) === this.selectedCoordinates.well.column &&
-                        objInfo.cell("row", obj) === this.selectedCoordinates.well.row) &&
-                        !this.allExemplars.has(Number(objNr));
+                         objInfo.cell("row", obj) === this.selectedCoordinates.well.row) &&
+                         !this.allExemplars.has(Number(objNr));
             });
 
             // Found a probe candidate.
@@ -377,7 +377,7 @@ export class EnrichedState extends InteractionState {
         return _.range(plateCount);
     }
 
-    // Well scores, by population activation functions.
+    // Well scores as sum of population activation functions. Indexed by plate, column, and row.
     private wellScs: number[][][] = null;
     wellScores(): number[][][] {
         if(!this.wellScs) {

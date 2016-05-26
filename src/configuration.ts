@@ -68,7 +68,7 @@ export class BaseConfiguration {
     //clusterPlateDotRadius = 1.5;
     //clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
     //clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
-    clusterAdditionLabel = new Font(34);
+    //clusterAdditionLabel = new Font(34);
     exemplarSpace = 2;
     exemplarColumnSpace = 2 * this.exemplarSpace;
 
@@ -76,41 +76,43 @@ export class BaseConfiguration {
     featureFont = new Font(10);
     featureCellSpace = [4, 2];
     featureCellDimensions = [this.splomInnerSize, this.featureFont.size];
-    featureSplit = 'joint';
+    //featureSplit = 'joint';
 
     // Transfer editor.
     transferPlotSize = this.clusterTileInnerSize;
     transferFont = new Font(8);
 
     // Plate index view.
-    plateWidth = 4;
-    plateIndexInnerHeight = 10;
-    plateIndexSpace = 5;
-    plateIndexMargin = 5;
+    //plateWidth = 4;
+    //plateIndexInnerHeight = 10;
+    //plateIndexSpace = 5;
+    //plateIndexMargin = 5;
 
     // Plate cluster shares.
     static voidColor = Color.NONE;
-    static shareColorMap = (normVal: number) => (normVal >= 0 ? heatedObjectMap[Math.ceil(255 * (1 - normVal))] :
-                                                BaseConfiguration.voidColor);
+    static shareColorMap = (normVal: number) =>
+        normVal >= 0 ?
+            heatedObjectMap[Math.ceil(255 * (1 - normVal))] :
+            BaseConfiguration.voidColor;
 
     // Plate mini heat map view.
     miniHeatWellDiameter = 2;
     miniHeatSpace = 2;
     miniHeatColumnMax = 12;
-    miniHeatColumnCount = 5;
+    //miniHeatColumnCount = 5;
     largeHeatMultiplier = 3;
-    heatMapFont = new Font(6);
+    //heatMapFont = new Font(6);
 
     // Plate view.
     wellDiameter = this.miniHeatWellDiameter * this.largeHeatMultiplier;
-    wellRadius = .5 * this.wellDiameter;
-    wellInnerRadius = this.wellRadius - 1;
+    //wellRadius = .5 * this.wellDiameter;
+    //wellInnerRadius = this.wellRadius - 1;
     plateColLabelMargin = 1;
     plateRowLabelMargin = 4;
 
     // Well list view.
     listWellsCount = 40;
-    listWellAbundanceWidth = 200;
+    //listWellAbundanceWidth = 200;
     listColumnSpace = 5;
     listWellLabel = this.sideLabel;
     listWellSpace = 2;

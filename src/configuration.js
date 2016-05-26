@@ -57,38 +57,33 @@ define(["require", "exports", './core/graphics/snippet', './core/graphics/style'
             //clusterPlateDotRadius = 1.5;
             //clusterLabel = new LabelStyle(this.sideFont, this.baseDim);
             //clusterSelectedLabel = new LabelStyle(this.sideFont, this.baseEmphasis);
-            this.clusterAdditionLabel = new style_1.Font(34);
+            //clusterAdditionLabel = new Font(34);
             this.exemplarSpace = 2;
             this.exemplarColumnSpace = 2 * this.exemplarSpace;
             // Features.
             this.featureFont = new style_1.Font(10);
             this.featureCellSpace = [4, 2];
             this.featureCellDimensions = [this.splomInnerSize, this.featureFont.size];
-            this.featureSplit = 'joint';
+            //featureSplit = 'joint';
             // Transfer editor.
             this.transferPlotSize = this.clusterTileInnerSize;
             this.transferFont = new style_1.Font(8);
-            // Plate index view.
-            this.plateWidth = 4;
-            this.plateIndexInnerHeight = 10;
-            this.plateIndexSpace = 5;
-            this.plateIndexMargin = 5;
             // Plate mini heat map view.
             this.miniHeatWellDiameter = 2;
             this.miniHeatSpace = 2;
             this.miniHeatColumnMax = 12;
-            this.miniHeatColumnCount = 5;
+            //miniHeatColumnCount = 5;
             this.largeHeatMultiplier = 3;
-            this.heatMapFont = new style_1.Font(6);
+            //heatMapFont = new Font(6);
             // Plate view.
             this.wellDiameter = this.miniHeatWellDiameter * this.largeHeatMultiplier;
-            this.wellRadius = .5 * this.wellDiameter;
-            this.wellInnerRadius = this.wellRadius - 1;
+            //wellRadius = .5 * this.wellDiameter;
+            //wellInnerRadius = this.wellRadius - 1;
             this.plateColLabelMargin = 1;
             this.plateRowLabelMargin = 4;
             // Well list view.
             this.listWellsCount = 40;
-            this.listWellAbundanceWidth = 200;
+            //listWellAbundanceWidth = 200;
             this.listColumnSpace = 5;
             this.listWellLabel = this.sideLabel;
             this.listWellSpace = 2;
@@ -106,10 +101,18 @@ define(["require", "exports", './core/graphics/snippet', './core/graphics/style'
             this.objectViewImageRadius = 40;
             this.wellViewMaxObjectRadius = 50;
         }
+        // Plate index view.
+        //plateWidth = 4;
+        //plateIndexInnerHeight = 10;
+        //plateIndexSpace = 5;
+        //plateIndexMargin = 5;
         // Plate cluster shares.
         BaseConfiguration.voidColor = style_1.Color.NONE;
-        BaseConfiguration.shareColorMap = function (normVal) { return (normVal >= 0 ? colormap_1.heatedObjectMap[Math.ceil(255 * (1 - normVal))] :
-            BaseConfiguration.voidColor); };
+        BaseConfiguration.shareColorMap = function (normVal) {
+            return normVal >= 0 ?
+                colormap_1.heatedObjectMap[Math.ceil(255 * (1 - normVal))] :
+                BaseConfiguration.voidColor;
+        };
         return BaseConfiguration;
     }());
     exports.BaseConfiguration = BaseConfiguration;
