@@ -5,6 +5,7 @@ import { Color } from '../core/graphics/style';
 import { BaseConfiguration } from '../configuration';
 import { Vector } from '../core/math';
 
+
 export class FeatureHistogramTable extends List<PlacedSnippet> {
     constructor(public state: EnrichedState) {
         super("ftrCols",
@@ -169,6 +170,13 @@ class FeatureParallelCoordinates extends PlacedSnippet {
             this.paintPolyLine(context, focusedObject.toString(), cfg.baseSelected, 2);
         }
 
+        // Normalized pickable area.
+        context.picking = true;
+        context.scale(this.dimensions[0], this.dimensions[1]);
+        context.fillStyle(Color.NONE);
+        context.fillRect(0, 0, 1, 1);
+        context.picking = false;
+
         context.transitioning = true;
 
         context.restore();
@@ -194,6 +202,16 @@ class FeatureParallelCoordinates extends PlacedSnippet {
             });
             context.stroke();
         }
+    }
+
+    mouseClick(event: ViewMouseEvent, coordinates: number[], enriched: EnrichedState, interaction: InteractionState) {
+        // Determine feature from list.
+        var features = this.state.features.value;
+        var featureIndex = Math.round(coordinates[1] * (features.length - 1));
+        var feature = features[featureIndex];
+
+        // Select exemplar with closest feature value.
+        interaction.selectedCoordinates.object = enriched.closestFeatureObject(feature, coordinates[0]);
     }
 }
 

@@ -27,7 +27,6 @@ export class InteractionState {
         this.openViews = new Chain(['plates']);
         this.configuration = new BaseConfiguration();
         this.selectedCoordinates.dataSet = dataSet;
-
     }
 
     // Remove given exemplar from any population (should be a single population).
@@ -227,6 +226,7 @@ export class EnrichedState extends InteractionState {
         return result;
     }
 
+    // Object that is closest to given coordinates, in the image of the selected well.
     closestWellObject(coordinates: number[]): number {
         var bestIndex = -1;
 
@@ -245,6 +245,30 @@ export class EnrichedState extends InteractionState {
                     focusedWell.well && row[i] === focusedWell.well.row &&
                     col[i] === focusedWell.well.column) {
                     var csDist = Vector.distance(coordinates, [x[i], y[i]]);
+                    if (csDist < minDist) {
+                        minDist = csDist;
+                        bestIndex = i;
+                    }
+                }
+            }
+        }
+
+        return bestIndex >= 0 ? Number(tbl.rows[bestIndex]) : null;
+    }
+
+    // Object that is closest to given value of the given image feature.
+    closestFeatureObject(feature: string, value: number) {
+        var bestIndex = -1;
+
+        var tbl = this.objectFeatureValues.value;
+        if(tbl && value >= 0) {
+            var ftr = tbl.columnVector(feature);
+
+            var minDist = Number.MAX_VALUE;
+            for(var i = 0; i < tbl.rows.length; i++) {
+                if(this.allExemplars.has(i)) {
+                    var rowVal = ftr[i];
+                    var csDist = Math.abs(rowVal - value);
                     if (csDist < minDist) {
                         minDist = csDist;
                         bestIndex = i;

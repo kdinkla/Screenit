@@ -139,6 +139,7 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
             }
             return result;
         };
+        // Object that is closest to given coordinates, in the image of the selected well.
         EnrichedState.prototype.closestWellObject = function (coordinates) {
             var bestIndex = -1;
             var tbl = this.objectInfo.value;
@@ -155,6 +156,26 @@ define(["require", "exports", './core/math', './core/graphics/style', './core/co
                         focusedWell.well && row[i] === focusedWell.well.row &&
                         col[i] === focusedWell.well.column) {
                         var csDist = math_1.Vector.distance(coordinates, [x[i], y[i]]);
+                        if (csDist < minDist) {
+                            minDist = csDist;
+                            bestIndex = i;
+                        }
+                    }
+                }
+            }
+            return bestIndex >= 0 ? Number(tbl.rows[bestIndex]) : null;
+        };
+        // Object that is closest to given value of the given image feature.
+        EnrichedState.prototype.closestFeatureObject = function (feature, value) {
+            var bestIndex = -1;
+            var tbl = this.objectFeatureValues.value;
+            if (tbl && value >= 0) {
+                var ftr = tbl.columnVector(feature);
+                var minDist = Number.MAX_VALUE;
+                for (var i = 0; i < tbl.rows.length; i++) {
+                    if (this.allExemplars.has(i)) {
+                        var rowVal = ftr[i];
+                        var csDist = Math.abs(rowVal - value);
                         if (csDist < minDist) {
                             minDist = csDist;
                             bestIndex = i;
