@@ -1,5 +1,5 @@
-# MPDA
-Multi-Parameter Data Analysis for High-throughput Screening - Visualization Prototype
+# Screenit
+A web-based tool that enables multi-parameter data analysis for high-throughput screening. Screenit was developed at the [Visual Computing Group](https://vcglab.org/screenit/)
 
 ## Installation
 Install the following software packages:
