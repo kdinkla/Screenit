@@ -54,7 +54,7 @@ Image feature data is stored as a NumPy array dump per image feature in __datase
 
 Well annotation data is stored as a tab-delimited file __dataset/DataSetName/wells.tab__. The file contains __plate   column  row__ columns to designate the well, and additional columns for annotations categories. A single well can be given multiple annotations of a single category by giving a list of annotations as __annotation1|annotation2|annotation3__.
 
-The example CellMorph data is 1.5GB and can be downloaded from Google Drive for now: https://drive.google.com/open?id=0B4zuo4p8QBcaSThHMm1jX2kwUkU
+The example CellMorph data is 1.5GB and can be downloaded from Google Drive for now: https://drive.google.com/file/d/0B4zuo4p8QBcaSThHMm1jX2kwUkU/view?usp=sharing&resourcekey=0-T3f0SyvEb-LBHokHrgF_0Q
 The __dataset/CellMorph__ directory already contains the __config.py__ file for CellMorph, which also contains explanatory comments per configuration option.
 
 The code for converting the CellMorph (per plate) tab-delimited files to NumPy columns can be found in __wrangle/numpyFill.py__.
